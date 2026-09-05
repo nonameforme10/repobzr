@@ -30,7 +30,7 @@
     }
   })();
 </script>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=4">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1087,17 +1087,6 @@
         </div>
       </div>
 
-      <!-- Admin Panel Navigation -->
-      <a href="admin.html" class="pos-admin-link" title="Open Admin Panel">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7"></rect>
-          <rect x="14" y="3" width="7" height="7"></rect>
-          <rect x="14" y="14" width="7" height="7"></rect>
-          <rect x="3" y="14" width="7" height="7"></rect>
-        </svg>
-        <span>Admin Panel</span>
-      </a>
-
       <!-- Sync Status Pill -->
       <div class="sync-pill online-synced" id="posSyncPill" title="POS Synchronization status">
         <span class="sync-dot"></span>
@@ -1672,7 +1661,7 @@ function renderGrid() {
         <div class="pos-empty-icon">📦</div>
         <div class="pos-empty-title">No products in catalog</div>
         <div class="pos-empty-sub">Create your first products in the Admin Panel to start selling.</div>
-        <a href="admin.html" class="pos-empty-btn">
+        <a href="https://admin.caretrack.website" target="_blank" rel="noopener" class="pos-empty-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
