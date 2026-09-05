@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#F4F1EA" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0F1411" media="(prefers-color-scheme: dark)">
+    <meta name="color-scheme" content="light dark">
+    <title>SalesTrack — Merchant Dashboard</title>
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem('salestrack-theme');
+                var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var theme = saved || (systemDark ? 'dark' : 'light');
+                document.documentElement.setAttribute('data-theme', theme);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="i18n.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18"/>
+                        <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
+                    </svg>
+                    <span data-i18n="brand.name">SalesTrack</span>
+                </div>
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-page="dashboard">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    <span data-i18n="nav.dashboard">Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-page="categories">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                    <span data-i18n="nav.categories">Categories</span>
+                </a>
+                <a href="#" class="nav-item" data-page="products">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    <span data-i18n="nav.products">Products</span>
+                </a>
+                <a href="#" class="nav-item" data-page="analytics">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                    <span data-i18n="nav.analytics">Analytics</span>
+                </a>
+                <a href="#" class="nav-item" data-page="activity">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span data-i18n="nav.activity">Activity Log</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn btn-outline btn-sm btn-block" id="resetDailyBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                    <span data-i18n="action.dailyReset">Daily Reset</span>
+                </button>
+                <button class="btn btn-outline btn-sm btn-block" id="exportBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span data-i18n="action.exportJson">Export JSON</span>
+                </button>
+                <button class="btn btn-outline btn-sm btn-block" id="importBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span data-i18n="action.importJson">Import JSON</span>
+                </button>
+                <input type="file" id="importFile" accept=".json" style="display:none">
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <div class="topbar-title" id="pageTitle" data-i18n="nav.dashboard">Dashboard</div>
+                <div class="topbar-actions">
+                    <div class="search-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="globalSearch" data-i18n-placeholder="topbar.searchPlaceholder" placeholder="Search products...">
+                    </div>
+
+                    <!-- Language switcher -->
+                    <div class="lang-switcher" id="langSwitcher">
+                        <button class="lang-toggle" id="langToggle" aria-label="Change language" data-i18n-title="topbar.language" title="Language" aria-haspopup="true" aria-expanded="false">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="2" y1="12" x2="22" y2="12"/>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                            <span class="lang-code" id="langCode">EN</span>
+                            <svg class="lang-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </button>
+                        <div class="lang-menu" id="langMenu" role="menu" hidden>
+                            <button class="lang-option" data-lang="en" role="menuitem">
+                                <span class="lang-name">English</span>
+                                <span class="lang-iso">EN</span>
+                            </button>
+                            <button class="lang-option" data-lang="ru" role="menuitem">
+                                <span class="lang-name">Русский</span>
+                                <span class="lang-iso">RU</span>
+                            </button>
+                            <button class="lang-option" data-lang="uz" role="menuitem">
+                                <span class="lang-name">Oʻzbekcha</span>
+                                <span class="lang-iso">UZ</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" data-i18n-title="topbar.toggleTheme" title="Toggle theme">
+                        <svg class="theme-icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="4"/>
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                        </svg>
+                        <svg class="theme-icon icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                        </svg>
+                    </button>
+
+                    <div class="date-display" id="currentDate"></div>
+                </div>
+            </header>
+
+            <!-- Content Container -->
+            <div class="content-scroll" id="contentArea">
+
+                <!-- DASHBOARD PAGE -->
+                <section class="page active" id="page-dashboard">
+                    <div class="stats-grid">
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-primary">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.soldToday">Products Sold Today</div>
+                                <div class="stat-value" id="dashSoldToday">0</div>
+                                <div class="stat-change positive" data-i18n="dash.liveTracking">Live tracking</div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-success">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.totalCategories">Total Categories</div>
+                                <div class="stat-value" id="dashTotalCategories">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-warning">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.bestCategory">Best Category</div>
+                                <div class="stat-value" id="dashBestCategory">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-revenue">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.totalRevenue">Total Revenue</div>
+                                <div class="stat-value" id="dashRevenue">0</div>
+                                <div class="currency-switcher" id="currencySwitcher" role="group" aria-label="Currency">
+                                    <button class="cs-btn active" type="button" data-code="UZS" aria-pressed="true">UZS</button>
+                                    <button class="cs-btn"        type="button" data-code="USD" aria-pressed="false">USD</button>
+                                    <button class="cs-btn"        type="button" data-code="EUR" aria-pressed="false">EUR</button>
+                                </div>
+                                <div class="rate-info" id="rateInfo" hidden></div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-info">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.totalProducts">Total Products</div>
+                                <div class="stat-value" id="dashTotalProducts">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FX converter widget (Google-style) -->
+                    <div class="fx-widget glass" id="fxWidget">
+                        <div class="fx-main">
+                            <div class="fx-rate-block">
+                                <div class="fx-rate-caption" id="fxCaption">1 United States Dollar equals</div>
+                                <div class="fx-rate-value"   id="fxRateValue">—</div>
+                                <div class="fx-rate-unit"    id="fxRateUnit">Uzbekistani Som</div>
+                                <div class="fx-rate-meta"    id="fxRateMeta"></div>
+                            </div>
+                            <div class="fx-converter">
+                                <div class="fx-row">
+                                    <input type="number" class="fx-input" id="fxAmountA" value="1" step="any" min="0" inputmode="decimal" aria-label="Amount from">
+                                    <select class="fx-select" id="fxCurrencyA" aria-label="Currency from">
+                                        <option value="USD">USD — US Dollar</option>
+                                        <option value="EUR">EUR — Euro</option>
+                                        <option value="UZS">UZS — Uzbekistani Som</option>
+                                    </select>
+                                </div>
+                                <div class="fx-equals" aria-hidden="true">=</div>
+                                <div class="fx-row">
+                                    <input type="number" class="fx-input" id="fxAmountB" value="0" step="any" min="0" inputmode="decimal" aria-label="Amount to">
+                                    <select class="fx-select" id="fxCurrencyB" aria-label="Currency to">
+                                        <option value="UZS">UZS — Uzbekistani Som</option>
+                                        <option value="USD">USD — US Dollar</option>
+                                        <option value="EUR">EUR — Euro</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="fx-chart-wrap">
+                            <div class="fx-chart-tabs" role="tablist">
+                                <button class="fx-tab"        type="button" data-range="7">1W</button>
+                                <button class="fx-tab active" type="button" data-range="30">1M</button>
+                                <button class="fx-tab"        type="button" data-range="90">3M</button>
+                            </div>
+                            <div class="fx-chart-body">
+                                <canvas id="fxChart"></canvas>
+                                <div class="fx-chart-empty" id="fxChartEmpty" hidden>
+                                    <span>Set <code>CBU_PROXY_URL</code> to load chart</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-charts">
+                        <div class="chart-card glass">
+                            <div class="chart-header">
+                                <h3 data-i18n="chart.categoryPerformance">Category Performance</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="dashCategoryChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card glass">
+                            <div class="chart-header">
+                                <h3 data-i18n="chart.dailyTrend">Daily Sales Trend</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="dashTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recent-activity glass">
+                        <div class="section-header">
+                            <h3 data-i18n="dash.recent">Recent Activity</h3>
+                            <a href="#" class="link" data-page="activity" data-i18n="dash.viewAll">View All</a>
+                        </div>
+                        <div class="activity-list" id="dashActivityList">
+                            <div class="empty-state" data-i18n="dash.noRecent">No recent activity</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CATEGORIES PAGE -->
+                <section class="page" id="page-categories">
+                    <div class="page-header">
+                        <h2 data-i18n="category.title">Categories</h2>
+                        <button class="btn btn-primary" id="addCategoryBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            <span data-i18n="category.add">Add Category</span>
+                        </button>
+                    </div>
+                    <div class="categories-grid" id="categoriesGrid">
+                        <div class="empty-state" data-i18n="category.empty">No categories yet. Create your first category!</div>
+                    </div>
+                </section>
+
+                <!-- PRODUCTS PAGE -->
+                <section class="page" id="page-products">
+                    <div class="page-header">
+                        <h2 data-i18n="product.title">Products</h2>
+                        <div class="page-actions">
+                            <select class="form-select" id="productCategoryFilter">
+                                <option value="" data-i18n="product.allCategories">All Categories</option>
+                            </select>
+                            <select class="form-select" id="productSort">
+                                <option value="name"  data-i18n="product.sortName">Sort by Name</option>
+                                <option value="sold"  data-i18n="product.sortSold">Sort by Sold</option>
+                                <option value="stock" data-i18n="product.sortStock">Sort by Stock</option>
+                                <option value="price" data-i18n="product.sortPrice">Sort by Price</option>
+                            </select>
+                            <button class="btn btn-primary" id="addProductBtn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                <span data-i18n="product.add">Add Product</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="products-grid" id="productsGrid">
+                        <div class="empty-state" data-i18n="product.empty">No products found.</div>
+                    </div>
+                </section>
+
+                <!-- ANALYTICS PAGE -->
+                <section class="page" id="page-analytics">
+                    <div class="page-header">
+                        <h2 data-i18n="analytics.title">Analytics &amp; Insights</h2>
+                    </div>
+                    <div class="analytics-grid">
+                        <div class="chart-card glass wide">
+                            <div class="chart-header">
+                                <h3 data-i18n="chart.categoryDistribution">Category Sales Distribution</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="analyticsPieChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card glass wide">
+                            <div class="chart-header">
+                                <h3 data-i18n="chart.productPerformance">Product Performance Comparison</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="analyticsBarChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card glass wide">
+                            <div class="chart-header">
+                                <h3 data-i18n="chart.salesTrend">Sales Trend Over Time</h3>
+                            </div>
+                            <div class="chart-body">
+                                <canvas id="analyticsLineChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="insights-panel glass">
+                        <h3 data-i18n="analytics.insights">Smart Insights</h3>
+                        <div class="insights-grid" id="insightsGrid">
+                            <div class="insight-card best">
+                                <div class="insight-title" data-i18n="analytics.topPerformer">Top Performer</div>
+                                <div class="insight-value" id="insightTopProduct">-</div>
+                            </div>
+                            <div class="insight-card worst">
+                                <div class="insight-title" data-i18n="analytics.needsAttention">Needs Attention</div>
+                                <div class="insight-value" id="insightLowProduct">-</div>
+                            </div>
+                            <div class="insight-card">
+                                <div class="insight-title" data-i18n="analytics.fastMoving">Fast Moving</div>
+                                <div class="insight-value" id="insightFastProduct">-</div>
+                            </div>
+                            <div class="insight-card">
+                                <div class="insight-title" data-i18n="analytics.slowMoving">Slow Moving</div>
+                                <div class="insight-value" id="insightSlowProduct">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ACTIVITY PAGE -->
+                <section class="page" id="page-activity">
+                    <div class="page-header">
+                        <h2 data-i18n="activity.title">Activity Log</h2>
+                        <button class="btn btn-danger" id="clearActivityBtn" data-i18n="activity.clearHistory">Clear History</button>
+                    </div>
+                    <div class="activity-filters">
+                        <select class="form-select" id="activityFilter">
+                            <option value=""       data-i18n="activity.filterAll">All Activities</option>
+                            <option value="sale"   data-i18n="activity.filterSale">Sales</option>
+                            <option value="return" data-i18n="activity.filterReturn">Returns</option>
+                            <option value="create" data-i18n="activity.filterCreate">Created</option>
+                            <option value="update" data-i18n="activity.filterUpdate">Updated</option>
+                            <option value="delete" data-i18n="activity.filterDelete">Deleted</option>
+                        </select>
+                    </div>
+                    <div class="activity-table-container glass">
+                        <table class="activity-table">
+                            <thead>
+                                <tr>
+                                    <th data-i18n="table.time">Time</th>
+                                    <th data-i18n="table.action">Action</th>
+                                    <th data-i18n="table.product">Product</th>
+                                    <th data-i18n="table.category">Category</th>
+                                    <th data-i18n="table.qty">Qty</th>
+                                    <th data-i18n="table.notes">Notes</th>
+                                    <th data-i18n="table.actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activityTableBody">
+                                <tr><td colspan="7" class="empty-cell" data-i18n="activity.none">No activity recorded</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">Modal Title</h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer" id="modalFooter"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Confirmation Dialog -->
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-dialog glass">
+            <h3 id="confirmTitle" data-i18n="common.areYouSure">Are you sure?</h3>
+            <p id="confirmMessage" data-i18n="common.cannotUndo">This action cannot be undone.</p>
+            <div class="confirm-actions">
+                <button class="btn btn-outline" id="confirmCancel" data-i18n="common.cancel">Cancel</button>
+                <button class="btn btn-danger"  id="confirmOk"     data-i18n="common.confirm">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
