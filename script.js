@@ -908,8 +908,18 @@ function formatCurrency(amountUZS) {
         }
     }
 
-    const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : undefined;
+    const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'en';
     const fractionDigits = displayCode === 'UZS' ? 0 : 2;
+
+    if (displayCode === 'UZS') {
+        const sym = (lang === 'ru') ? 'сум' : 'soʻm';
+        const num = Math.round(converted);
+        const formatted = (lang === 'en')
+            ? num.toLocaleString('en-US')
+            : num.toLocaleString('ru-RU');
+        return `${formatted} ${sym}`;
+    }
+
     try {
         return new Intl.NumberFormat(lang, {
             style: 'currency',
@@ -952,7 +962,17 @@ function getCategoryName(id) {
 
 function getProductName(id) {
     const p = getProduct(id);
-    return p ? p.name : 'Unknown';
+    if (!p) return 'Unknown';
+    return getProductDisplayName(p);
+}
+
+function getProductDisplayName(p) {
+    if (!p) return '';
+    const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'en';
+    if (p.translations && p.translations[lang] && p.translations[lang].trim()) {
+        return p.translations[lang].trim();
+    }
+    return p.name || '';
 }
 
 function getProductsByCategory(catId) {
@@ -1144,6 +1164,7 @@ function addProduct(data) {
         sold: 0,
         price: priceNum,
         image: data.image || null,
+        translations: (data.translations && typeof data.translations === 'object') ? data.translations : {},
         notes: data.notes || '',
         createdAt: Date.now()
     };
@@ -1157,6 +1178,7 @@ function addProduct(data) {
         sold: prod.sold,
         price: prod.price,
         image: prod.image,
+        translations: prod.translations,
         notes: prod.notes,
         createdAt: prod.createdAt
     });
@@ -1202,6 +1224,9 @@ function updateProduct(id, data) {
     if (data.image !== undefined) {
         prod.image = data.image;
     }
+    if (data.translations !== undefined) {
+        prod.translations = (data.translations && typeof data.translations === 'object') ? data.translations : {};
+    }
     prod.notes = data.notes || '';
     const expVer = prod.version || 1;
     saveState();
@@ -1213,6 +1238,7 @@ function updateProduct(id, data) {
         sold: prod.sold,
         price: prod.price,
         image: prod.image,
+        translations: prod.translations,
         notes: prod.notes,
         expectedVersion: expVer
     });
@@ -1535,10 +1561,19 @@ function renderProducts() {
 
     let prods = [...state.products];
     if (catFilter) prods = prods.filter(p => p.categoryId === catFilter);
-    if (search) prods = prods.filter(p => p.name.toLowerCase().includes(search));
+    if (search) {
+        prods = prods.filter(p => {
+            const disp = getProductDisplayName(p).toLowerCase();
+            const orig = (p.name || '').toLowerCase();
+            const uz = (p.translations?.uz || '').toLowerCase();
+            const ru = (p.translations?.ru || '').toLowerCase();
+            const en = (p.translations?.en || '').toLowerCase();
+            return disp.includes(search) || orig.includes(search) || uz.includes(search) || ru.includes(search) || en.includes(search);
+        });
+    }
 
     prods.sort((a, b) => {
-        if (sortMode === 'name') return a.name.localeCompare(b.name);
+        if (sortMode === 'name') return getProductDisplayName(a).localeCompare(getProductDisplayName(b));
         if (sortMode === 'sold') return (b.sold || 0) - (a.sold || 0);
         if (sortMode === 'stock') {
             const aQty = (a.quantity !== null && a.quantity !== undefined) ? a.quantity : -1;
@@ -1579,12 +1614,23 @@ function renderProducts() {
             </div>
         ` : '';
 
+        const dispTitle = getProductDisplayName(p);
+        const transList = p.translations ? [
+            p.translations.uz ? `UZ: ${p.translations.uz}` : '',
+            p.translations.ru ? `RU: ${p.translations.ru}` : '',
+            p.translations.en ? `EN: ${p.translations.en}` : ''
+        ].filter(Boolean) : [];
+        const transSubtitle = (transList.length > 0)
+            ? `<div class="product-trans-preview" style="font-size: 0.6875rem; color: var(--ink-muted); margin-top: 3px;">${escapeHtml(transList.join(' · '))}</div>`
+            : '';
+
         return `
             <div class="product-card glass">
                 ${imgHtml}
                 <div class="product-header">
                     <div>
-                        <div class="product-title">${escapeHtml(p.name)}</div>
+                        <div class="product-title">${escapeHtml(dispTitle)}</div>
+                        ${transSubtitle}
                     </div>
                     <div class="product-actions-top">
                         <button class="btn btn-icon btn-sm btn-secondary" onclick="openEditProduct('${p.id}')" title="${editLbl}">
@@ -2571,19 +2617,146 @@ function clearModalImage() {
     renderImageUploadArea();
 }
 
+let isAiTranslating = false;
+let lastAiTranslatedName = '';
+
+function getAiTranslationBoxHtml(translations = {}, hasTypo = false, original = '', corrected = '', typoExplanation = '') {
+    const uzVal = translations.uz || '';
+    const ruVal = translations.ru || '';
+    const enVal = translations.en || '';
+    return `
+        <div id="aiTypoBanner" class="ai-typo-banner" style="${hasTypo ? 'display:flex;' : 'display:none;'}">
+            <span>💡 Typo detected: "<b>${escapeHtml(original)}</b>" → Suggested: "<b>${escapeHtml(corrected)}</b>"${typoExplanation ? ` (${escapeHtml(typoExplanation)})` : ''}</span>
+            <button type="button" class="btn btn-primary btn-sm" onclick="applyTypoCorrection('${escapeHtml(corrected).replace(/'/g, "\\'")}')">Apply</button>
+        </div>
+        <div id="aiTranslationsContainer" class="ai-translations-box">
+            <div class="ai-trans-header">
+                <span class="ai-trans-title">Multilingual Names (UZ · RU · EN)</span>
+                <span class="ai-trans-badge" id="aiProviderBadge">AI Ready</span>
+            </div>
+            <div class="ai-trans-grid">
+                <div class="ai-trans-field">
+                    <span class="ai-flag">🇺🇿 UZ</span>
+                    <input type="text" class="form-input trans-input" id="transUzInput" value="${escapeHtml(uzVal)}" placeholder="Oʻzbekcha">
+                </div>
+                <div class="ai-trans-field">
+                    <span class="ai-flag">🇷🇺 RU</span>
+                    <input type="text" class="form-input trans-input" id="transRuInput" value="${escapeHtml(ruVal)}" placeholder="Русский">
+                </div>
+                <div class="ai-trans-field">
+                    <span class="ai-flag">🇬🇧 EN</span>
+                    <input type="text" class="form-input trans-input" id="transEnInput" value="${escapeHtml(enVal)}" placeholder="English">
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function triggerAiTranslation(force = true) {
+    const nameInput = document.getElementById('prodNameInput');
+    if (!nameInput) return;
+    const name = nameInput.value.trim();
+    if (!name || (name === lastAiTranslatedName && !force)) return;
+    if (isAiTranslating) return;
+
+    const btn = document.getElementById('btnAiTranslate');
+    const badge = document.getElementById('aiProviderBadge');
+    isAiTranslating = true;
+    if (btn) {
+        btn.classList.add('loading');
+        const textSpan = btn.querySelector('span');
+        if (textSpan) textSpan.textContent = 'Checking AI...';
+    }
+    if (badge) badge.textContent = 'Translating...';
+
+    try {
+        const res = await fetch('/api/ai/translate-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await res.json();
+        if (data.ok && data.translations) {
+            lastAiTranslatedName = name;
+            const uzInput = document.getElementById('transUzInput');
+            const ruInput = document.getElementById('transRuInput');
+            const enInput = document.getElementById('transEnInput');
+            if (uzInput) uzInput.value = data.translations.uz || '';
+            if (ruInput) ruInput.value = data.translations.ru || '';
+            if (enInput) enInput.value = data.translations.en || '';
+
+            const banner = document.getElementById('aiTypoBanner');
+            if (banner) {
+                if (data.hasTypo && data.corrected && data.corrected.toLowerCase() !== name.toLowerCase()) {
+                    banner.style.display = 'flex';
+                    banner.innerHTML = `
+                        <span>💡 Typo detected: "<b>${escapeHtml(data.original)}</b>" → Suggested: "<b>${escapeHtml(data.corrected)}</b>"${data.typoExplanation ? ` (${escapeHtml(data.typoExplanation)})` : ''}</span>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="applyTypoCorrection('${escapeHtml(data.corrected).replace(/'/g, "\\'")}')">Apply</button>
+                    `;
+                } else {
+                    banner.style.display = 'none';
+                }
+            }
+
+            if (badge) badge.textContent = '✨ Ready';
+        }
+    } catch (err) {
+        console.warn('[AI translation error]', err);
+        if (badge) badge.textContent = 'Offline';
+    } finally {
+        isAiTranslating = false;
+        if (btn) {
+            btn.classList.remove('loading');
+            const textSpan = btn.querySelector('span');
+            if (textSpan) textSpan.textContent = 'AI Check & Translate';
+        }
+    }
+}
+
+function onProdNameBlur() {
+    const uzVal = document.getElementById('transUzInput')?.value.trim();
+    const ruVal = document.getElementById('transRuInput')?.value.trim();
+    if (!uzVal && !ruVal) {
+        triggerAiTranslation(false);
+    }
+}
+
+function applyTypoCorrection(corrected) {
+    const nameInput = document.getElementById('prodNameInput');
+    if (nameInput) {
+        nameInput.value = corrected;
+    }
+    const banner = document.getElementById('aiTypoBanner');
+    if (banner) banner.style.display = 'none';
+    showToast(`Corrected to "${corrected}"`, 'success');
+}
+
 function openAddProduct() {
     currentModalImage = null;
+    lastAiTranslatedName = '';
     openModal(tr('product.add'), `
         <div class="form-group">
-            <label class="form-label">${tr('product.nameLabel')}</label>
-            <input type="text" class="form-input" id="prodNameInput" placeholder="${tr('product.namePlaceholder')}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">${tr('product.nameLabel')}</label>
+                <button type="button" class="ai-translate-btn" id="btnAiTranslate" onclick="triggerAiTranslation(true)" title="AI Typo Check & Multilingual Translation">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <span>AI Check &amp; Translate</span>
+                </button>
+            </div>
+            <input type="text" class="form-input" id="prodNameInput" placeholder="${tr('product.namePlaceholder')}" onblur="onProdNameBlur()">
+            ${getAiTranslationBoxHtml()}
         </div>
         <div class="form-group">
             <div class="image-upload-wrapper" id="imageUploadContainer"></div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.priceLabel')}</label>
-            <input type="number" class="form-input" id="prodPriceInput" placeholder="${tr('product.pricePlaceholder')}" min="0.01" step="0.01" required>
+            <div style="position:relative;display:flex;align-items:center;">
+                <input type="number" class="form-input" id="prodPriceInput" placeholder="${tr('product.pricePlaceholder')}" min="1" step="any" required style="padding-right:64px;">
+                <span style="position:absolute;right:14px;color:var(--ink-muted);font-weight:600;font-size:0.875rem;pointer-events:none;">${window.i18n && window.i18n.getLang() === 'ru' ? 'сум' : 'soʻm'}</span>
+            </div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.quantityLabel')}</label>
@@ -2606,18 +2779,31 @@ function openEditProduct(id) {
     const prod = getProduct(id);
     if (!prod) return;
     currentModalImage = prod.image || null;
+    lastAiTranslatedName = prod.name || '';
     const qtyVal = (prod.quantity !== null && prod.quantity !== undefined) ? prod.quantity : '';
     openModal(tr('product.edit'), `
         <div class="form-group">
-            <label class="form-label">${tr('product.nameLabel')}</label>
-            <input type="text" class="form-input" id="prodNameInput" value="${escapeHtml(prod.name)}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">${tr('product.nameLabel')}</label>
+                <button type="button" class="ai-translate-btn" id="btnAiTranslate" onclick="triggerAiTranslation(true)" title="AI Typo Check & Multilingual Translation">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <span>AI Check &amp; Translate</span>
+                </button>
+            </div>
+            <input type="text" class="form-input" id="prodNameInput" value="${escapeHtml(prod.name)}" onblur="onProdNameBlur()">
+            ${getAiTranslationBoxHtml(prod.translations || {})}
         </div>
         <div class="form-group">
             <div class="image-upload-wrapper" id="imageUploadContainer"></div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.priceLabel')}</label>
-            <input type="number" class="form-input" id="prodPriceInput" value="${prod.price !== null && prod.price !== undefined ? prod.price : ''}" min="0.01" step="0.01" required>
+            <div style="position:relative;display:flex;align-items:center;">
+                <input type="number" class="form-input" id="prodPriceInput" value="${prod.price !== null && prod.price !== undefined ? Math.round(prod.price) : ''}" min="1" step="any" required style="padding-right:64px;">
+                <span style="position:absolute;right:14px;color:var(--ink-muted);font-weight:600;font-size:0.875rem;pointer-events:none;">${window.i18n && window.i18n.getLang() === 'ru' ? 'сум' : 'soʻm'}</span>
+            </div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.quantityLabel')}</label>
@@ -2636,21 +2822,33 @@ function openEditProduct(id) {
 }
 
 function submitProduct() {
+    const translations = {
+        uz: document.getElementById('transUzInput')?.value.trim() || '',
+        ru: document.getElementById('transRuInput')?.value.trim() || '',
+        en: document.getElementById('transEnInput')?.value.trim() || ''
+    };
     addProduct({
         name: document.getElementById('prodNameInput').value,
         quantity: document.getElementById('prodQtyInput').value,
         price: document.getElementById('prodPriceInput').value,
         image: currentModalImage,
+        translations,
         notes: document.getElementById('prodNotesInput').value
     });
 }
 
 function submitEditProduct(id) {
+    const translations = {
+        uz: document.getElementById('transUzInput')?.value.trim() || '',
+        ru: document.getElementById('transRuInput')?.value.trim() || '',
+        en: document.getElementById('transEnInput')?.value.trim() || ''
+    };
     updateProduct(id, {
         name: document.getElementById('prodNameInput').value,
         quantity: document.getElementById('prodQtyInput').value,
         price: document.getElementById('prodPriceInput').value,
         image: currentModalImage,
+        translations,
         notes: document.getElementById('prodNotesInput').value
     });
 }

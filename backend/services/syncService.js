@@ -55,7 +55,7 @@ async function getSnapshot() {
   try {
     const [categoriesRes, productsRes, activitiesRes, settingsRes, seqRes] = await Promise.all([
       client.query('SELECT id, name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
-      client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, image, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
+      client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, image, translations, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query('SELECT id, type, timestamp, product_id AS "productId", product_name AS "productName", category_id AS "categoryId", category_name AS "categoryName", quantity::float, notes, previous_quantity::float AS "previousQuantity", previous_sold::float AS "previousSold" FROM activities ORDER BY timestamp DESC LIMIT 500'),
       client.query('SELECT key, value FROM settings'),
       client.query('SELECT COALESCE(MAX(seq), 0)::bigint AS max_seq FROM changes')
@@ -334,7 +334,7 @@ async function processSyncBatch(deviceId, operations = []) {
           );
 
         } else if (op.type === 'CREATE_PRODUCT') {
-          const { id, categoryId, name, quantity, sold, price, notes, image, createdAt } = payload;
+          const { id, categoryId, name, quantity, sold, price, notes, image, translations, createdAt } = payload;
           if (!isValidId(id)) throw { code: 'INVALID_PAYLOAD', message: 'Valid product id required' };
           if (!isValidName(name)) throw { code: 'INVALID_PAYLOAD', message: 'Product name must be 1-200 characters' };
           if (categoryId && !isValidId(categoryId)) throw { code: 'INVALID_PAYLOAD', message: 'Invalid categoryId' };
@@ -357,10 +357,12 @@ async function processSyncBatch(deviceId, operations = []) {
 
           const sanitizedPrice = Number(price);
           const imageRef = (typeof image === 'string' && image.trim().length > 0) ? image.trim() : null;
+          const translationsObj = (translations && typeof translations === 'object') ? translations : {};
+          const translationsData = JSON.stringify(translationsObj);
 
           await client.query(
-            `INSERT INTO products (id, category_id, name, quantity, sold, price, notes, image, is_deleted, version, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 1, $9, $10)
+            `INSERT INTO products (id, category_id, name, quantity, sold, price, notes, image, translations, is_deleted, version, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, FALSE, 1, $10, $11)
              ON CONFLICT (id) DO UPDATE SET
                category_id = EXCLUDED.category_id,
                name = EXCLUDED.name,
@@ -369,19 +371,20 @@ async function processSyncBatch(deviceId, operations = []) {
                price = EXCLUDED.price,
                notes = EXCLUDED.notes,
                image = EXCLUDED.image,
+               translations = EXCLUDED.translations,
                is_deleted = FALSE,
                version = products.version + 1,
                updated_at = EXCLUDED.updated_at`,
-            [id, categoryId || null, name.trim(), initialQty, initialSold || 0, sanitizedPrice, notes ? notes.trim() : '', imageRef, createdAt || now, now]
+            [id, categoryId || null, name.trim(), initialQty, initialSold || 0, sanitizedPrice, notes ? notes.trim() : '', imageRef, translationsData, createdAt || now, now]
           );
 
           await client.query(
             'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-            ['product', id, 'CREATE', { id, categoryId: categoryId || null, name: name.trim(), quantity: initialQty, sold: initialSold || 0, price: sanitizedPrice, notes: notes ? notes.trim() : '', image: imageRef, isDeleted: false, version: 1, createdAt: createdAt || now, updatedAt: now }, now]
+            ['product', id, 'CREATE', { id, categoryId: categoryId || null, name: name.trim(), quantity: initialQty, sold: initialSold || 0, price: sanitizedPrice, notes: notes ? notes.trim() : '', image: imageRef, translations: translationsObj, isDeleted: false, version: 1, createdAt: createdAt || now, updatedAt: now }, now]
           );
 
         } else if (op.type === 'UPDATE_PRODUCT') {
-          const { id, categoryId, name, quantity, sold, price, notes, image, expectedVersion } = payload;
+          const { id, categoryId, name, quantity, sold, price, notes, image, translations, expectedVersion } = payload;
           if (!isValidId(id)) throw { code: 'INVALID_PAYLOAD', message: 'Product id required for update' };
           if (name !== undefined && !isValidName(name)) throw { code: 'INVALID_PAYLOAD', message: 'Product name must be 1-200 characters' };
           if (categoryId && !isValidId(categoryId)) throw { code: 'INVALID_PAYLOAD', message: 'Invalid categoryId' };
@@ -389,7 +392,7 @@ async function processSyncBatch(deviceId, operations = []) {
           if (price !== undefined && !isValidPrice(price)) throw { code: 'INVALID_PAYLOAD', message: 'Base catalog price must be a positive number > 0' };
 
           const prodRes = await client.query(
-            'SELECT id, name, category_id, quantity::float, sold::float, price::float, notes, image, is_deleted, version FROM products WHERE id = $1 FOR UPDATE',
+            'SELECT id, name, category_id, quantity::float, sold::float, price::float, notes, image, translations, is_deleted, version FROM products WHERE id = $1 FOR UPDATE',
             [id]
           );
 
@@ -430,6 +433,10 @@ async function processSyncBatch(deviceId, operations = []) {
           const newVersion = (product.version || 1) + 1;
           const sanitizedPrice = (price !== undefined) ? Number(price) : product.price;
           const imageRef = (image !== undefined) ? (typeof image === 'string' && image.trim().length > 0 ? image.trim() : null) : product.image;
+          const translationsObj = (translations !== undefined)
+            ? ((translations && typeof translations === 'object') ? translations : {})
+            : (product.translations || {});
+          const translationsData = (translations !== undefined) ? JSON.stringify(translationsObj) : null;
 
           await client.query(
             `UPDATE products SET
@@ -440,9 +447,10 @@ async function processSyncBatch(deviceId, operations = []) {
                price = $5,
                notes = CASE WHEN $6::boolean THEN $7::text ELSE notes END,
                image = CASE WHEN $8::boolean THEN $9::text ELSE image END,
-               version = $10,
-               updated_at = $11
-             WHERE id = $12`,
+               translations = CASE WHEN $10::boolean THEN $11::jsonb ELSE translations END,
+               version = $12,
+               updated_at = $13
+             WHERE id = $14`,
             [
               categoryId,
               name ? name.trim() : null,
@@ -453,6 +461,8 @@ async function processSyncBatch(deviceId, operations = []) {
               notes !== undefined ? (notes ? notes.trim() : '') : null,
               image !== undefined,
               imageRef,
+              translations !== undefined,
+              translationsData,
               newVersion,
               now,
               id
@@ -461,7 +471,7 @@ async function processSyncBatch(deviceId, operations = []) {
 
           await client.query(
             'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-            ['product', id, 'UPDATE', { id, categoryId: categoryId || product.category_id, name: name ? name.trim() : product.name, quantity: updatedQty, sold: sold !== undefined ? Number(sold) : product.sold, price: sanitizedPrice, notes: notes !== undefined ? notes : product.notes, image: imageRef, version: newVersion, isDeleted: false, updatedAt: now }, now]
+            ['product', id, 'UPDATE', { id, categoryId: categoryId || product.category_id, name: name ? name.trim() : product.name, quantity: updatedQty, sold: sold !== undefined ? Number(sold) : product.sold, price: sanitizedPrice, notes: notes !== undefined ? notes : product.notes, image: imageRef, translations: translationsObj, version: newVersion, isDeleted: false, updatedAt: now }, now]
           );
 
         } else if (op.type === 'DELETE_PRODUCT') {

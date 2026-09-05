@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const cbuService = require('./services/cbu');
 const syncService = require('./services/syncService');
 const imageStorageService = require('./services/imageStorageService');
+const aiTranslationService = require('./services/aiTranslationService');
 const db = require('./db');
 
 const app = express();
@@ -247,6 +248,34 @@ apiRouter.get('/storage/auth', (req, res) => {
     res.status(200).json(params);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// AI Rate Limiter (60 requests per minute)
+const aiTranslateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many translation requests, please try again in a moment.' }
+});
+
+// 4. AI Multilingual Translation & Typo Correction
+apiRouter.post('/ai/translate-product', aiTranslateLimiter, async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Product name is required' });
+    }
+
+    const result = await aiTranslationService.translateAndCheckProduct(name);
+    res.status(200).json({
+      ok: true,
+      ...result
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

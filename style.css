@@ -2636,3 +2636,107 @@ canvas {
     box-shadow: var(--shadow-md);
 }
 
+
+/* AI Translations & Typo Assistant in Modals */
+.ai-translate-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    border-color: rgba(212, 160, 23, 0.35);
+    background: rgba(212, 160, 23, 0.08);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+.ai-translate-btn:hover {
+    background: rgba(212, 160, 23, 0.18);
+    border-color: var(--accent);
+}
+.ai-translate-btn.loading svg {
+    animation: spin 1s linear infinite;
+}
+
+.ai-typo-banner {
+    margin-top: 8px;
+    padding: 9px 12px;
+    background: rgba(234, 179, 8, 0.12);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    color: #FCD34D;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.ai-typo-banner button {
+    padding: 3px 8px;
+    font-size: 0.75rem;
+}
+
+.ai-translations-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.ai-trans-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.ai-trans-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.ai-trans-badge {
+    font-size: 0.6875rem;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    font-weight: 500;
+}
+.ai-trans-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+@media (max-width: 600px) {
+    .ai-trans-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.ai-trans-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    padding: 2px 8px;
+}
+.ai-flag {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    white-space: nowrap;
+}
+.trans-input {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 6px 4px !important;
+    font-size: 0.8125rem !important;
+    color: var(--ink) !important;
+    width: 100%;
+}

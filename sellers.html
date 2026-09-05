@@ -30,7 +30,7 @@
     }
   })();
 </script>
-<link rel="stylesheet" href="/style.css?v=4">
+<link rel="stylesheet" href="/style.css?v=7">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -732,16 +732,16 @@
 
   .price-symbol {
     position: absolute;
-    left: 14px;
-    font-size: 1.125rem;
-    font-weight: 700;
+    right: 14px;
+    font-size: 0.9375rem;
+    font-weight: 600;
     color: var(--ink-muted);
     pointer-events: none;
   }
 
   .price-input {
     width: 100%;
-    padding: 10px 14px 10px 32px;
+    padding: 10px 64px 10px 14px;
     background: var(--bg-input);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
@@ -1077,12 +1077,12 @@
         </div>
         <div class="header-stat-divider"></div>
         <div class="header-stat">
-          <div class="val" id="hdr-revenue">$0.00</div>
+          <div class="val" id="hdr-revenue">0 soʻm</div>
           <div class="lbl">Revenue</div>
         </div>
         <div class="header-stat-divider"></div>
         <div class="header-stat">
-          <div class="val profit-val" id="hdr-profit">+$0.00</div>
+          <div class="val profit-val" id="hdr-profit">+0 soʻm</div>
           <div class="lbl">Extra Profit</div>
         </div>
       </div>
@@ -1167,8 +1167,8 @@
       <div class="form-group">
         <label class="field-label" for="price-input">Selling Price (per unit)</label>
         <div class="price-input-wrap">
-          <span class="price-symbol">$</span>
-          <input class="price-input" type="number" id="price-input" step="0.01" min="0" inputmode="decimal" placeholder="0.00">
+          <input class="price-input" type="number" id="price-input" step="any" min="0" inputmode="numeric" placeholder="0">
+          <span class="price-symbol">soʻm</span>
         </div>
       </div>
 
@@ -1193,7 +1193,7 @@
         </div>
         <div class="summary-profit even" id="sum-profit-row">
           <span id="sum-profit-label">At base price</span>
-          <span id="sum-profit-val">$0.00</span>
+          <span id="sum-profit-val">0 soʻm</span>
         </div>
       </div>
     </div>
@@ -1578,13 +1578,15 @@ async function loadProductsFromStorage() {
     image: p.image || p.img || null,
     sold: Number(p.sold) || 0,
     notes: p.notes || '',
+    translations: p.translations || {},
     version: p.version || 1
   }));
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────
 function fmt(n) {
-  return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const val = Math.round(Math.abs(n || 0));
+  return val.toLocaleString('ru-RU') + ' soʻm';
 }
 
 function escapeHtml(str) {
@@ -1610,6 +1612,12 @@ function renderCard(p) {
   };
 
   const imgSrc = p.image || 'assets/logo.webp';
+  const tr = p.translations || {};
+  const transPills = [
+    tr.uz && `<span title="O'zbekcha">🇺🇿 ${escapeHtml(tr.uz)}</span>`,
+    tr.ru && `<span title="Русский">🇷🇺 ${escapeHtml(tr.ru)}</span>`,
+    tr.en && `<span title="English">🇬🇧 ${escapeHtml(tr.en)}</span>`
+  ].filter(Boolean);
 
   return `
     <div class="pos-card ${isOut ? 'out-of-stock' : ''}" id="card-${p.id}">
@@ -1620,6 +1628,11 @@ function renderCard(p) {
       </div>
       <div class="pos-card-body">
         <div class="pos-card-name">${escapeHtml(p.name)}</div>
+        ${transPills.length > 0 ? `
+          <div class="pos-card-trans" style="font-size:0.75rem;color:var(--ink-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(transPills.map(b => b.replace(/<[^>]*>/g, '')).join(' · '))}">
+            ${transPills.join(' · ')}
+          </div>
+        ` : ''}
         <div class="pos-card-sku">SKU: ${escapeHtml(p.sku)}</div>
         <div class="pos-card-price-row">
           <div class="pos-card-price">${fmt(p.price)}</div>
@@ -1643,7 +1656,12 @@ function renderCard(p) {
 function renderGrid() {
   const q = searchVal.toLowerCase();
   let visible = products.filter(p => {
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q));
+    const uz = (p.translations && p.translations.uz ? p.translations.uz.toLowerCase() : '');
+    const ru = (p.translations && p.translations.ru ? p.translations.ru.toLowerCase() : '');
+    const en = (p.translations && p.translations.en ? p.translations.en.toLowerCase() : '');
+    const matchSearch = !q || p.name.toLowerCase().includes(q) ||
+      (p.sku && p.sku.toLowerCase().includes(q)) ||
+      uz.includes(q) || ru.includes(q) || en.includes(q);
     const isUntracked = p.stock === null || p.stock === undefined;
     const matchFilter = filterVal === 'all' ||
       (filterVal === 'in-stock' && (isUntracked || p.stock > 0)) ||
@@ -1713,7 +1731,7 @@ function openModal(productId) {
 
   document.getElementById('modal-sku').textContent = `${activeProduct.name}${activeProduct.sku ? ` · SKU: ${activeProduct.sku}` : ''}`;
   document.getElementById('qty-input').value = 1;
-  document.getElementById('price-input').value = activeProduct.price.toFixed(2);
+  document.getElementById('price-input').value = Math.round(activeProduct.price || 0);
 
   updateSummary();
   validateQty();
@@ -1760,7 +1778,7 @@ function updateSummary() {
   if (Math.abs(diff) < 0.001) {
     profitRow.className = 'summary-profit even';
     profitLbl.textContent = 'At base catalog price';
-    profitVal.textContent = '$0.00';
+    profitVal.textContent = '0 soʻm';
   } else if (diff > 0) {
     profitRow.className = 'summary-profit profit';
     profitLbl.textContent = `Extra profit`;
@@ -1865,6 +1883,7 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
     sold: p.sold,
     image: p.image,
     notes: p.notes,
+    translations: p.translations || {},
     version: (p.version || 1) + 1,
     updatedAt: Date.now()
   });
@@ -1881,7 +1900,7 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
     sellingPrice: price,
     totalSaleValue: tx.totalSaleValue,
     priceDiff: tx.priceDiff,
-    notes: `POS sale (${qty}x @ $${price.toFixed(2)})`
+    notes: `POS sale (${qty}x @ ${fmt(price)})`
   });
 
   // Enqueue SALE operation for PostgreSQL sync engine
@@ -1889,7 +1908,7 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
     productId: p.id,
     quantity: qty,
     sellingPrice: price,
-    notes: `POS sale: ${qty}x @ $${price.toFixed(2)}`,
+    notes: `POS sale: ${qty}x @ ${fmt(price)}`,
     timestamp: Date.now(),
     activityId
   });
