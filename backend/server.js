@@ -15,6 +15,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
+// Trust reverse proxy (Nginx) so client IP and rate-limiting work properly
+app.set('trust proxy', 1);
+
 // 1. Security Headers
 app.use(helmet());
 
@@ -57,6 +60,7 @@ const limiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: {
     error: 'Too many requests from this IP, please try again later.'
   }
