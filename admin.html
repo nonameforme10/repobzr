@@ -9,6 +9,16 @@
     <meta name="color-scheme" content="light dark">
     <title>Bazar — Merchant Dashboard</title>
     <script>
+        // Domain access guard: ensure admin is only viewed on admin.caretrack.website or local dev
+        (function () {
+            var h = window.location.hostname;
+            var isAllowed = !h || h === 'admin.caretrack.website' || h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local') || h.endsWith('.vercel.app');
+            if (!isAllowed) {
+                window.location.replace('/404.html');
+                return;
+            }
+        })();
+
         (function () {
             try {
                 var saved = localStorage.getItem('salestrack-theme');

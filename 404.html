@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Bazar â€” Page Not Found. The requested page or resource could not be located.">
+<meta name="theme-color" content="#FAF8F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0D0B" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<title>404 â€” Page Not Found | Bazar</title>
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('salestrack-theme');
+      var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var theme = saved || (systemDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* â”€â”€ 404 PAGE LAYOUT & STYLING (BAZAR THEME) â”€â”€ */
+
+  .error-page-layout {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-app);
+    color: var(--ink);
+  }
+
+  /* â”€â”€ HEADER â”€â”€ */
+  .error-header {
+    background: var(--bg-topbar);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 68px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .brand-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+
+  .brand-logo {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .brand-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.02em;
+  }
+
+  .brand-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-ring);
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .header-nav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .nav-link {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink-subtle);
+    text-decoration: none;
+    transition: var(--transition-fast);
+  }
+
+  .nav-link:hover {
+    color: var(--ink-strong);
+  }
+
+  /* â”€â”€ MAIN CONTENT â”€â”€ */
+  .error-main {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 28px;
+    max-width: 1280px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .error-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+    width: 100%;
+  }
+
+  /* Left Column */
+  .error-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .error-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    border-radius: var(--radius-pill);
+    background: var(--danger-soft);
+    border: 1px solid rgba(178, 59, 59, 0.2);
+    color: var(--danger);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .error-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    box-shadow: 0 0 8px var(--danger);
+    animation: dot-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.6; transform: scale(0.9); }
+    50%      { opacity: 1; transform: scale(1.2); }
+  }
+
+  .error-title {
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
+    font-weight: 800;
+    color: var(--ink-strong);
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    margin-bottom: 16px;
+  }
+
+  .error-title .gold-text {
+    color: var(--accent-strong);
+    background: linear-gradient(135deg, var(--accent-strong), var(--gold));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .error-desc {
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--ink-muted);
+    margin-bottom: 28px;
+    max-width: 500px;
+  }
+
+  /* Terminal Card */
+  .terminal-card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 32px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8125rem;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .terminal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .terminal-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .t-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+  }
+
+  .t-dot-red    { background: #E06464; }
+  .t-dot-yellow { background: #D9A04A; }
+  .t-dot-green  { background: #3FB76A; }
+
+  .terminal-label {
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .terminal-line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 6px;
+    color: var(--ink-subtle);
+  }
+
+  .terminal-line:last-child {
+    margin-bottom: 0;
+  }
+
+  .t-prompt {
+    color: var(--accent-strong);
+    font-weight: 600;
+  }
+
+  .t-path {
+    color: var(--ink-strong);
+    word-break: break-all;
+  }
+
+  .t-status {
+    color: var(--danger);
+    font-weight: 600;
+  }
+
+  /* Action Buttons */
+  .error-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .btn-dashboard {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    background: var(--accent);
+    color: var(--ink-invert);
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition-fast);
+    box-shadow: 0 1px 2px rgba(184, 134, 11, 0.25);
+  }
+
+  [data-theme="dark"] .btn-dashboard {
+    color: #0E0D0B;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .btn-dashboard:hover {
+    background: var(--accent-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(184, 134, 11, 0.35);
+  }
+
+  .btn-pos {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 22px;
+    background: var(--bg-surface);
+    color: var(--ink-strong);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition-fast);
+  }
+
+  .btn-pos:hover {
+    background: var(--bg-surface-2);
+    border-color: var(--ink-muted);
+    transform: translateY(-1px);
+  }
+
+  /* Quick links */
+  .quick-links {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .quick-links-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted);
+  }
+
+  .quick-chip {
+    padding: 4px 10px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-subtle);
+    text-decoration: none;
+    transition: var(--transition-fast);
+  }
+
+  .quick-chip:hover {
+    border-color: var(--accent);
+    color: var(--accent-strong);
+    background: var(--accent-soft);
+  }
+
+  /* Right Column â€” Animated 3D Bazar Media Frame */
+  .error-visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+  }
+
+  .media-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 540px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .media-wrapper::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .bazar-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #0E0D0B;
+  }
+
+  .video-ambient-glow {
+    position: absolute;
+    width: 90%;
+    height: 90%;
+    background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
+    filter: blur(40px);
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  /* â”€â”€ FOOTER â”€â”€ */
+  .error-footer {
+    border-top: 1px solid var(--border);
+    background: var(--bg-surface);
+    padding: 18px 28px;
+  }
+
+  .footer-container {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+  }
+
+  .footer-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+  }
+
+  .status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+
+  .footer-sep {
+    color: var(--border-strong);
+  }
+
+  /* â”€â”€ RESPONSIVE â”€â”€ */
+  @media (max-width: 960px) {
+    .error-grid {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+    .error-visual {
+      order: -1;
+    }
+    .media-wrapper {
+      max-width: 100%;
+    }
+    .error-header {
+      padding: 0 16px;
+      height: 60px;
+    }
+    .header-nav {
+      display: none;
+    }
+    .error-main {
+      padding: 32px 16px;
+    }
+    .error-footer {
+      padding: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .error-actions {
+      flex-direction: column;
+      width: 100%;
+    }
+    .btn-dashboard, .btn-pos {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="error-page-layout">
+
+  <!-- HEADER -->
+  <header class="error-header">
+    <a href="admin.html" class="brand-group">
+      <img src="assets/logo.webp" alt="Bazar" class="brand-logo">
+      <span class="brand-title">Bazar</span>
+      <span class="brand-badge">Merchant Suite</span>
+    </a>
+
+    <div class="header-right">
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="theme-icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+        </svg>
+        <svg class="theme-icon icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN ERROR VIEW -->
+  <main class="error-main">
+    <div class="error-grid">
+
+      <!-- Left Column: Information & Navigation -->
+      <div class="error-content">
+        <div class="error-pill">
+          <span class="error-dot"></span>
+          <span>HTTP 404 â€” Page Not Found</span>
+        </div>
+
+        <h1 class="error-title">
+          Lost in the <br>
+          <span class="gold-text">Marketplace?</span>
+        </h1>
+
+        <p class="error-desc">
+          The shelf you are looking for seems to be empty. The page might have been relocated, removed, or the link may contain a typo.
+        </p>
+
+        <!-- Route Debug Card -->
+        <div class="terminal-card">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <span class="t-dot t-dot-red"></span>
+              <span class="t-dot t-dot-yellow"></span>
+              <span class="t-dot t-dot-green"></span>
+            </div>
+            <span class="terminal-label">Router Trace</span>
+          </div>
+          <div class="terminal-line">
+            <span class="t-prompt">REQ &gt;</span>
+            <span class="t-path" id="currentPath">/unknown-route</span>
+          </div>
+          <div class="terminal-line">
+            <span class="t-status">ERR &gt; 404 Not Found (Private Route)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Animated 3D Bazar Emblem -->
+      <div class="error-visual">
+        <div class="video-ambient-glow"></div>
+        <div class="media-wrapper">
+          <video class="bazar-video" autoplay loop muted playsinline poster="assets/logo.webp">
+            <source src="assets/404.webm" type="video/webm">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="error-footer">
+    <div class="footer-container">
+      <span>&copy; 2026 Bazar Merchant Suite. All rights reserved.</span>
+      <div class="footer-status">
+        <span class="status-indicator"></span>
+        <span>Gateway Operational</span>
+        <span class="footer-sep">&bull;</span>
+        <span id="timestamp"></span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Display Current Request Path
+  try {
+    const p = window.location.pathname;
+    document.getElementById('currentPath').textContent = (p && p !== '/') ? p : '/requested-resource-missing';
+
+    // Domain-aware button destination
+    const h = window.location.hostname;
+    const isLocal = !h || h === 'localhost' || h === '127.0.0.1';
+    const dashBtn = document.getElementById('btnDashboard');
+    const posBtn = document.getElementById('btnPos');
+    if (dashBtn) {
+      dashBtn.href = isLocal ? 'admin.html' : 'https://admin.caretrack.website/';
+    }
+    if (posBtn) {
+      posBtn.href = isLocal ? 'sellers.html' : 'https://sellers.caretrack.website/';
+    }
+  } catch (e) {}
+
+  // Update Live UTC Timestamp
+  function updateTimestamp() {
+    const now = new Date();
+    const ts = now.toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+    const el = document.getElementById('timestamp');
+    if (el) el.textContent = ts;
+  }
+  updateTimestamp();
+  setInterval(updateTimestamp, 1000);
+
+  // Theme Toggle
+  const themeBtn = document.getElementById('themeToggle');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try {
+        localStorage.setItem('salestrack-theme', next);
+      } catch (e) {}
+    });
+  }
+
+  // Follow system theme changes if not overridden
+  if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = (e) => {
+      if (!localStorage.getItem('salestrack-theme')) {
+        document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      }
+    };
+    if (mq.addEventListener) mq.addEventListener('change', listener);
+    else if (mq.addListener) mq.addListener(listener);
+  }
+</script>
+</body>
+</html>
+
