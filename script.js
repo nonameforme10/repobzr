@@ -10,13 +10,12 @@ const STORAGE_KEY = 'salesDashboard_v1';
 // and converts at display time using rates fetched from the CBU proxy.
 const BASE_CURRENCY = 'UZS';
 
-// === CBU PROXY ==============================================================
-// Replace these placeholders with your deployed Firebase Cloud Function URLs.
-// `CBU_PROXY_URL` returns today's full CBU rates array (raw passthrough).
-// `CBU_HISTORY_URL` returns last N days for a single currency:
-//   GET <url>?ccy=USD&days=30 → [{ date: "YYYY-MM-DD", rate: 12345.67 }, ...]
-const CBU_PROXY_URL   = 'https://us-central1-bozor-b05d3.cloudfunctions.net/getCbuRates';
-const CBU_HISTORY_URL = CBU_PROXY_URL.replace(/getCbuRates\b/, 'getCbuHistory');
+// === BACKEND API CONFIGURATION ==============================================
+// Canonical backend path is '/api' (proxied by Vercel rewrites to your VPS HTTPS endpoint).
+// Can be overridden via window.SALESTRACK_API_URL if connecting directly.
+const API_BASE_URL    = (typeof window !== 'undefined' && window.SALESTRACK_API_URL) || '/api';
+const CBU_PROXY_URL   = `${API_BASE_URL}/rates`;
+const CBU_HISTORY_URL = `${API_BASE_URL}/history`;
 
 let state = {
     categories: [],
@@ -73,7 +72,7 @@ const currency = (() => {
     }
 
     function isProxyConfigured() {
-        return !!CBU_PROXY_URL && !/REGION-PROJECT/i.test(CBU_PROXY_URL);
+        return typeof API_BASE_URL === 'string' && API_BASE_URL.trim().length > 0;
     }
 
     async function fetchRates(force = false) {
@@ -954,12 +953,8 @@ function setupCurrencySwitcher() {
             const code = btn.dataset.code;
             if (code !== BASE_CURRENCY && !currency.getRate(code)) {
                 // Trying to switch to a currency we have no rate for
-                if (!currency.isProxyConfigured()) {
-                    showToast('Set CBU_PROXY_URL in script.js to enable USD / EUR conversion', 'warning');
-                } else {
-                    showToast('Rates are still loading — try again in a moment', 'info');
-                    currency.fetchRates(true);
-                }
+                showToast('Exchange rates are loading — try again in a moment', 'info');
+                currency.fetchRates(true);
                 return;
             }
             currency.setActive(code);
@@ -1100,9 +1095,7 @@ const fx = (() => {
             if (chart) { chart.destroy(); chart = null; }
             if (empty) {
                 empty.hidden = false;
-                empty.querySelector('span').textContent = currency.isProxyConfigured()
-                    ? 'No history available'
-                    : 'Set CBU_PROXY_URL to load chart';
+                empty.querySelector('span').textContent = 'Exchange rate history unavailable';
             }
             return;
         }

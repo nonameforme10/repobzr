@@ -1,0 +1,13 @@
+# Backend server files (handled by VPS)
+backend/
+functions/
+
+# Local configuration and logs
+.env*
+*.log
+
+# Firebase configuration
+.firebaserc
+firebase.json
+firestore.indexes.json
+firestore.rules

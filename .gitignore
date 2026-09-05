@@ -67,3 +67,12 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+.vercel
+.env*
+!.env.example
+!*.env.example
+backend/node_modules/
+backend/.env*
+!backend/.env.example
+*.log
