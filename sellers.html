@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#FAF8F3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0E0D0B" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
-<title>Bazar — Seller POS</title>
+<title data-i18n="pos.title">Bazar — Seller POS</title>
 <script>
   // Domain access guard: ensure sellers POS is only viewed on sellers.caretrack.website or local dev
   (function () {
@@ -30,11 +30,12 @@
     }
   })();
 </script>
-<link rel="stylesheet" href="/style.css?v=7">
+<link rel="stylesheet" href="/style.css?v=8">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="/i18n.js?v=8"></script>
 <style>
   /* ── POS SPECIFIC COMPONENT STYLING (THEME-ALIGNED) ── */
 
@@ -202,6 +203,31 @@
     box-shadow: 0 0 0 3px var(--accent-ring);
   }
 
+  .pos-search-clear {
+    position: absolute;
+    right: 10px;
+    background: none;
+    border: none;
+    color: var(--ink-muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 4px;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .pos-search-clear:hover {
+    color: var(--ink-strong);
+  }
+
+  .lang-menu {
+    z-index: 200;
+    right: 0 !important;
+  }
+
   .pos-filter-group {
     display: flex;
     align-items: center;
@@ -239,6 +265,40 @@
     margin-left: auto;
     display: flex;
     align-items: center;
+    gap: 8px;
+  }
+
+  .view-toggle {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .view-btn {
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-xs);
+    padding: 5px 7px;
+    cursor: pointer;
+    color: var(--ink-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-fast);
+  }
+
+  .view-btn:hover {
+    color: var(--ink-strong);
+  }
+
+  .view-btn.active {
+    background: var(--bg-surface);
+    color: var(--accent-strong);
+    box-shadow: var(--shadow-xs);
   }
 
   .count-pill {
@@ -250,6 +310,7 @@
     font-weight: 600;
     color: var(--ink-muted);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
   /* ── GRID ── */
@@ -402,6 +463,16 @@
     letter-spacing: -0.01em;
   }
 
+  .pos-card-orig {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    font-weight: 400;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   .pos-card-sku {
     font-size: 0.6875rem;
     color: var(--ink-muted);
@@ -438,47 +509,115 @@
 
   .pos-card-price-row {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
-    padding-bottom: 14px;
+    gap: 8px;
+    padding-bottom: 12px;
     border-bottom: 1px solid var(--divider);
     margin-top: auto;
+    flex-wrap: wrap;
   }
 
   .pos-card-price {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 700;
     color: var(--ink-strong);
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
 
-  .pos-card-stock {
-    font-size: 0.75rem;
-    color: var(--ink-muted);
-    font-weight: 500;
-    text-align: right;
-  }
-
-  .pos-card-stock .stock-num {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--ink-strong);
-    display: block;
-    font-variant-numeric: tabular-nums;
+  .stock-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+    font-size: 0.6875rem;
+    font-weight: 600;
     line-height: 1.2;
+    white-space: nowrap;
   }
 
-  .pos-card-stock.stock-low .stock-num {
-    color: var(--warning);
+  .stock-pill .stock-num {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
-  .pos-card-stock.stock-out .stock-num {
-    color: var(--danger);
-  }
-
-  .pos-card-stock.stock-untracked .stock-num {
+  .stock-pill.stock-untracked {
+    background: var(--bg-surface-2);
     color: var(--ink-muted);
+    border: 1px solid var(--border);
+  }
+
+  .stock-pill.stock-in {
+    background: var(--success-soft);
+    color: var(--success);
+    border: 1px solid rgba(21, 128, 61, 0.25);
+  }
+
+  .stock-pill.stock-low {
+    background: var(--warning-soft);
+    color: var(--warning);
+    border: 1px solid rgba(166, 101, 26, 0.25);
+  }
+
+  .stock-pill.stock-out {
+    background: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid rgba(178, 59, 59, 0.25);
+  }
+
+  /* ── LIST VIEW MODE ── */
+  .pos-grid.pos-list-view {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .pos-grid.pos-list-view .pos-card {
+    flex-direction: row;
+    align-items: center;
+    padding: 10px 14px;
+    gap: 14px;
+  }
+
+  .pos-grid.pos-list-view .pos-card-img-wrap {
+    width: 68px;
+    height: 68px;
+    aspect-ratio: 1/1;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+  }
+
+  .pos-grid.pos-list-view .pos-card-body {
+    padding: 0;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pos-grid.pos-list-view .pos-card-price-row {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-top: 4px;
+    gap: 10px;
+    justify-content: flex-start;
+  }
+
+  .pos-grid.pos-list-view .pos-card-sku {
+    margin-bottom: 0;
+  }
+
+  .pos-grid.pos-list-view .pos-card-footer {
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .pos-grid.pos-list-view .sold-btn {
+    width: auto;
+    padding: 8px 16px;
+    font-size: 0.8125rem;
+    white-space: nowrap;
   }
 
   .pos-card-footer {
@@ -994,40 +1133,115 @@
     color: var(--ink-muted);
   }
 
-  /* ── MOBILE RESPONSIVENESS ── */
-  @media (max-width: 680px) {
+  /* ── RESPONSIVE HELPERS & MOBILE STATS STRIP ── */
+  .desktop-only { display: flex; }
+  .mobile-only { display: none; }
+
+  .pos-mobile-stats {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .desktop-only { display: none !important; }
+    .mobile-only { display: grid !important; }
+
     .pos-header {
       padding: 0 16px;
-      height: 60px;
+      height: 58px;
     }
-    .header-stat:first-child {
-      display: none;
+    .brand-title span:first-child {
+      font-size: 1rem;
     }
-    .header-stat-divider:first-of-type {
-      display: none;
+    .brand-badge {
+      font-size: 0.625rem;
+      padding: 1px 6px;
     }
-    .header-stats-cluster {
-      padding: 4px 10px;
-      gap: 10px;
+    .header-actions {
+      gap: 8px;
     }
+
+    /* Mobile 3-card stats strip */
+    .pos-mobile-stats {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px 16px 0;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+    }
+    .m-stat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 7px 6px;
+      text-align: center;
+      box-shadow: var(--shadow-xs);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+    }
+    .m-stat-val {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--ink-strong);
+      line-height: 1.2;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .m-stat-val.profit-val {
+      color: var(--success);
+    }
+    .m-stat-lbl {
+      font-size: 0.625rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: var(--ink-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .pos-toolbar {
-      padding: 16px 16px 0;
+      padding: 12px 16px 0;
+      gap: 10px;
     }
     .pos-search-box {
       max-width: 100%;
+      min-width: 100%;
+    }
+    .pos-toolbar-actions {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .pos-filter-group {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+    }
+    .pos-filter-group::-webkit-scrollbar {
+      display: none;
     }
     .pos-grid-container {
-      padding: 16px 16px 40px;
+      padding: 14px 16px 40px;
     }
     .pos-grid {
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 14px;
     }
-    .pos-card-price {
-      font-size: 1.125rem;
+    .pos-card-body {
+      padding: 12px 14px 0;
     }
-    .pos-card-meta {
-      display: none;
+    .pos-card-footer {
+      padding: 10px 14px 14px;
     }
 
     .pos-overlay {
@@ -1052,6 +1266,12 @@
       max-width: 100%;
     }
   }
+
+  @media (min-width: 480px) and (max-width: 768px) {
+    .pos-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
 </style>
 </head>
 <body>
@@ -1063,38 +1283,67 @@
     <div class="brand-group">
       <img src="assets/logo.webp" alt="Bazar" class="brand-logo">
       <div class="brand-title">
-        <span>Bazar</span>
-        <span class="brand-badge">POS Terminal</span>
+        <span data-i18n="brand.name">Bazar</span>
+        <span class="brand-badge" data-i18n="pos.terminalBadge">POS Terminal</span>
       </div>
     </div>
 
     <div class="header-actions">
-      <!-- Live Session Stats -->
-      <div class="header-stats-cluster">
+      <!-- Live Session Stats (Desktop) -->
+      <div class="header-stats-cluster desktop-only">
         <div class="header-stat">
           <div class="val" id="hdr-sales">0</div>
-          <div class="lbl">Sales Today</div>
+          <div class="lbl" data-i18n="pos.salesToday">Sales Today</div>
         </div>
         <div class="header-stat-divider"></div>
         <div class="header-stat">
           <div class="val" id="hdr-revenue">0 soʻm</div>
-          <div class="lbl">Revenue</div>
+          <div class="lbl" data-i18n="pos.revenue">Revenue</div>
         </div>
         <div class="header-stat-divider"></div>
         <div class="header-stat">
           <div class="val profit-val" id="hdr-profit">+0 soʻm</div>
-          <div class="lbl">Extra Profit</div>
+          <div class="lbl" data-i18n="pos.extraProfit">Extra Profit</div>
         </div>
       </div>
 
       <!-- Sync Status Pill -->
-      <div class="sync-pill online-synced" id="posSyncPill" title="POS Synchronization status">
+      <div class="sync-pill online-synced" id="posSyncPill" data-i18n-title="pos.syncStatus" title="POS Synchronization status">
         <span class="sync-dot"></span>
-        <span class="sync-label" id="posSyncLabel">Synced</span>
+        <span class="sync-label" id="posSyncLabel" data-i18n="pos.synced">Synced</span>
+      </div>
+
+      <!-- Language Switcher -->
+      <div class="lang-switcher" id="langSwitcher">
+        <button class="lang-toggle" id="langToggle" aria-label="Language: EN" data-i18n-title="topbar.language" title="Language" aria-haspopup="true" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <span class="lang-code" id="langCode">EN</span>
+          <svg class="lang-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
+        <div class="lang-menu" id="langMenu" role="menu" hidden>
+          <button class="lang-option" data-lang="en" role="menuitem">
+            <span class="lang-name">English</span>
+            <span class="lang-iso">EN</span>
+          </button>
+          <button class="lang-option" data-lang="ru" role="menuitem">
+            <span class="lang-name">Русский</span>
+            <span class="lang-iso">RU</span>
+          </button>
+          <button class="lang-option" data-lang="uz" role="menuitem">
+            <span class="lang-name">Oʻzbekcha</span>
+            <span class="lang-iso">UZ</span>
+          </button>
+        </div>
       </div>
 
       <!-- Theme Toggle -->
-      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" data-i18n-title="topbar.toggleTheme" title="Toggle theme">
         <svg class="theme-icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="4"/>
           <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
@@ -1106,6 +1355,22 @@
     </div>
   </header>
 
+  <!-- MOBILE SESSION STATS STRIP -->
+  <div class="pos-mobile-stats mobile-only">
+    <div class="m-stat-card">
+      <div class="m-stat-val" id="m-hdr-sales">0</div>
+      <div class="m-stat-lbl" data-i18n="pos.salesToday">Sales Today</div>
+    </div>
+    <div class="m-stat-card">
+      <div class="m-stat-val" id="m-hdr-revenue">0 soʻm</div>
+      <div class="m-stat-lbl" data-i18n="pos.revenue">Revenue</div>
+    </div>
+    <div class="m-stat-card m-profit">
+      <div class="m-stat-val profit-val" id="m-hdr-profit">+0 soʻm</div>
+      <div class="m-stat-lbl" data-i18n="pos.extraProfit">Extra Profit</div>
+    </div>
+  </div>
+
   <!-- TOOLBAR -->
   <div class="pos-toolbar">
     <div class="pos-search-box">
@@ -1113,17 +1378,40 @@
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" class="pos-search-input" id="search" placeholder="Search products or SKU...">
+      <input type="text" class="pos-search-input" id="search" data-i18n-placeholder="pos.searchPlaceholder" placeholder="Search products or SKU...">
+      <button class="pos-search-clear" id="searchClear" aria-label="Clear" type="button">✕</button>
     </div>
 
-    <div class="pos-filter-group">
-      <button class="pos-filter-btn active" data-filter="all">All Items</button>
-      <button class="pos-filter-btn" data-filter="in-stock">In Stock</button>
-      <button class="pos-filter-btn" data-filter="low">Low Stock</button>
-    </div>
+    <div class="pos-toolbar-actions">
+      <div class="pos-filter-group">
+        <button class="pos-filter-btn active" data-filter="all" data-i18n="pos.filterAll">All Items</button>
+        <button class="pos-filter-btn" data-filter="in-stock" data-i18n="pos.filterInStock">In Stock</button>
+        <button class="pos-filter-btn" data-filter="low" data-i18n="pos.filterLowStock">Low Stock</button>
+      </div>
 
-    <div class="toolbar-right">
-      <span class="count-pill" id="product-count">—</span>
+      <div class="toolbar-right">
+        <div class="view-toggle" id="viewToggle" role="group" aria-label="View mode">
+          <button class="view-btn active" id="viewGridBtn" data-view="grid" data-i18n-title="pos.viewGrid" title="Grid view" aria-label="Grid view">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+          </button>
+          <button class="view-btn" id="viewListBtn" data-view="list" data-i18n-title="pos.viewList" title="List view" aria-label="List view">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <span class="count-pill" id="product-count">—</span>
+      </div>
     </div>
   </div>
 
@@ -1139,7 +1427,7 @@
   <div class="pos-modal" id="modal">
     <div class="pos-modal-header">
       <div>
-        <div class="pos-modal-title">Record Sale</div>
+        <div class="pos-modal-title" data-i18n="pos.recordSaleTitle">Record Sale</div>
         <div class="pos-modal-sub" id="modal-sku"></div>
       </div>
       <button class="pos-modal-close" id="modal-close" aria-label="Close">✕</button>
@@ -1147,7 +1435,7 @@
     <div class="pos-modal-body">
       <!-- Quantity Control -->
       <div class="form-group">
-        <label class="field-label" for="qty-input">Quantity</label>
+        <label class="field-label" for="qty-input" data-i18n="pos.quantity">Quantity</label>
         <div class="qty-control" id="qty-control">
           <button class="qty-btn" id="qty-dec" aria-label="Decrease" type="button">−</button>
           <input class="qty-input" type="number" id="qty-input" value="1" min="1" inputmode="numeric">
@@ -1159,16 +1447,16 @@
             <line x1="12" y1="9" x2="12" y2="13"/>
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
-          Only <span id="qty-max-label"></span> items available.
+          <span id="qty-warn-text">Only <span id="qty-max-label"></span> items available.</span>
         </div>
       </div>
 
       <!-- Selling Price -->
       <div class="form-group">
-        <label class="field-label" for="price-input">Selling Price (per unit in ming soʻm)</label>
+        <label class="field-label" for="price-input" data-i18n="pos.sellingPrice">Selling Price (per unit in ming soʻm)</label>
         <div class="price-input-wrap">
           <input class="price-input" type="number" id="price-input" step="any" min="0" inputmode="decimal" placeholder="140">
-          <span class="price-symbol">ming soʻm</span>
+          <span class="price-symbol" data-i18n="pos.thousandSum">ming soʻm</span>
         </div>
         <div id="price-live-preview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
       </div>
@@ -1176,31 +1464,31 @@
       <!-- Summary -->
       <div class="summary">
         <div class="summary-row">
-          <span class="s-label">Base catalog price</span>
+          <span class="s-label" data-i18n="pos.basePrice">Base catalog price</span>
           <span class="s-val" id="sum-base">—</span>
         </div>
         <div class="summary-row">
-          <span class="s-label">Total base value</span>
+          <span class="s-label" data-i18n="pos.totalBaseValue">Total base value</span>
           <span class="s-val" id="sum-base-total">—</span>
         </div>
         <div class="summary-divider"></div>
         <div class="summary-row">
-          <span class="s-label">Unit selling price</span>
+          <span class="s-label" data-i18n="pos.unitSellingPrice">Unit selling price</span>
           <span class="s-val" id="sum-sell">—</span>
         </div>
         <div class="summary-row">
-          <span class="s-label">Total sale amount</span>
+          <span class="s-label" data-i18n="pos.totalSaleAmount">Total sale amount</span>
           <span class="s-val" id="sum-sell-total">—</span>
         </div>
         <div class="summary-profit even" id="sum-profit-row">
-          <span id="sum-profit-label">At base price</span>
+          <span id="sum-profit-label" data-i18n="pos.atBasePrice">At base catalog price</span>
           <span id="sum-profit-val">0 soʻm</span>
         </div>
       </div>
     </div>
     <div class="pos-modal-footer">
-      <button class="btn-cancel" id="btn-cancel" type="button">Cancel</button>
-      <button class="btn-confirm" id="btn-confirm" type="button">Confirm Sale</button>
+      <button class="btn-cancel" id="btn-cancel" type="button" data-i18n="pos.cancel">Cancel</button>
+      <button class="btn-confirm" id="btn-confirm" type="button" data-i18n="pos.confirmSale">Confirm Sale</button>
     </div>
   </div>
 </div>
@@ -1295,6 +1583,19 @@ const localDb = {
     });
   },
 
+  async clear(storeName) {
+    if (!this.db) return;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) { resolve(); }
+    });
+  },
+
   async getMeta(key) {
     if (!this.db) return null;
     return new Promise((resolve) => {
@@ -1359,15 +1660,39 @@ function notifyCatalog(type, data = {}) {
 if (catalogChannel) {
   catalogChannel.onmessage = async (e) => {
     const { type, product } = e.data || {};
+    if (type === 'DATABASE_RESET') {
+      await Promise.all([
+        localDb.clear('products'),
+        localDb.clear('categories'),
+        localDb.clear('activities'),
+        localDb.clear('outbox')
+      ]);
+      await localDb.setMeta('lastSyncSeq', 0);
+      products = [];
+      categories = [];
+      sessions.sales = 0;
+      sessions.revenue = 0;
+      sessions.extraProfit = 0;
+      const elSales = document.getElementById('hdr-sales');
+      const elRev = document.getElementById('hdr-revenue');
+      const elProf = document.getElementById('hdr-profit');
+      if (elSales) elSales.textContent = '0';
+      if (elRev) elRev.textContent = fmt(0);
+      if (elProf) elProf.textContent = `+${fmt(0)}`;
+      renderGrid();
+      syncEngine.updateUI();
+      return;
+    }
     if (type === 'PRODUCT_CREATED' || type === 'PRODUCT_UPDATED' || type === 'PRODUCT_DELETED' || type === 'CATALOG_CHANGED') {
       await loadProductsFromStorage();
       renderGrid();
+      const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
       if (type === 'PRODUCT_CREATED' && product?.name) {
-        showToast(`New product added: ${product.name}`, 'info');
+        showToast(t('pos.toastNewProduct', { name: product.name }), 'info');
       } else if (type === 'PRODUCT_UPDATED' && product?.name) {
-        showToast(`Product updated: ${product.name}`, 'info');
+        showToast(t('pos.toastUpdatedProduct', { name: product.name }), 'info');
       } else if (type === 'PRODUCT_DELETED') {
-        showToast(`Product removed from catalog`, 'info');
+        showToast(t('pos.toastRemovedProduct'), 'info');
       }
     }
   };
@@ -1388,22 +1713,23 @@ const syncEngine = {
     const allOps = await localDb.getAll('outbox');
     const pending = allOps.filter(o => o.status === 'pending' || o.status === 'syncing');
     const failed = allOps.filter(o => o.status === 'failed' || o.status === 'conflict');
+    const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
 
     pill.className = 'sync-pill';
     if (failed.length > 0) {
       pill.classList.add('sync-alert');
-      label.textContent = `⚠️ ${failed.length} sync issue${failed.length > 1 ? 's' : ''}`;
+      label.textContent = `⚠️ ` + t('pos.syncIssues', { count: failed.length, plural: failed.length > 1 ? 's' : '' });
     } else if (!this.isOnline) {
       pill.classList.add('offline');
       label.textContent = pending.length > 0
-        ? `🔴 Offline (${pending.length})`
-        : '🔴 Offline';
+        ? `🔴 ` + t('pos.offlineCount', { count: pending.length })
+        : `🔴 ` + t('pos.offline');
     } else if (this.syncing || pending.length > 0) {
       pill.classList.add('syncing');
-      label.textContent = `🟡 Syncing (${pending.length})...`;
+      label.textContent = `🟡 ` + t('pos.syncingCount', { count: pending.length });
     } else {
       pill.classList.add('online-synced');
-      label.textContent = '🟢 Synced';
+      label.textContent = `🟢 ` + t('pos.synced');
     }
   },
 
@@ -1498,7 +1824,8 @@ const syncEngine = {
             await localDb.put('products', { ...prod, quantity: prod.stock });
             updateCardStock(prod.id);
           }
-          showToast(`🚨 Sale rejected: Insufficient stock on server.`, 'error', 7000);
+          const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+          showToast(t('pos.toastInsufficientStock'), 'error', 7000);
         }
       } else {
         op.status = 'pending';
@@ -1587,7 +1914,9 @@ async function loadProductsFromStorage() {
 // ── RENDER ────────────────────────────────────────────────────────────────
 function fmt(n) {
   const val = Math.round(Math.abs(n || 0));
-  return val.toLocaleString('ru-RU') + ' soʻm';
+  const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const sym = (lang === 'ru') ? 'сум' : 'soʻm';
+  return val.toLocaleString('ru-RU') + ' ' + sym;
 }
 
 function parsePrice(val) {
@@ -1608,47 +1937,55 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function getLocalizedProductName(p, lang) {
+  lang = lang || ((window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz');
+  if (p.translations && p.translations[lang] && p.translations[lang].trim()) {
+    return p.translations[lang].trim();
+  }
+  return p.name || '';
+}
+
 function renderCard(p) {
   const isUntracked = p.stock === null || p.stock === undefined;
   const isOut = !isUntracked && p.stock === 0;
   const isLow = !isUntracked && p.stock > 0 && p.stock <= 3;
   const badge = isOut ? 'out' : isLow ? 'low' : null;
 
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+
   const badgeMap = {
-    low: '<span class="card-badge badge-low">Low stock</span>',
-    out: '<span class="card-badge badge-out">Out of stock</span>',
-    new: '<span class="card-badge badge-new">New</span>'
+    low: `<span class="card-badge badge-low">${t('pos.lowStockBadge')}</span>`,
+    out: `<span class="card-badge badge-out">${t('pos.outOfStockBadge')}</span>`,
+    new: `<span class="card-badge badge-new">${t('pos.newBadge')}</span>`
   };
 
   const imgSrc = p.image || 'assets/logo.webp';
-  const tr = p.translations || {};
-  const transPills = [
-    tr.uz && `<span title="O'zbekcha">🇺🇿 ${escapeHtml(tr.uz)}</span>`,
-    tr.ru && `<span title="Русский">🇷🇺 ${escapeHtml(tr.ru)}</span>`,
-    tr.en && `<span title="English">🇬🇧 ${escapeHtml(tr.en)}</span>`
-  ].filter(Boolean);
+  const localizedTitle = getLocalizedProductName(p, currentLang);
+  const showOrig = p.name && localizedTitle !== p.name;
+
+  const stockPillHtml = isUntracked
+    ? `<span class="stock-pill stock-untracked" id="stock-${p.id}">${t('pos.untracked')}</span>`
+    : isOut
+      ? `<span class="stock-pill stock-out" id="stock-${p.id}">${t('pos.outOfStockBadge')}</span>`
+      : isLow
+        ? `<span class="stock-pill stock-low" id="stock-${p.id}"><span class="stock-num">${p.stock}</span> ${t('pos.lowStockBadge')}</span>`
+        : `<span class="stock-pill stock-in" id="stock-${p.id}"><span class="stock-num">${p.stock}</span> ${t('pos.inStock')}</span>`;
 
   return `
     <div class="pos-card ${isOut ? 'out-of-stock' : ''}" id="card-${p.id}">
       <div class="sync-indicator" id="sync-${p.id}"></div>
       <div class="pos-card-img-wrap">
-        <img src="${imgSrc}" alt="${escapeHtml(p.name)}" class="pos-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.webp';">
+        <img src="${imgSrc}" alt="${escapeHtml(localizedTitle)}" class="pos-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.webp';">
         ${badge ? badgeMap[badge] || '' : ''}
       </div>
       <div class="pos-card-body">
-        <div class="pos-card-name">${escapeHtml(p.name)}</div>
-        ${transPills.length > 0 ? `
-          <div class="pos-card-trans" style="font-size:0.75rem;color:var(--ink-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHtml(transPills.map(b => b.replace(/<[^>]*>/g, '')).join(' · '))}">
-            ${transPills.join(' · ')}
-          </div>
-        ` : ''}
+        <div class="pos-card-name">${escapeHtml(localizedTitle)}</div>
+        ${showOrig ? `<div class="pos-card-orig">${escapeHtml(p.name)}</div>` : ''}
         <div class="pos-card-sku">SKU: ${escapeHtml(p.sku)}</div>
         <div class="pos-card-price-row">
           <div class="pos-card-price">${fmt(p.price)}</div>
-          <div class="pos-card-stock ${isUntracked ? 'stock-untracked' : isOut ? 'stock-out' : isLow ? 'stock-low' : ''}">
-            <span class="stock-num" id="stock-${p.id}">${isUntracked ? '—' : p.stock}</span>
-            ${isUntracked ? 'untracked' : 'in stock'}
-          </div>
+          ${stockPillHtml}
         </div>
       </div>
       <div class="pos-card-footer">
@@ -1656,7 +1993,7 @@ function renderCard(p) {
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
-          Record Sale
+          ${t('pos.recordSale')}
         </button>
       </div>
     </div>`;
@@ -1664,11 +2001,15 @@ function renderCard(p) {
 
 function renderGrid() {
   const q = searchVal.toLowerCase();
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+
   let visible = products.filter(p => {
     const uz = (p.translations && p.translations.uz ? p.translations.uz.toLowerCase() : '');
     const ru = (p.translations && p.translations.ru ? p.translations.ru.toLowerCase() : '');
     const en = (p.translations && p.translations.en ? p.translations.en.toLowerCase() : '');
-    const matchSearch = !q || p.name.toLowerCase().includes(q) ||
+    const loc = getLocalizedProductName(p, currentLang).toLowerCase();
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || loc.includes(q) ||
       (p.sku && p.sku.toLowerCase().includes(q)) ||
       uz.includes(q) || ru.includes(q) || en.includes(q);
     const isUntracked = p.stock === null || p.stock === undefined;
@@ -1680,20 +2021,25 @@ function renderGrid() {
 
   const grid = document.getElementById('product-grid');
   const count = document.getElementById('product-count');
-  count.textContent = `${visible.length} product${visible.length !== 1 ? 's' : ''}`;
+  if (count) {
+    count.textContent = t('pos.productCount', {
+      count: visible.length,
+      plural: visible.length === 1 ? '' : 's'
+    });
+  }
 
   if (!products.length) {
     grid.innerHTML = `
       <div class="pos-empty">
         <div class="pos-empty-icon">📦</div>
-        <div class="pos-empty-title">No products in catalog</div>
-        <div class="pos-empty-sub">Create your first products in the Admin Panel to start selling.</div>
+        <div class="pos-empty-title">${t('pos.emptyCatalogTitle')}</div>
+        <div class="pos-empty-sub">${t('pos.emptyCatalogSub')}</div>
         <a href="https://admin.caretrack.website" target="_blank" rel="noopener" class="pos-empty-btn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          Open Admin Panel
+          ${t('pos.openAdmin')}
         </a>
       </div>`;
     return;
@@ -1703,8 +2049,8 @@ function renderGrid() {
     grid.innerHTML = `
       <div class="pos-empty">
         <div class="pos-empty-icon">⌕</div>
-        <div class="pos-empty-title">No matching products</div>
-        <div class="pos-empty-sub">Try adjusting your keyword or filter criteria.</div>
+        <div class="pos-empty-title">${t('pos.noMatchTitle')}</div>
+        <div class="pos-empty-sub">${t('pos.noMatchSub')}</div>
       </div>`;
     return;
   }
@@ -1715,19 +2061,34 @@ function updateCardStock(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
   const isUntracked = p.stock === null || p.stock === undefined;
+  const isOut = !isUntracked && p.stock === 0;
+  const isLow = !isUntracked && p.stock > 0 && p.stock <= 3;
   const card = document.getElementById(`card-${p.id}`);
-  const stockEl = document.getElementById(`stock-${p.id}`);
-  if (stockEl) stockEl.textContent = isUntracked ? '—' : p.stock;
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+
+  const stockPillHtml = isUntracked
+    ? `<span class="stock-pill stock-untracked" id="stock-${p.id}">${t('pos.untracked')}</span>`
+    : isOut
+      ? `<span class="stock-pill stock-out" id="stock-${p.id}">${t('pos.outOfStockBadge')}</span>`
+      : isLow
+        ? `<span class="stock-pill stock-low" id="stock-${p.id}"><span class="stock-num">${p.stock}</span> ${t('pos.lowStockBadge')}</span>`
+        : `<span class="stock-pill stock-in" id="stock-${p.id}"><span class="stock-num">${p.stock}</span> ${t('pos.inStock')}</span>`;
+
   if (card) {
-    const stockContainer = card.querySelector('.pos-card-stock');
-    if (stockContainer) {
-      stockContainer.className = `pos-card-stock ${isUntracked ? 'stock-untracked' : p.stock === 0 ? 'stock-out' : (p.stock <= 3 ? 'stock-low' : '')}`;
-      stockContainer.innerHTML = `<span class="stock-num" id="stock-${p.id}">${isUntracked ? '—' : p.stock}</span>${isUntracked ? 'untracked' : 'in stock'}`;
+    const existingPill = card.querySelector('.stock-pill');
+    if (existingPill) {
+      existingPill.outerHTML = stockPillHtml;
+    } else {
+      const priceRow = card.querySelector('.pos-card-price-row');
+      if (priceRow) priceRow.insertAdjacentHTML('beforeend', stockPillHtml);
     }
     const btn = card.querySelector('.sold-btn');
     if (!isUntracked && p.stock === 0) {
       card.classList.add('out-of-stock');
       if (btn) btn.disabled = true;
+    } else {
+      card.classList.remove('out-of-stock');
+      if (btn) btn.disabled = false;
     }
   }
 }
@@ -1738,7 +2099,9 @@ function openModal(productId) {
   const isUntracked = activeProduct && (activeProduct.stock === null || activeProduct.stock === undefined);
   if (!activeProduct || (!isUntracked && activeProduct.stock === 0)) return;
 
-  document.getElementById('modal-sku').textContent = `${activeProduct.name}${activeProduct.sku ? ` · SKU: ${activeProduct.sku}` : ''}`;
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const locTitle = getLocalizedProductName(activeProduct, currentLang);
+  document.getElementById('modal-sku').textContent = `${locTitle}${activeProduct.sku ? ` · SKU: ${activeProduct.sku}` : ''}`;
   document.getElementById('qty-input').value = 1;
   const unitMing = activeProduct.price >= 1000 ? Math.round(activeProduct.price / 1000) : activeProduct.price;
   document.getElementById('price-input').value = unitMing;
@@ -1755,8 +2118,12 @@ function closeModal() {
   document.getElementById('overlay').classList.remove('open');
   activeProduct = null;
   confirmLock = false;
-  document.getElementById('btn-confirm').disabled = false;
-  document.getElementById('btn-confirm').textContent = 'Confirm Sale';
+  const btn = document.getElementById('btn-confirm');
+  if (btn) {
+    btn.disabled = false;
+    const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+    btn.textContent = t('pos.confirmSale');
+  }
 }
 
 // ── SUMMARY CALC ──────────────────────────────────────────────────────────
@@ -1766,12 +2133,13 @@ function updateSummary() {
   const rawPrice = parseFloat(document.getElementById('price-input').value);
   const price    = parsePrice(rawPrice);
   const base     = activeProduct.price;
+  const t        = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
 
   const previewEl = document.getElementById('price-live-preview');
   if (previewEl) {
     if (!isNaN(rawPrice) && rawPrice > 0) {
       previewEl.style.display = 'block';
-      const mingLabel = (price / 1000).toLocaleString('ru-RU') + ' ming soʻm';
+      const mingLabel = (price / 1000).toLocaleString('ru-RU') + ' ' + t('pos.thousandSum');
       previewEl.textContent = `💰 ${mingLabel} = ${fmt(price)}`;
     } else {
       previewEl.style.display = 'none';
@@ -1789,7 +2157,7 @@ function updateSummary() {
 
   if (isNaN(rawPrice) || rawPrice <= 0) {
     profitRow.className = 'summary-profit even';
-    profitLbl.textContent = 'Enter a selling price';
+    profitLbl.textContent = t('pos.enterSellingPrice');
     profitVal.textContent = '—';
     return;
   }
@@ -1799,15 +2167,15 @@ function updateSummary() {
 
   if (Math.abs(diff) < 0.001) {
     profitRow.className = 'summary-profit even';
-    profitLbl.textContent = 'At base catalog price';
-    profitVal.textContent = '0 soʻm';
+    profitLbl.textContent = t('pos.atBasePrice');
+    profitVal.textContent = fmt(0);
   } else if (diff > 0) {
     profitRow.className = 'summary-profit profit';
-    profitLbl.textContent = `Extra profit`;
+    profitLbl.textContent = t('pos.extraProfit');
     profitVal.textContent = `+${fmt(total)}`;
   } else {
     profitRow.className = 'summary-profit discount';
-    profitLbl.textContent = `Discount / reduction`;
+    profitLbl.textContent = t('pos.discount');
     profitVal.textContent = `−${fmt(Math.abs(total))}`;
   }
 }
@@ -1818,12 +2186,17 @@ function validateQty() {
   const warn = document.getElementById('qty-warn');
   const ctrl = document.getElementById('qty-control');
   const maxLbl = document.getElementById('qty-max-label');
+  const warnText = document.getElementById('qty-warn-text');
   const isUntracked = activeProduct.stock === null || activeProduct.stock === undefined;
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
 
   if (!isUntracked && qty > activeProduct.stock) {
     warn.classList.add('visible');
     ctrl.classList.add('error');
-    maxLbl.textContent = activeProduct.stock;
+    if (maxLbl) maxLbl.textContent = activeProduct.stock;
+    if (warnText) {
+      warnText.textContent = t('pos.onlyItemsAvailable', { max: activeProduct.stock });
+    }
     return false;
   } else {
     warn.classList.remove('visible');
@@ -1857,6 +2230,7 @@ document.getElementById('price-input').addEventListener('input', () => {
 document.getElementById('btn-confirm').addEventListener('click', async () => {
   if (confirmLock || !activeProduct) return;
 
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
   const qty      = parseInt(document.getElementById('qty-input').value) || 0;
   const rawPrice = parseFloat(document.getElementById('price-input').value);
   const price    = parsePrice(rawPrice);
@@ -1864,13 +2238,13 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
   const isUntracked = p.stock === null || p.stock === undefined;
 
   // Validate
-  if (qty < 1) { showToast('Enter a valid quantity.', 'warn'); return; }
-  if (!isUntracked && qty > p.stock) { showToast(`Only ${p.stock} items in stock.`, 'warn'); return; }
-  if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast('Enter a valid selling price.', 'warn'); return; }
+  if (qty < 1) { showToast(t('pos.toastValidQty'), 'warn'); return; }
+  if (!isUntracked && qty > p.stock) { showToast(t('pos.toastStockLimit', { stock: p.stock }), 'warn'); return; }
+  if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast(t('pos.toastValidPrice'), 'warn'); return; }
 
   confirmLock = true;
   document.getElementById('btn-confirm').disabled = true;
-  document.getElementById('btn-confirm').textContent = 'Saving…';
+  document.getElementById('btn-confirm').textContent = t('pos.saving');
 
   // Transaction record (local session)
   const tx = {
@@ -1945,11 +2319,7 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
     total: tx.totalSaleValue
   });
 
-  // Update header stats
-  document.getElementById('hdr-sales').textContent = sessions.sales;
-  document.getElementById('hdr-revenue').textContent = fmt(sessions.revenue);
-  document.getElementById('hdr-profit').textContent = `+${fmt(sessions.extraProfit)}`;
-
+  updateHeaderStats();
   updateCardStock(p.id);
   closeModal();
 
@@ -1958,18 +2328,43 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
 
   // Build toast detail
   const diff = tx.priceDiff;
-  const profitLine = Math.abs(diff) < 0.01 ? 'Sold at catalog price' :
-    diff > 0 ? `Extra profit: +${fmt(diff)}` : `Discount: −${fmt(Math.abs(diff))}`;
+  const profitLine = Math.abs(diff) < 0.01 ? t('pos.toastSoldAtBase') :
+    diff > 0 ? t('pos.toastExtraProfit', { amount: fmt(diff) }) : t('pos.toastDiscount', { amount: fmt(Math.abs(diff)) });
 
-  showToast(`${p.name} × ${qty} · Sold for ${fmt(price * qty)}`, 'success', profitLine);
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const locName = getLocalizedProductName(p, currentLang);
+  showToast(t('pos.toastSaleSuccess', { name: locName, qty, total: fmt(price * qty) }), 'success', profitLine);
 });
+
+// ── HEADER STATS UPDATE (DESKTOP + MOBILE) ────────────────────────────────
+function updateHeaderStats() {
+  const salesEl = document.getElementById('hdr-sales');
+  const mSalesEl = document.getElementById('m-hdr-sales');
+  const revEl = document.getElementById('hdr-revenue');
+  const mRevEl = document.getElementById('m-hdr-revenue');
+  const profitEl = document.getElementById('hdr-profit');
+  const mProfitEl = document.getElementById('m-hdr-profit');
+
+  if (salesEl) salesEl.textContent = sessions.sales;
+  if (mSalesEl) mSalesEl.textContent = sessions.sales;
+  if (revEl) revEl.textContent = fmt(sessions.revenue);
+  if (mRevEl) mRevEl.textContent = fmt(sessions.revenue);
+  if (profitEl) profitEl.textContent = `+${fmt(sessions.extraProfit)}`;
+  if (mProfitEl) mProfitEl.textContent = `+${fmt(sessions.extraProfit)}`;
+}
 
 // ── SYNC INDICATOR ────────────────────────────────────────────────────────
 function showSync(productId, status) {
   const el = document.getElementById(`sync-${productId}`);
   if (!el) return;
   el.className = 'sync-indicator visible sync-' + status;
-  const icons = { saved: '✓ Saved', syncing: '⟳ Syncing', synced: '✓ Synced', failed: '⚠ Sync failed' };
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  const icons = {
+    saved: `✓ ${t('pos.saved')}`,
+    syncing: `⟳ ${t('pos.syncing')}`,
+    synced: `✓ ${t('pos.synced')}`,
+    failed: `⚠ ${t('pos.syncFailed')}`
+  };
   el.textContent = icons[status] || '';
   if (status === 'synced') {
     setTimeout(() => el.classList.remove('visible'), 3000);
@@ -2010,10 +2405,26 @@ document.addEventListener('keydown', e => {
 });
 
 // ── SEARCH & FILTER ───────────────────────────────────────────────────────
-document.getElementById('search').addEventListener('input', e => {
-  searchVal = e.target.value;
-  renderGrid();
-});
+const searchInputEl = document.getElementById('search');
+const searchClearEl = document.getElementById('searchClear');
+if (searchInputEl) {
+  searchInputEl.addEventListener('input', e => {
+    searchVal = e.target.value;
+    if (searchClearEl) {
+      searchClearEl.style.display = searchVal ? 'flex' : 'none';
+    }
+    renderGrid();
+  });
+}
+if (searchClearEl && searchInputEl) {
+  searchClearEl.addEventListener('click', () => {
+    searchInputEl.value = '';
+    searchVal = '';
+    searchClearEl.style.display = 'none';
+    renderGrid();
+    searchInputEl.focus();
+  });
+}
 document.querySelectorAll('.pos-filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.pos-filter-btn').forEach(b => b.classList.remove('active'));
@@ -2022,6 +2433,90 @@ document.querySelectorAll('.pos-filter-btn').forEach(btn => {
     renderGrid();
   });
 });
+
+// ── VIEW TOGGLE (GRID / LIST) ─────────────────────────────────────────────
+let currentViewMode = 'grid';
+try {
+  const savedView = localStorage.getItem('salestrack-pos-view');
+  if (savedView === 'list' || savedView === 'grid') currentViewMode = savedView;
+} catch (e) {}
+
+function setViewMode(mode) {
+  currentViewMode = mode;
+  try { localStorage.setItem('salestrack-pos-view', mode); } catch (e) {}
+  const grid = document.getElementById('product-grid');
+  const gridBtn = document.getElementById('viewGridBtn');
+  const listBtn = document.getElementById('viewListBtn');
+  if (grid) {
+    grid.classList.toggle('pos-list-view', mode === 'list');
+  }
+  if (gridBtn) gridBtn.classList.toggle('active', mode === 'grid');
+  if (listBtn) listBtn.classList.toggle('active', mode === 'list');
+}
+
+function setupViewToggle() {
+  const gridBtn = document.getElementById('viewGridBtn');
+  const listBtn = document.getElementById('viewListBtn');
+  if (gridBtn) gridBtn.addEventListener('click', () => setViewMode('grid'));
+  if (listBtn) listBtn.addEventListener('click', () => setViewMode('list'));
+  setViewMode(currentViewMode);
+}
+
+// ── LANGUAGE SWITCHER ─────────────────────────────────────────────────────
+function setupLanguageSwitcher() {
+  const wrapper = document.getElementById('langSwitcher');
+  const toggle  = document.getElementById('langToggle');
+  const menu    = document.getElementById('langMenu');
+  if (!wrapper || !toggle || !menu) return;
+
+  const openMenu = () => {
+    menu.hidden = false;
+    requestAnimationFrame(() => wrapper.classList.add('open'));
+    toggle.setAttribute('aria-expanded', 'true');
+  };
+  const closeMenu = () => {
+    wrapper.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+    setTimeout(() => { if (!wrapper.classList.contains('open')) menu.hidden = true; }, 160);
+  };
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    wrapper.classList.contains('open') ? closeMenu() : openMenu();
+  });
+
+  menu.querySelectorAll('.lang-option').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const code = btn.getAttribute('data-lang');
+      if (window.i18n && code) {
+        window.i18n.setLang(code);
+      }
+      closeMenu();
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (wrapper.classList.contains('open') && !wrapper.contains(e.target)) closeMenu();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && wrapper.classList.contains('open')) closeMenu();
+  });
+
+  updateLanguageSwitcherUI();
+}
+
+function updateLanguageSwitcherUI() {
+  const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const codeEl = document.getElementById('langCode');
+  if (codeEl) codeEl.textContent = lang.toUpperCase();
+  const toggleBtn = document.getElementById('langToggle');
+  if (toggleBtn) toggleBtn.setAttribute('aria-label', `Language: ${lang.toUpperCase()}`);
+  document.querySelectorAll('#langMenu .lang-option').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+  });
+}
 
 // ── THEME TOGGLE ──────────────────────────────────────────────────────────
 const themeBtn = document.getElementById('themeToggle');
@@ -2053,6 +2548,25 @@ async function init() {
   await loadProductsFromStorage();
   renderGrid();
 
+  setupLanguageSwitcher();
+  setupViewToggle();
+
+  // Listen to i18n changes
+  document.addEventListener('i18n:change', () => {
+    if (window.i18n && window.i18n.t) {
+      document.title = window.i18n.t('pos.title');
+    }
+    updateLanguageSwitcherUI();
+    updateHeaderStats();
+    syncEngine.updateUI();
+    renderGrid();
+  });
+
+  // Initial title setup
+  if (window.i18n && window.i18n.t) {
+    document.title = window.i18n.t('pos.title');
+  }
+
   // Hydrate session stats from today's activities
   try {
     const todayStart = new Date().setHours(0, 0, 0, 0);
@@ -2061,9 +2575,7 @@ async function init() {
     sessions.sales = todaySales.length;
     sessions.revenue = todaySales.reduce((acc, a) => acc + (Number(a.totalSaleValue) || (Number(a.sellingPrice || 0) * (a.quantity || 1))), 0);
     sessions.extraProfit = todaySales.reduce((acc, a) => acc + (Math.max(0, Number(a.priceDiff) || 0)), 0);
-    document.getElementById('hdr-sales').textContent = sessions.sales;
-    document.getElementById('hdr-revenue').textContent = fmt(sessions.revenue);
-    document.getElementById('hdr-profit').textContent = `+${fmt(sessions.extraProfit)}`;
+    updateHeaderStats();
   } catch (e) {
     console.warn('[pos stats] Failed to hydrate session stats:', e);
   }

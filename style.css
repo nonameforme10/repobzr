@@ -1335,6 +1335,20 @@ canvas {
 
 .btn-outline svg { stroke: currentColor; }
 
+.btn-outline-danger {
+    background: transparent;
+    color: var(--danger);
+    border-color: rgba(178, 59, 59, 0.35);
+}
+
+.btn-outline-danger:hover {
+    background: rgba(178, 59, 59, 0.08);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.btn-outline-danger svg { stroke: currentColor; }
+
 .btn-sm {
     padding: 5px 10px;
     font-size: 0.75rem;
@@ -2551,6 +2565,17 @@ canvas {
 [data-theme="dark"] .btn-danger {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color: #FFFFFF;
+}
+
+[data-theme="dark"] .btn-outline-danger {
+    color: #f87171;
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+[data-theme="dark"] .btn-outline-danger:hover {
+    background: rgba(248, 113, 113, 0.14);
+    border-color: #f87171;
+    color: #f87171;
 }
 
 /* Logo chip slightly more luminous in dark */

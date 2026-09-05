@@ -1449,6 +1449,67 @@ function dailyReset() {
     });
 }
 
+// ==================== CLEAR ALL DATA (SQL + CLIENT) ====================
+async function clearAllData() {
+    confirmAction(tr('action.clearAllData'), tr('action.confirmClearAllData'), async () => {
+        const btn = document.getElementById('clearAllDataBtn');
+        const originalHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg> <span>...</span>`;
+        }
+        try {
+            // 1. Wipe backend PostgreSQL database
+            const res = await fetch('/api/reset-database', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}));
+                throw new Error(errJson.error || `Server responded with ${res.status}`);
+            }
+
+            // 2. Clear local IndexedDB stores
+            await Promise.all([
+                localDb.clear('products'),
+                localDb.clear('categories'),
+                localDb.clear('activities'),
+                localDb.clear('outbox')
+            ]);
+            await localDb.setMeta('lastSyncSeq', 0);
+
+            // 3. Clear localStorage snapshot
+            try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+
+            // 4. Reset in-memory state
+            state.products = [];
+            state.categories = [];
+            state.activities = [];
+
+            // 5. Update UI & Category Filter
+            refreshAll();
+            const filter = document.getElementById('productCategoryFilter');
+            if (filter) {
+                filter.innerHTML = '<option value="">All Categories</option>';
+            }
+            syncEngine.updateUI();
+
+            // 6. Broadcast reset to any open POS/Sellers tabs
+            notifyCatalogChange('DATABASE_RESET');
+
+            showToast(tr('action.clearAllDataSuccess'), 'success', 4000);
+        } catch (err) {
+            console.error('[clearAllData error]', err);
+            showToast(err.message || 'Failed to clear database', 'error', 5000);
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalHtml;
+            }
+        }
+    });
+}
+
 // ==================== RENDERERS ====================
 function refreshAll() {
     renderDashboard();
@@ -3046,6 +3107,7 @@ function setupEventListeners() {
         e.target.value = '';
     });
     document.getElementById('resetDailyBtn')?.addEventListener('click', dailyReset);
+    document.getElementById('clearAllDataBtn')?.addEventListener('click', clearAllData);
     document.getElementById('clearActivityBtn')?.addEventListener('click', () => {
         confirmAction(tr('activity.clearHistory'), tr('activity.confirmClear'), () => {
             state.activities = [];

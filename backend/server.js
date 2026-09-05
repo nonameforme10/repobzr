@@ -165,6 +165,33 @@ apiRouter.post('/sync', syncPostLimiter, async (req, res, next) => {
   }
 });
 
+// Database Wipe / Reset Endpoint (Testing & Clean State)
+apiRouter.post('/reset-database', async (req, res, next) => {
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    // Truncate business and sync tracking tables, restarting identity counters
+    await client.query(`
+      TRUNCATE TABLE products, activities, categories, sync_operations, changes RESTART IDENTITY CASCADE
+    `);
+    // Clear settings and restore default UZS currency
+    await client.query('DELETE FROM settings');
+    await client.query(
+      "INSERT INTO settings (key, value, updated_at) VALUES ('general', $1, $2)",
+      [JSON.stringify({ currency: 'UZS' }), Date.now()]
+    );
+    await client.query('COMMIT');
+    console.log('[db] Database data wipe executed successfully.');
+    res.status(200).json({ ok: true, message: 'Database reset successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[db reset error]', err.message);
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
 // Today's CBU Rates handler
 const ratesHandler = async (req, res, next) => {
   try {
