@@ -561,6 +561,12 @@ const syncEngine = {
                 .filter(Boolean)
         );
 
+        await Promise.all([
+            localDb.clear('categories'),
+            localDb.clear('products'),
+            localDb.clear('activities')
+        ]);
+
         if (Array.isArray(snapshot.categories)) {
             const mergedCats = snapshot.categories.map(sc => {
                 if (pendingEntityIds.has(sc.id)) {
@@ -572,7 +578,9 @@ const syncEngine = {
             const serverCatIds = new Set(snapshot.categories.map(c => c.id));
             const pendingNewCats = state.categories.filter(c => pendingEntityIds.has(c.id) && !serverCatIds.has(c.id));
             state.categories = [...mergedCats, ...pendingNewCats];
-            await localDb.putAll('categories', state.categories);
+            if (state.categories.length > 0) await localDb.putAll('categories', state.categories);
+        } else {
+            state.categories = [];
         }
 
         if (Array.isArray(snapshot.products)) {
@@ -586,12 +594,22 @@ const syncEngine = {
             const serverProdIds = new Set(snapshot.products.map(p => p.id));
             const pendingNewProds = state.products.filter(p => pendingEntityIds.has(p.id) && !serverProdIds.has(p.id));
             state.products = [...mergedProds, ...pendingNewProds];
-            await localDb.putAll('products', state.products);
+            if (state.products.length > 0) await localDb.putAll('products', state.products);
+        } else {
+            state.products = [];
         }
 
         if (Array.isArray(snapshot.activities)) {
             state.activities = snapshot.activities;
-            await localDb.putAll('activities', state.activities);
+            if (state.activities.length > 0) await localDb.putAll('activities', state.activities);
+        } else {
+            state.activities = [];
+        }
+
+        // If the server snapshot is completely empty, clean local outbox and localStorage
+        if (state.categories.length === 0 && state.products.length === 0) {
+            await localDb.clear('outbox');
+            try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
         }
 
         refreshAll();
@@ -2406,44 +2424,25 @@ function setupEventListeners() {
     });
 }
 
-// ==================== DEMO DATA ====================
-function loadDemoData() {
-    if (state.categories.length || state.products.length) return;
-
-    const clothes = { id: generateId(), name: 'Clothes', createdAt: Date.now() };
-    const shoes = { id: generateId(), name: 'Shoes', createdAt: Date.now() };
-    const electronics = { id: generateId(), name: 'Electronics', createdAt: Date.now() };
-    const accessories = { id: generateId(), name: 'Accessories', createdAt: Date.now() };
-
-    state.categories = [clothes, shoes, electronics, accessories];
-
-    const demoProducts = [
-        { id: generateId(), categoryId: clothes.id, name: 'Atlas Jacket', quantity: 12, sold: 5, price: 89.99, notes: 'Premium winter collection', createdAt: Date.now() },
-        { id: generateId(), categoryId: clothes.id, name: 'Shuba Coat', quantity: 8, sold: 3, price: 149.99, notes: 'Russian style fur coat', createdAt: Date.now() },
-        { id: generateId(), categoryId: clothes.id, name: 'Hoodie Pro', quantity: 25, sold: 12, price: 59.99, notes: '', createdAt: Date.now() },
-        { id: generateId(), categoryId: shoes.id, name: 'Running Sneakers', quantity: 18, sold: 7, price: 79.99, notes: 'Size 42-45 available', createdAt: Date.now() },
-        { id: generateId(), categoryId: shoes.id, name: 'Leather Boots', quantity: 6, sold: 2, price: 129.99, notes: 'Handmade leather', createdAt: Date.now() },
-        { id: generateId(), categoryId: electronics.id, name: 'Wireless Earbuds', quantity: 30, sold: 15, price: 49.99, notes: 'Bluetooth 5.3', createdAt: Date.now() },
-        { id: generateId(), categoryId: electronics.id, name: 'Smart Watch', quantity: 10, sold: 4, price: 199.99, notes: 'Heart rate monitor', createdAt: Date.now() },
-        { id: generateId(), categoryId: accessories.id, name: 'Leather Belt', quantity: 20, sold: 6, price: 34.99, notes: '', createdAt: Date.now() },
-        { id: generateId(), categoryId: accessories.id, name: 'Sunglasses', quantity: 15, sold: 3, price: 44.99, notes: 'UV400 protection', createdAt: Date.now() }
-    ];
-
-    state.products = demoProducts;
-
-    // Generate some demo activities
-    const now = Date.now();
-    state.activities = [
-        { id: generateId(), type: 'create', timestamp: now - 86400000 * 3, categoryId: clothes.id, categoryName: 'Clothes', notes: 'Category created' },
-        { id: generateId(), type: 'create', timestamp: now - 86400000 * 3, productId: demoProducts[0].id, productName: 'Atlas Jacket', categoryId: clothes.id, categoryName: 'Clothes', notes: 'Product created' },
-        { id: generateId(), type: 'sale', timestamp: now - 3600000 * 4, productId: demoProducts[0].id, productName: 'Atlas Jacket', categoryId: clothes.id, categoryName: 'Clothes', quantity: 2, notes: 'Customer bought 2 jackets for winter', previousQuantity: 14, previousSold: 3 },
-        { id: generateId(), type: 'sale', timestamp: now - 3600000 * 2, productId: demoProducts[5].id, productName: 'Wireless Earbuds', categoryId: electronics.id, categoryName: 'Electronics', quantity: 1, notes: 'Gift purchase', previousQuantity: 31, previousSold: 14 },
-        { id: generateId(), type: 'sale', timestamp: now - 1800000, productId: demoProducts[2].id, productName: 'Hoodie Pro', categoryId: clothes.id, categoryName: 'Clothes', quantity: 1, notes: 'Teen customer', previousQuantity: 26, previousSold: 11 },
-        { id: generateId(), type: 'update', timestamp: now - 900000, productId: demoProducts[3].id, productName: 'Running Sneakers', categoryId: shoes.id, categoryName: 'Shoes', quantity: 5, notes: 'Restocked +5 from warehouse' }
-    ];
-
-    saveState();
-    showToast(tr('data.demoLoaded'), 'success');
+// ==================== CLEAN SLATE / RESET ====================
+async function purgeDemoDataIfPresent() {
+    const demoProductNames = new Set([
+        'Atlas Jacket', 'Shuba Coat', 'Hoodie Pro', 'Running Sneakers',
+        'Leather Boots', 'Wireless Earbuds', 'Smart Watch', 'Leather Belt', 'Sunglasses'
+    ]);
+    if (state.products.some(p => demoProductNames.has(p.name))) {
+        state.products = [];
+        state.categories = [];
+        state.activities = [];
+        await Promise.all([
+            localDb.clear('products'),
+            localDb.clear('categories'),
+            localDb.clear('activities'),
+            localDb.clear('outbox')
+        ]);
+        await localDb.setMeta('lastSyncSeq', 0);
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+    }
 }
 
 // ==================== INIT ====================
@@ -2460,10 +2459,8 @@ async function init() {
 
     await localDb.init();
     await loadState();
+    await purgeDemoDataIfPresent();
     currency.load();                  // hydrate cached active code + rates
-    if (!state.categories.length && !state.products.length) {
-        loadDemoData();
-    }
     setupEventListeners();
     refreshAll();
     navigateTo('dashboard');

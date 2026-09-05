@@ -90,8 +90,8 @@ async function getChangesSince(sinceSeq = 0) {
     const minSeq = Number(statsRes.rows[0]?.min_seq || 0);
     const maxSeq = Number(statsRes.rows[0]?.max_seq || 0);
 
-    // If client cursor is behind oldest retained change (and database has changes)
-    if (cursor > 0 && minSeq > 0 && cursor < minSeq) {
+    // If client cursor is behind oldest retained change OR ahead of maxSeq (db was wiped/reset)
+    if ((cursor > 0 && maxSeq === 0) || (cursor > maxSeq) || (minSeq > 1 && cursor < minSeq) || (cursor > 0 && minSeq > 0 && cursor < minSeq)) {
       return {
         requiresBootstrap: true,
         currentSeq: maxSeq,
