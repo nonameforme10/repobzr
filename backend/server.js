@@ -59,6 +59,14 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     if (allowedOrigins.length === 0 || allowedOrigins.includes('*')) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
+
+    try {
+      const url = new URL(origin);
+      if (url.hostname === 'caretrack.website' || url.hostname.endsWith('.caretrack.website') || url.hostname.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+    } catch (e) {}
+
     return callback(new Error(`Origin '${origin}' not allowed by CORS`));
   },
   methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'DELETE', 'PATCH'],
