@@ -4,7 +4,23 @@
  * stock validation, deterministic idempotency, and incremental changelog.
  */
 
+const crypto = require('crypto');
 const { pool, getClient } = require('../db');
+
+function canonicalStringify(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalStringify).join(',') + ']';
+  }
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + canonicalStringify(obj[k])).join(',') + '}';
+}
+
+function hashPayload(payload) {
+  return crypto.createHash('sha256').update(canonicalStringify(payload)).digest('hex');
+}
 
 /**
  * Fetch full authoritative snapshot for initial bootstrap/hydration
@@ -102,14 +118,30 @@ async function processSyncBatch(deviceId, operations = []) {
 
       await client.query('BEGIN');
       try {
+        const now = Date.now();
+        const payload = op.payload || {};
+        const currentHash = hashPayload(payload);
+
         // 1. Deterministic Idempotency Check
         const existingRes = await client.query(
-          'SELECT result FROM sync_operations WHERE id = $1',
+          'SELECT result, payload_hash FROM sync_operations WHERE id = $1',
           [op.id]
         );
 
         if (existingRes.rows.length > 0) {
-          const cached = existingRes.rows[0].result;
+          const row = existingRes.rows[0];
+          // Reject if operation ID reused with different payload
+          if (row.payload_hash && row.payload_hash !== currentHash) {
+            const reuseError = {
+              code: 'IDEMPOTENCY_KEY_REUSE',
+              message: 'Operation ID reused with conflicting payload'
+            };
+            rejected.push({ id: op.id, ...reuseError });
+            await client.query('ROLLBACK');
+            continue;
+          }
+
+          const cached = row.result;
           if (cached && cached.rejected) {
             rejected.push({ id: op.id, ...cached.rejected });
           } else {
@@ -120,9 +152,6 @@ async function processSyncBatch(deviceId, operations = []) {
         }
 
         // 2. Process Operation
-        const now = Date.now();
-        const payload = op.payload || {};
-
         if (op.type === 'SALE') {
           const { productId, quantity, notes, timestamp } = payload;
           const saleQty = Number(quantity);
@@ -151,8 +180,8 @@ async function processSyncBatch(deviceId, operations = []) {
             };
 
             await client.query(
-              'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result) VALUES ($1, $2, $3, $4, $5, $6)',
-              [op.id, deviceId, op.type, op.createdAt || now, now, { rejected: rejectInfo }]
+              'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+              [op.id, deviceId, op.type, op.createdAt || now, now, { rejected: rejectInfo }, currentHash]
             );
             await client.query('COMMIT');
             rejected.push({ id: op.id, ...rejectInfo });
@@ -361,8 +390,8 @@ async function processSyncBatch(deviceId, operations = []) {
 
         // Record successful operation in sync_operations table for idempotency
         await client.query(
-          'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result) VALUES ($1, $2, $3, $4, $5, $6)',
-          [op.id, deviceId, op.type, op.createdAt || now, now, { success: true }]
+          'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [op.id, deviceId, op.type, op.createdAt || now, now, { success: true }, currentHash]
         );
 
         await client.query('COMMIT');

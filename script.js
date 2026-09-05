@@ -349,6 +349,26 @@ const syncEngine = {
 
     async kick() {
         if (this.syncing) return;
+
+        if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
+            try {
+                await navigator.locks.request('salestrack-sync-lock', { ifAvailable: true }, async (lock) => {
+                    if (!lock) {
+                        // Another tab is actively executing sync
+                        return;
+                    }
+                    await this._executeSync();
+                });
+            } catch (e) {
+                await this._executeSync();
+            }
+        } else {
+            await this._executeSync();
+        }
+    },
+
+    async _executeSync() {
+        if (this.syncing) return;
         clearTimeout(this.retryTimer);
         this.syncing = true;
         await this.updateUI();
@@ -412,8 +432,33 @@ const syncEngine = {
                 op.errorCode = rej.code || 'REJECTED';
                 op.errorMessage = rej.message || 'Operation rejected by server';
                 op.attempts = (op.attempts || 0) + 1;
-                await localDb.put('outbox', op);
-                showToast(`⚠️ Sync notice: ${op.errorMessage}`, 'warning');
+
+                // Explicit handling of rejected offline sales or operations
+                if (op.type === 'SALE') {
+                    const prodId = op.payload?.productId;
+                    const saleQty = Number(op.payload?.quantity) || 0;
+                    const prod = state.products.find(p => p.id === prodId);
+                    if (prod) {
+                        // Reconcile and restore optimistic local stock deduction
+                        prod.quantity += saleQty;
+                        prod.sold = Math.max(0, prod.sold - saleQty);
+                        await localDb.put('products', prod);
+                    }
+                    // Remove or tag the optimistic activity
+                    if (op.payload?.activityId) {
+                        state.activities = state.activities.filter(a => a.id !== op.payload.activityId);
+                        await localDb.delete('activities', op.payload.activityId);
+                    }
+                    op.status = 'conflict';
+                    await localDb.put('outbox', op);
+                    refreshAll();
+
+                    const prodName = prod?.name || 'Product';
+                    showToast(`🚨 Sale rejected (${prodName}): ${rej.message || 'Insufficient stock on server'}. Local stock restored.`, 'error', 7000);
+                } else {
+                    await localDb.put('outbox', op);
+                    showToast(`⚠️ Sync notice: ${op.errorMessage}`, 'warning', 5000);
+                }
             } else {
                 op.status = 'pending';
                 await localDb.put('outbox', op);
@@ -754,13 +799,14 @@ function tr(key, params) {
 }
 
 // ==================== TOASTS & CONFIRM ====================
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', duration = 3000) {
     const container = document.getElementById('toastContainer');
+    if (!container) return;
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     toast.textContent = message;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    setTimeout(() => toast.remove(), duration);
 }
 
 function confirmAction(title, message, onConfirm) {
@@ -2375,6 +2421,16 @@ function loadDemoData() {
 
 // ==================== INIT ====================
 async function init() {
+    // Request persistent storage defensively to prevent browser eviction
+    if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
+        try {
+            const isPersisted = await navigator.storage.persist();
+            console.log(`[storage] Persistent storage granted: ${isPersisted}`);
+        } catch (e) {
+            console.warn('[storage] navigator.storage.persist error:', e);
+        }
+    }
+
     await localDb.init();
     await loadState();
     currency.load();                  // hydrate cached active code + rates
