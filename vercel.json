@@ -1,6 +1,239 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin.caretrack.website"
+        }
+      ],
+      "destination": "/admin",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "sellers.caretrack.website"
+        }
+      ],
+      "destination": "/sellers",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "project-7qjuu.vercel.app"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers",
+      "has": [
+        {
+          "type": "host",
+          "value": "caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "project-7qjuu.vercel.app"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "project-7qjuu.vercel.app"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers",
+      "has": [
+        {
+          "type": "host",
+          "value": "project-7qjuu.vercel.app"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "project-7qjuu.vercel.app"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/sellers.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin",
+      "has": [
+        {
+          "type": "host",
+          "value": "sellers.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    },
+    {
+      "source": "/admin.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "sellers.caretrack.website"
+        }
+      ],
+      "destination": "/404",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -12,168 +245,10 @@
       ]
     }
   ],
-  "redirects": [
-    {
-      "source": "/admin",
-      "has": [{ "type": "host", "value": "caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin.html",
-      "has": [{ "type": "host", "value": "caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers",
-      "has": [{ "type": "host", "value": "caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers.html",
-      "has": [{ "type": "host", "value": "caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin",
-      "has": [{ "type": "host", "value": "www.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin.html",
-      "has": [{ "type": "host", "value": "www.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers",
-      "has": [{ "type": "host", "value": "www.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers.html",
-      "has": [{ "type": "host", "value": "www.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin",
-      "has": [{ "type": "host", "value": "project-7qjuu.vercel.app" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin.html",
-      "has": [{ "type": "host", "value": "project-7qjuu.vercel.app" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers",
-      "has": [{ "type": "host", "value": "project-7qjuu.vercel.app" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers.html",
-      "has": [{ "type": "host", "value": "project-7qjuu.vercel.app" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers",
-      "has": [{ "type": "host", "value": "admin.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/sellers.html",
-      "has": [{ "type": "host", "value": "admin.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin",
-      "has": [{ "type": "host", "value": "sellers.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin.html",
-      "has": [{ "type": "host", "value": "sellers.caretrack.website" }],
-      "destination": "/404.html",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",
       "destination": "https://api.caretrack.website/api/:path*"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "admin.caretrack.website" }],
-      "destination": "/admin.html"
-    },
-    {
-      "source": "/admin",
-      "has": [{ "type": "host", "value": "admin.caretrack.website" }],
-      "destination": "/admin.html"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "sellers.caretrack.website" }],
-      "destination": "/sellers.html"
-    },
-    {
-      "source": "/sellers",
-      "has": [{ "type": "host", "value": "sellers.caretrack.website" }],
-      "destination": "/sellers.html"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "caretrack.website" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "www.caretrack.website" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "project-7qjuu.vercel.app" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/:path((?!api|assets|style\\.css|script\\.js|i18n\\.js|favicon\\.ico).*)",
-      "has": [{ "type": "host", "value": "caretrack.website" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/:path((?!api|assets|style\\.css|script\\.js|i18n\\.js|favicon\\.ico).*)",
-      "has": [{ "type": "host", "value": "www.caretrack.website" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/:path((?!api|assets|style\\.css|script\\.js|i18n\\.js|favicon\\.ico).*)",
-      "has": [{ "type": "host", "value": "project-7qjuu.vercel.app" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/:path((?!api|assets|admin|style\\.css|script\\.js|i18n\\.js|favicon\\.ico).*)",
-      "has": [{ "type": "host", "value": "admin.caretrack.website" }],
-      "destination": "/404.html"
-    },
-    {
-      "source": "/:path((?!api|assets|sellers|style\\.css|script\\.js|i18n\\.js|favicon\\.ico).*)",
-      "has": [{ "type": "host", "value": "sellers.caretrack.website" }],
-      "destination": "/404.html"
     }
   ]
 }
