@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.yourdomain.com/api/:path*"
+      "destination": "https://api.caretrack.website/api/:path*"
     }
   ]
 }

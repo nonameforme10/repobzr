@@ -44,7 +44,7 @@ Ensure `.env` contains:
 ```env
 PORT=5000
 NODE_ENV=production
-CORS_ORIGIN=https://project-7gjuu.vercel.app
+CORS_ORIGIN=https://caretrack.website,https://www.caretrack.website,https://project-7gjuu.vercel.app
 RATES_CACHE_TTL_MS=3600000
 HISTORY_CACHE_TTL_MS=86400000
 FETCH_TIMEOUT_MS=8000
@@ -71,18 +71,18 @@ pm2 startup
 Vercel serves your frontend over HTTPS (`https://project-7gjuu.vercel.app`). For Vercel rewrites and browser requests to work seamlessly, the VPS must serve HTTPS over port 443.
 
 ### 3.1. Create Nginx Site Configuration
-Point your domain or subdomain (e.g. `api.yourdomain.com`) to your VPS IP address in your DNS settings (A record). Then create the Nginx configuration:
+Point your domain or subdomain (e.g. `api.caretrack.website`) to your VPS IP address in your DNS settings (A record). Then create the Nginx configuration:
 
 ```bash
 sudo nano /etc/nginx/sites-available/salestrack-backend
 ```
 
-Paste the following configuration (replace `api.yourdomain.com` with your actual domain):
+Paste the following configuration (replace `api.caretrack.website` with your actual domain):
 
 ```nginx
 server {
     listen 80;
-    server_name api.yourdomain.com;
+    server_name api.caretrack.website;
 
     location / {
         proxy_pass http://127.0.0.1:5000;
@@ -113,7 +113,7 @@ sudo systemctl reload nginx
 
 ### 3.2. Secure with Free Let's Encrypt SSL
 ```bash
-sudo certbot --nginx -d api.yourdomain.com
+sudo certbot --nginx -d api.caretrack.website
 ```
 Certbot will automatically obtain the SSL certificate and update Nginx to redirect HTTP to HTTPS.
 
