@@ -1,7 +1,7 @@
 /**
  * SalesTrack — VPS Backend Server
  * Production-ready Express API with PostgreSQL 16 local-first sync engine,
- * Helmet, Rate Limiting, Strict CORS, and CBU currency proxy.
+ * Helmet, Tiered Rate Limiting, Strict CORS, Structured Logging, and CBU currency proxy.
  */
 
 require('dotenv').config();
@@ -27,7 +27,26 @@ app.use(helmet());
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// 3. Strict CORS Configuration
+// 3. Structured JSON Request Logger Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    if (req.originalUrl.startsWith('/api') && !req.originalUrl.includes('/health')) {
+      console.log(JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: res.statusCode >= 500 ? 'error' : (res.statusCode >= 400 ? 'warn' : 'info'),
+        method: req.method,
+        path: req.originalUrl,
+        status: res.statusCode,
+        ip: req.ip,
+        durationMs: Date.now() - start
+      }));
+    }
+  });
+  next();
+});
+
+// 4. Strict CORS Configuration
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(o => o.trim())
@@ -35,17 +54,9 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '')
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow server-to-server requests, curl, or when no origin header is provided
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.length === 0 || allowedOrigins.includes('*')) {
-      return callback(null, true);
-    }
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
+    if (allowedOrigins.length === 0 || allowedOrigins.includes('*')) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error(`Origin '${origin}' not allowed by CORS`));
   },
   methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -55,21 +66,46 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// 4. Rate Limiting for API routes (300 requests per 15 min per IP for sync activity)
-const limiter = rateLimit({
+// 5. Tiered Rate Limiters (Mounted BEFORE Database Processing)
+const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   validate: { xForwardedForHeader: false },
-  message: {
-    error: 'Too many requests from this IP, please try again later.'
-  }
+  message: { error: 'Too many requests from this IP, please try again later.' }
 });
 
-// 5. Canonical /api Router
+const syncPostLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many sync submissions, please try again in a moment.' }
+});
+
+const syncGetLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many change requests, please try again in a moment.' }
+});
+
+const dataLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many snapshot requests, please try again in a moment.' }
+});
+
+// 6. Canonical /api Router
 const apiRouter = express.Router();
-apiRouter.use(limiter);
+apiRouter.use(generalLimiter);
 
 // Health check endpoint (verifies server + PostgreSQL database connectivity)
 apiRouter.get('/health', async (req, res) => {
@@ -84,7 +120,7 @@ apiRouter.get('/health', async (req, res) => {
 });
 
 // Full Authoritative Data Snapshot (for initial bootstrap or reset)
-apiRouter.get('/data', async (req, res, next) => {
+apiRouter.get('/data', dataLimiter, async (req, res, next) => {
   try {
     const data = await syncService.getSnapshot();
     res.status(200).json(data);
@@ -94,7 +130,7 @@ apiRouter.get('/data', async (req, res, next) => {
 });
 
 // Incremental Delta Sync (Client queries changes since lastSyncSeq)
-apiRouter.get('/sync', async (req, res, next) => {
+apiRouter.get('/sync', syncGetLimiter, async (req, res, next) => {
   try {
     const since = req.query.since ? Number(req.query.since) : 0;
     const result = await syncService.getChangesSince(since);
@@ -105,7 +141,7 @@ apiRouter.get('/sync', async (req, res, next) => {
 });
 
 // Process Outbox Sync Batch from Client (Idempotent & Transactional)
-apiRouter.post('/sync', async (req, res, next) => {
+apiRouter.post('/sync', syncPostLimiter, async (req, res, next) => {
   try {
     const { deviceId, operations } = req.body;
     if (!deviceId) return res.status(400).json({ error: 'Missing deviceId' });
@@ -151,38 +187,30 @@ apiRouter.get('/history', historyHandler);
 apiRouter.get('/getCbuRates', ratesHandler);
 apiRouter.get('/getCbuHistory', historyHandler);
 
-// Mount router under /api
+// Mount router at /api
 app.use('/api', apiRouter);
 
-// Top-level aliases for root backward compatibility
-app.get('/health', (req, res) => res.redirect(307, '/api/health'));
-app.get('/getCbuRates', ratesHandler);
-app.get('/getCbuHistory', historyHandler);
-
-// Root route
-app.get('/', (req, res) => {
-  res.status(200).json({
-    name: 'SalesTrack Backend API',
-    status: 'running',
-    docs: '/api/health'
-  });
-});
-
-// 6. 404 Not Found Handler
+// 7. Global 404 Handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Endpoint not found' });
 });
 
-// 7. Global Error Handler
-app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
-  const statusCode = err.status || 500;
-  console.error('[server error]', err.message);
+// 8. Centralized Error Handler
+app.use((err, req, res, next) => {
+  console.error(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    level: 'error',
+    event: 'unhandled_server_error',
+    message: err.message,
+    stack: err.stack
+  }));
+  const statusCode = err.status || err.statusCode || 500;
   res.status(statusCode).json({
     error: err.message || 'Internal Server Error'
   });
 });
 
-// 8. Server Start & Migration Runner
+// 9. Server Start, Migrations & Scheduled Pruning
 let server;
 
 async function startServer() {
@@ -190,6 +218,16 @@ async function startServer() {
     // Run automated migrations before listening for traffic
     await db.runMigrations();
     console.log('[SalesTrack Backend] Database migrations up to date.');
+
+    // Run initial changelog pruning and schedule daily
+    syncService.pruneOldChanges(60).catch(err => {
+      console.warn('[changelog prune error]', err.message);
+    });
+    setInterval(() => {
+      syncService.pruneOldChanges(60).catch(err => {
+        console.warn('[changelog prune error]', err.message);
+      });
+    }, 24 * 60 * 60 * 1000).unref();
 
     server = app.listen(PORT, () => {
       console.log(`[SalesTrack Backend] Listening on port ${PORT} (${NODE_ENV})`);

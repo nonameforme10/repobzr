@@ -455,6 +455,14 @@ const syncEngine = {
 
                     const prodName = prod?.name || 'Product';
                     showToast(`🚨 Sale rejected (${prodName}): ${rej.message || 'Insufficient stock on server'}. Local stock restored.`, 'error', 7000);
+                } else if (rej.code === 'VERSION_CONFLICT') {
+                    op.status = 'conflict';
+                    await localDb.put('outbox', op);
+                    showToast(`⚠️ Update conflict: ${rej.message || 'Item was modified on another device'}.`, 'warning', 7000);
+                } else if (rej.code === 'PRODUCT_DELETED') {
+                    op.status = 'conflict';
+                    await localDb.put('outbox', op);
+                    showToast(`⚠️ Operation rejected: Product was deleted on another device.`, 'warning', 7000);
                 } else {
                     await localDb.put('outbox', op);
                     showToast(`⚠️ Sync notice: ${op.errorMessage}`, 'warning', 5000);
@@ -503,7 +511,7 @@ const syncEngine = {
                 if (pendingEntityIds.has(ch.entityId)) continue; // conflict protection
                 const prod = ch.data;
                 const idx = state.products.findIndex(p => p.id === ch.entityId);
-                if (ch.action === 'DELETE') {
+                if (ch.action === 'DELETE' || ch.data?.isDeleted) {
                     if (idx !== -1) { state.products.splice(idx, 1); modified = true; }
                     await localDb.delete('products', ch.entityId);
                 } else if (idx !== -1) {
@@ -518,7 +526,7 @@ const syncEngine = {
             } else if (ch.entityType === 'category') {
                 const cat = ch.data;
                 const idx = state.categories.findIndex(c => c.id === ch.entityId);
-                if (ch.action === 'DELETE') {
+                if (ch.action === 'DELETE' || ch.data?.isDeleted) {
                     if (idx !== -1) { state.categories.splice(idx, 1); modified = true; }
                     await localDb.delete('categories', ch.entityId);
                 } else if (idx !== -1) {
@@ -554,18 +562,30 @@ const syncEngine = {
         );
 
         if (Array.isArray(snapshot.categories)) {
-            state.categories = snapshot.categories;
+            const mergedCats = snapshot.categories.map(sc => {
+                if (pendingEntityIds.has(sc.id)) {
+                    return state.categories.find(c => c.id === sc.id) || sc;
+                }
+                return sc;
+            });
+            // Preserve newly created local categories not yet known to server
+            const serverCatIds = new Set(snapshot.categories.map(c => c.id));
+            const pendingNewCats = state.categories.filter(c => pendingEntityIds.has(c.id) && !serverCatIds.has(c.id));
+            state.categories = [...mergedCats, ...pendingNewCats];
             await localDb.putAll('categories', state.categories);
         }
 
         if (Array.isArray(snapshot.products)) {
-            const merged = snapshot.products.map(sp => {
+            const mergedProds = snapshot.products.map(sp => {
                 if (pendingEntityIds.has(sp.id)) {
                     return state.products.find(p => p.id === sp.id) || sp;
                 }
                 return sp;
             });
-            state.products = merged;
+            // Preserve newly created local products not yet known to server
+            const serverProdIds = new Set(snapshot.products.map(p => p.id));
+            const pendingNewProds = state.products.filter(p => pendingEntityIds.has(p.id) && !serverProdIds.has(p.id));
+            state.products = [...mergedProds, ...pendingNewProds];
             await localDb.putAll('products', state.products);
         }
 
@@ -899,9 +919,10 @@ function updateCategory(id, name) {
     if (!cat) return;
     if (!name.trim()) return showToast(tr('category.nameRequired'), 'error');
     const oldName = cat.name;
+    const expVer = cat.version || 1;
     cat.name = name.trim();
     saveState();
-    enqueueOperation('UPDATE_CATEGORY', { id, name: cat.name });
+    enqueueOperation('UPDATE_CATEGORY', { id, name: cat.name, expectedVersion: expVer });
     addActivity({ type: 'update', categoryId: id, categoryName: cat.name, notes: `Renamed from "${oldName}"` });
     showToast(tr('category.updated'), 'success');
     refreshAll();
@@ -970,6 +991,7 @@ function updateProduct(id, data) {
     prod.quantity = parseInt(data.quantity) || 0;
     prod.price = data.price ? parseFloat(data.price) : null;
     prod.notes = data.notes || '';
+    const expVer = prod.version || 1;
     saveState();
     enqueueOperation('UPDATE_PRODUCT', {
         id,
@@ -978,7 +1000,8 @@ function updateProduct(id, data) {
         quantity: prod.quantity,
         sold: prod.sold,
         price: prod.price,
-        notes: prod.notes
+        notes: prod.notes,
+        expectedVersion: expVer
     });
     addActivity({
         type: 'update',
