@@ -1948,8 +1948,29 @@ function updateDashTrendChart() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { ticks: { color: t.text, font: { size: 11 } }, grid: { color: t.grid }, border: { color: t.border } },
-                y: { ticks: { color: t.text, font: { size: 11 } }, grid: { color: t.grid }, border: { display: false }, beginAtZero: true }
+                x: {
+                    ticks: {
+                        color: t.text,
+                        font: { size: 10 },
+                        maxTicksLimit: 6,
+                        maxRotation: 0,
+                        minRotation: 0,
+                        autoSkip: true
+                    },
+                    grid: { color: t.grid },
+                    border: { color: t.border }
+                },
+                y: {
+                    ticks: {
+                        color: t.text,
+                        font: { size: 11 },
+                        precision: 0,
+                        stepSize: 1
+                    },
+                    grid: { color: t.grid },
+                    border: { display: false },
+                    beginAtZero: true
+                }
             },
             plugins: {
                 legend: { display: false },
@@ -2030,8 +2051,28 @@ function updateAnalyticsCharts() {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        x: { ticks: { color: t.text, font: { size: 11 } }, grid: { display: false }, border: { color: t.border } },
-                        y: { ticks: { color: t.text, font: { size: 11 } }, grid: { color: t.grid }, border: { display: false }, beginAtZero: true }
+                        x: {
+                            ticks: {
+                                color: t.text,
+                                font: { size: 10 },
+                                maxRotation: 45,
+                                maxTicksLimit: 8,
+                                autoSkip: true
+                            },
+                            grid: { display: false },
+                            border: { color: t.border }
+                        },
+                        y: {
+                            ticks: {
+                                color: t.text,
+                                font: { size: 11 },
+                                precision: 0,
+                                stepSize: 1
+                            },
+                            grid: { color: t.grid },
+                            border: { display: false },
+                            beginAtZero: true
+                        }
                     },
                     plugins: {
                         legend: { display: false },
@@ -2043,7 +2084,15 @@ function updateAnalyticsCharts() {
             chartInstances.analyticsBar = new Chart(barCtx, {
                 type: 'bar',
                 data: { labels: ['No Data'], datasets: [{ data: [0], backgroundColor: t.empty, borderRadius: 6 }] },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: t.text } }, y: { ticks: { color: t.text }, beginAtZero: true } }, plugins: { legend: { display: false } } }
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { ticks: { color: t.text, font: { size: 10 } } },
+                        y: { ticks: { color: t.text, font: { size: 11 }, precision: 0, stepSize: 1 }, beginAtZero: true }
+                    },
+                    plugins: { legend: { display: false } }
+                }
             });
         }
     }
@@ -2089,8 +2138,27 @@ function updateAnalyticsCharts() {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { ticks: { color: t.text, font: { size: 11 } }, grid: { color: t.grid }, border: { color: t.border } },
-                    y: { ticks: { color: t.text, font: { size: 11 } }, grid: { color: t.grid }, border: { display: false }, beginAtZero: true }
+                    x: {
+                        ticks: {
+                            color: t.text,
+                            font: { size: 10 },
+                            maxRotation: 0,
+                            autoSkip: true
+                        },
+                        grid: { color: t.grid },
+                        border: { color: t.border }
+                    },
+                    y: {
+                        ticks: {
+                            color: t.text,
+                            font: { size: 11 },
+                            precision: 0,
+                            stepSize: 1
+                        },
+                        grid: { color: t.grid },
+                        border: { display: false },
+                        beginAtZero: true
+                    }
                 },
                 plugins: {
                     legend: { display: false },
@@ -2298,7 +2366,8 @@ function navigateTo(page) {
 
     // Close sidebar on mobile
     if (window.innerWidth <= 768) {
-        document.getElementById('sidebar').classList.remove('open');
+        document.getElementById('sidebar')?.classList.remove('open');
+        document.getElementById('sidebarOverlay')?.classList.remove('active');
     }
 
     // Refresh charts when entering dashboard or analytics
@@ -2317,12 +2386,31 @@ function setupEventListeners() {
         });
     });
 
-    // Sidebar toggle
+    // Sidebar toggle and overlay
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const openSidebar = () => {
+        sidebar?.classList.add('open');
+        sidebarOverlay?.classList.add('active');
+    };
+    const closeSidebar = () => {
+        sidebar?.classList.remove('open');
+        sidebarOverlay?.classList.remove('active');
+    };
+
     document.getElementById('menuToggle').addEventListener('click', () => {
-        document.getElementById('sidebar').classList.toggle('open');
+        if (sidebar?.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
     });
-    document.getElementById('sidebarToggle').addEventListener('click', () => {
-        document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarToggle').addEventListener('click', closeSidebar);
+    sidebarOverlay?.addEventListener('click', closeSidebar);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar?.classList.contains('open')) {
+            closeSidebar();
+        }
     });
 
     // Add buttons

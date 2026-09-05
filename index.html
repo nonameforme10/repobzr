@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#F4F1EA" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0F1411" media="(prefers-color-scheme: dark)">
     <meta name="color-scheme" content="light dark">
@@ -91,6 +91,7 @@
                 <input type="file" id="importFile" accept=".json" style="display:none">
             </div>
         </aside>
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
         <!-- Main Content -->
         <main class="main-content">
@@ -188,7 +189,7 @@
                                 <div class="stat-value" id="dashBestCategory">-</div>
                             </div>
                         </div>
-                        <div class="stat-card glass">
+                        <div class="stat-card glass stat-revenue">
                             <div class="stat-icon icon-revenue">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                             </div>
