@@ -18,7 +18,7 @@
     --ink:              #1A201D;   /* near-black, slight green tint */
     --ink-strong:       #0E1310;
     --ink-muted:        #5A615E;
-    --ink-subtle:       #8B918E;
+    --ink-subtle:       #686E6B;
     --ink-faint:        #B6B9B6;
     --ink-invert:       #FFFFFF;
 
@@ -2321,7 +2321,7 @@ canvas {
     --ink:              #E2DFD6;
     --ink-strong:       #F0EDE4;
     --ink-muted:        #A3A8A1;
-    --ink-subtle:       #7A807B;
+    --ink-subtle:       #989E99;
     --ink-faint:        #4A504D;
     --ink-invert:       #0F1411;
 

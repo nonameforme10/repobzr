@@ -1511,6 +1511,8 @@ function updateLanguageSwitcherUI() {
     const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'en';
     const codeEl = document.getElementById('langCode');
     if (codeEl) codeEl.textContent = lang.toUpperCase();
+    const toggleBtn = document.getElementById('langToggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-label', `Language: ${lang.toUpperCase()}`);
     document.querySelectorAll('#langMenu .lang-option').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
     });
@@ -1747,9 +1749,11 @@ const fx = (() => {
 
     function setRange(days) {
         currentRange = days;
-        document.querySelectorAll('.fx-tab').forEach(t =>
-            t.classList.toggle('active', String(days) === t.dataset.range)
-        );
+        document.querySelectorAll('.fx-tab').forEach(t => {
+            const isActive = String(days) === t.dataset.range;
+            t.classList.toggle('active', isActive);
+            t.setAttribute('aria-selected', String(isActive));
+        });
         refreshChart();
     }
 

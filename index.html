@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="SalesTrack — Modern merchant sales tracking, inventory management, and currency conversion dashboard.">
     <meta name="theme-color" content="#F4F1EA" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#0F1411" media="(prefers-color-scheme: dark)">
     <meta name="color-scheme" content="light dark">
@@ -32,8 +33,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="i18n.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="i18n.js" defer></script>
 </head>
 <body>
     <div id="app">
@@ -109,7 +110,7 @@
 
                     <!-- Language switcher -->
                     <div class="lang-switcher" id="langSwitcher">
-                        <button class="lang-toggle" id="langToggle" aria-label="Change language" data-i18n-title="topbar.language" title="Language" aria-haspopup="true" aria-expanded="false">
+                        <button class="lang-toggle" id="langToggle" aria-label="Language: EN" data-i18n-title="topbar.language" title="Language" aria-haspopup="true" aria-expanded="false">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="10"/>
                                 <line x1="2" y1="12" x2="22" y2="12"/>
@@ -245,10 +246,10 @@
                             </div>
                         </div>
                         <div class="fx-chart-wrap">
-                            <div class="fx-chart-tabs" role="tablist">
-                                <button class="fx-tab"        type="button" data-range="7">1W</button>
-                                <button class="fx-tab active" type="button" data-range="30">1M</button>
-                                <button class="fx-tab"        type="button" data-range="90">3M</button>
+                            <div class="fx-chart-tabs" role="tablist" aria-label="Exchange rate history range">
+                                <button class="fx-tab"        type="button" data-range="7"  role="tab" aria-selected="false">1W</button>
+                                <button class="fx-tab active" type="button" data-range="30" role="tab" aria-selected="true">1M</button>
+                                <button class="fx-tab"        type="button" data-range="90" role="tab" aria-selected="false">3M</button>
                             </div>
                             <div class="fx-chart-body">
                                 <canvas id="fxChart"></canvas>
@@ -448,6 +449,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js" defer></script>
 </body>
 </html>
