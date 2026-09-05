@@ -933,6 +933,45 @@ function formatCurrency(amountUZS) {
     }
 }
 
+function parseCatalogPrice(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    const num = parseFloat(val);
+    if (isNaN(num) || num <= 0) return 0;
+    // Uzbek bazaar standard: sellers count in thousands ('ming soʻm'), e.g. 140 means 140 000 so'm.
+    // Numbers < 10 000 (e.g. 140, 250, 50, 1.5) are in thousands.
+    // Numbers >= 10 000 (e.g. 140000) are already full so'm.
+    if (num < 10000) {
+        return Math.round(num * 1000);
+    }
+    return Math.round(num);
+}
+
+function formatThousandSumPreview(val) {
+    if (!val || isNaN(parseFloat(val)) || parseFloat(val) <= 0) return '';
+    const fullSum = parseCatalogPrice(val);
+    const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'en';
+    const sym = (lang === 'ru') ? 'сум' : 'soʻm';
+    const thousandSym = (lang === 'ru') ? 'тыс. сум' : 'ming soʻm';
+    const formattedFull = fullSum.toLocaleString(lang === 'en' ? 'en-US' : 'ru-RU') + ' ' + sym;
+    const mingVal = (fullSum / 1000).toLocaleString(lang === 'en' ? 'en-US' : 'ru-RU') + ' ' + thousandSym;
+
+    let usdEquivalent = '';
+    const usdRate = currency.getRate('USD');
+    if (usdRate && usdRate > 0) {
+        const inUsd = (fullSum / usdRate).toFixed(2);
+        usdEquivalent = ` (≈ $${inUsd})`;
+    }
+    return `💰 ${mingVal} = ${formattedFull}${usdEquivalent}`;
+}
+
+function updatePricePreview(val, targetId = 'prodPricePreview') {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    const text = formatThousandSumPreview(val);
+    el.textContent = text;
+    el.style.display = text ? 'flex' : 'none';
+}
+
 function getTodayStart() {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -1145,10 +1184,11 @@ function deleteCategory(id) {
 // ==================== PRODUCT CRUD ====================
 function addProduct(data) {
     if (!data.name || !data.name.trim()) return showToast(tr('product.nameRequired'), 'error');
-    const priceNum = parseFloat(data.price);
-    if (!data.price || isNaN(priceNum) || priceNum <= 0) {
+    const rawPrice = parseFloat(data.price);
+    if (!data.price || isNaN(rawPrice) || rawPrice <= 0) {
         return showToast(tr('product.priceRequired'), 'error');
     }
+    const priceNum = parseCatalogPrice(data.price);
 
     let qty = null;
     if (data.quantity !== undefined && data.quantity !== null && data.quantity.toString().trim() !== '') {
@@ -1200,10 +1240,11 @@ function updateProduct(id, data) {
     const prod = getProduct(id);
     if (!prod) return;
     if (!data.name || !data.name.trim()) return showToast(tr('product.nameRequired'), 'error');
-    const priceNum = parseFloat(data.price);
-    if (!data.price || isNaN(priceNum) || priceNum <= 0) {
+    const rawPrice = parseFloat(data.price);
+    if (!data.price || isNaN(rawPrice) || rawPrice <= 0) {
         return showToast(tr('product.priceRequired'), 'error');
     }
+    const priceNum = parseCatalogPrice(data.price);
 
     prod.name = data.name.trim();
     prod.price = priceNum;
@@ -2754,9 +2795,11 @@ function openAddProduct() {
         <div class="form-group">
             <label class="form-label">${tr('product.priceLabel')}</label>
             <div style="position:relative;display:flex;align-items:center;">
-                <input type="number" class="form-input" id="prodPriceInput" placeholder="${tr('product.pricePlaceholder')}" min="1" step="any" required style="padding-right:64px;">
-                <span style="position:absolute;right:14px;color:var(--ink-muted);font-weight:600;font-size:0.875rem;pointer-events:none;">${window.i18n && window.i18n.getLang() === 'ru' ? 'сум' : 'soʻm'}</span>
+                <input type="number" class="form-input" id="prodPriceInput" placeholder="${tr('product.pricePlaceholder')}" min="0.1" step="any" required style="padding-right:95px;" oninput="updatePricePreview(this.value, 'prodPricePreview')">
+                <span style="position:absolute;right:14px;color:var(--ink-muted);font-weight:600;font-size:0.875rem;pointer-events:none;">${tr('currency.thousandSum')}</span>
             </div>
+            <div id="prodPricePreview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
+            <div class="form-hint" style="margin-top:4px;">${tr('product.priceHint')}</div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.quantityLabel')}</label>
@@ -2781,6 +2824,8 @@ function openEditProduct(id) {
     currentModalImage = prod.image || null;
     lastAiTranslatedName = prod.name || '';
     const qtyVal = (prod.quantity !== null && prod.quantity !== undefined) ? prod.quantity : '';
+    const priceVal = (prod.price !== null && prod.price !== undefined) ? (prod.price >= 1000 ? Math.round(prod.price / 1000) : prod.price) : '';
+    const initialPreview = priceVal ? formatThousandSumPreview(priceVal) : '';
     openModal(tr('product.edit'), `
         <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -2801,9 +2846,11 @@ function openEditProduct(id) {
         <div class="form-group">
             <label class="form-label">${tr('product.priceLabel')}</label>
             <div style="position:relative;display:flex;align-items:center;">
-                <input type="number" class="form-input" id="prodPriceInput" value="${prod.price !== null && prod.price !== undefined ? Math.round(prod.price) : ''}" min="1" step="any" required style="padding-right:64px;">
-                <span style="position:absolute;right:14px;color:var(--ink-muted);font-weight:600;font-size:0.875rem;pointer-events:none;">${window.i18n && window.i18n.getLang() === 'ru' ? 'сум' : 'soʻm'}</span>
+                <input type="number" class="form-input" id="prodPriceInput" value="${priceVal}" min="0.1" step="any" required style="padding-right:95px;" oninput="updatePricePreview(this.value, 'prodPricePreview')">
+                <span style="position:absolute;right:14px;color:var(--ink-muted);font-weight:600;font-size:0.875rem;pointer-events:none;">${tr('currency.thousandSum')}</span>
             </div>
+            <div id="prodPricePreview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:${initialPreview ? 'flex' : 'none'};">${initialPreview}</div>
+            <div class="form-hint" style="margin-top:4px;">${tr('product.priceHint')}</div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.quantityLabel')}</label>

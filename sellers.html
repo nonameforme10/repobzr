@@ -741,7 +741,7 @@
 
   .price-input {
     width: 100%;
-    padding: 10px 64px 10px 14px;
+    padding: 10px 95px 10px 14px;
     background: var(--bg-input);
     border: 1.5px solid var(--border);
     border-radius: var(--radius-sm);
@@ -1165,11 +1165,12 @@
 
       <!-- Selling Price -->
       <div class="form-group">
-        <label class="field-label" for="price-input">Selling Price (per unit)</label>
+        <label class="field-label" for="price-input">Selling Price (per unit in ming soʻm)</label>
         <div class="price-input-wrap">
-          <input class="price-input" type="number" id="price-input" step="any" min="0" inputmode="numeric" placeholder="0">
-          <span class="price-symbol">soʻm</span>
+          <input class="price-input" type="number" id="price-input" step="any" min="0" inputmode="decimal" placeholder="140">
+          <span class="price-symbol">ming soʻm</span>
         </div>
+        <div id="price-live-preview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
       </div>
 
       <!-- Summary -->
@@ -1589,6 +1590,14 @@ function fmt(n) {
   return val.toLocaleString('ru-RU') + ' soʻm';
 }
 
+function parsePrice(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  const num = parseFloat(val);
+  if (isNaN(num) || num <= 0) return 0;
+  if (num < 10000) return Math.round(num * 1000);
+  return Math.round(num);
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -1731,7 +1740,8 @@ function openModal(productId) {
 
   document.getElementById('modal-sku').textContent = `${activeProduct.name}${activeProduct.sku ? ` · SKU: ${activeProduct.sku}` : ''}`;
   document.getElementById('qty-input').value = 1;
-  document.getElementById('price-input').value = Math.round(activeProduct.price || 0);
+  const unitMing = activeProduct.price >= 1000 ? Math.round(activeProduct.price / 1000) : activeProduct.price;
+  document.getElementById('price-input').value = unitMing;
 
   updateSummary();
   validateQty();
@@ -1752,20 +1762,32 @@ function closeModal() {
 // ── SUMMARY CALC ──────────────────────────────────────────────────────────
 function updateSummary() {
   if (!activeProduct) return;
-  const qty   = parseInt(document.getElementById('qty-input').value) || 1;
-  const price = parseFloat(document.getElementById('price-input').value);
-  const base  = activeProduct.price;
+  const qty      = parseInt(document.getElementById('qty-input').value) || 1;
+  const rawPrice = parseFloat(document.getElementById('price-input').value);
+  const price    = parsePrice(rawPrice);
+  const base     = activeProduct.price;
+
+  const previewEl = document.getElementById('price-live-preview');
+  if (previewEl) {
+    if (!isNaN(rawPrice) && rawPrice > 0) {
+      previewEl.style.display = 'block';
+      const mingLabel = (price / 1000).toLocaleString('ru-RU') + ' ming soʻm';
+      previewEl.textContent = `💰 ${mingLabel} = ${fmt(price)}`;
+    } else {
+      previewEl.style.display = 'none';
+    }
+  }
 
   document.getElementById('sum-base').textContent = fmt(base);
   document.getElementById('sum-base-total').textContent = fmt(base * qty);
-  document.getElementById('sum-sell').textContent = isNaN(price) ? '—' : fmt(price);
-  document.getElementById('sum-sell-total').textContent = isNaN(price) ? '—' : fmt(price * qty);
+  document.getElementById('sum-sell').textContent = (isNaN(rawPrice) || rawPrice <= 0) ? '—' : fmt(price);
+  document.getElementById('sum-sell-total').textContent = (isNaN(rawPrice) || rawPrice <= 0) ? '—' : fmt(price * qty);
 
   const profitRow = document.getElementById('sum-profit-row');
   const profitLbl = document.getElementById('sum-profit-label');
   const profitVal = document.getElementById('sum-profit-val');
 
-  if (isNaN(price)) {
+  if (isNaN(rawPrice) || rawPrice <= 0) {
     profitRow.className = 'summary-profit even';
     profitLbl.textContent = 'Enter a selling price';
     profitVal.textContent = '—';
@@ -1835,15 +1857,16 @@ document.getElementById('price-input').addEventListener('input', () => {
 document.getElementById('btn-confirm').addEventListener('click', async () => {
   if (confirmLock || !activeProduct) return;
 
-  const qty   = parseInt(document.getElementById('qty-input').value) || 0;
-  const price = parseFloat(document.getElementById('price-input').value);
-  const p     = activeProduct;
+  const qty      = parseInt(document.getElementById('qty-input').value) || 0;
+  const rawPrice = parseFloat(document.getElementById('price-input').value);
+  const price    = parsePrice(rawPrice);
+  const p        = activeProduct;
   const isUntracked = p.stock === null || p.stock === undefined;
 
   // Validate
   if (qty < 1) { showToast('Enter a valid quantity.', 'warn'); return; }
   if (!isUntracked && qty > p.stock) { showToast(`Only ${p.stock} items in stock.`, 'warn'); return; }
-  if (isNaN(price) || price <= 0) { showToast('Enter a valid selling price.', 'warn'); return; }
+  if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast('Enter a valid selling price.', 'warn'); return; }
 
   confirmLock = true;
   document.getElementById('btn-confirm').disabled = true;
