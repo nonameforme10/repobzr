@@ -136,26 +136,461 @@ const currency = (() => {
     };
 })();
 
-// ==================== STORAGE ====================
-function loadState() {
+// ==================== LOCAL-FIRST INDEXEDDB & SYNC ENGINE ====================
+const DB_NAME = 'SalesTrackDB';
+const DB_VERSION = 1;
+
+const localDb = {
+    db: null,
+    async init() {
+        return new Promise((resolve, reject) => {
+            if (this.db) return resolve(this.db);
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('products')) db.createObjectStore('products', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('activities')) db.createObjectStore('activities', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('outbox')) {
+                    const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
+                    outboxStore.createIndex('status', 'status', { unique: false });
+                }
+                if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+            };
+            req.onsuccess = (e) => {
+                this.db = e.target.result;
+                resolve(this.db);
+            };
+            req.onerror = (e) => {
+                console.error('[idb] Failed to open IndexedDB:', e.target.error);
+                resolve(null); // fallback gracefully if storage restricted
+            };
+        });
+    },
+
+    async getAll(storeName) {
+        if (!this.db) return [];
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction(storeName, 'readonly');
+                const store = tx.objectStore(storeName);
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => resolve([]);
+            } catch (e) { resolve([]); }
+        });
+    },
+
+    async put(storeName, value) {
+        if (!this.db) return;
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                store.put(value);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch (e) { resolve(); }
+        });
+    },
+
+    async putAll(storeName, items) {
+        if (!this.db || !Array.isArray(items)) return;
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                for (const item of items) {
+                    store.put(item);
+                }
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch (e) { resolve(); }
+        });
+    },
+
+    async delete(storeName, key) {
+        if (!this.db) return;
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                store.delete(key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch (e) { resolve(); }
+        });
+    },
+
+    async clear(storeName) {
+        if (!this.db) return;
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                store.clear();
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            } catch (e) { resolve(); }
+        });
+    },
+
+    async getMeta(key) {
+        if (!this.db) return null;
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction('meta', 'readonly');
+                const store = tx.objectStore('meta');
+                const req = store.get(key);
+                req.onsuccess = () => resolve(req.result ? req.result.value : null);
+                req.onerror = () => resolve(null);
+            } catch (e) { resolve(null); }
+        });
+    },
+
+    async setMeta(key, value) {
+        if (!this.db) return;
+        return this.put('meta', { key, value });
+    }
+};
+
+function getDeviceId() {
+    let devId = null;
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            state = { ...state, ...parsed };
+        devId = localStorage.getItem('salestrack_device_id');
+    } catch (e) {}
+
+    if (!devId) {
+        devId = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+        try {
+            localStorage.setItem('salestrack_device_id', devId);
+        } catch (e) {}
+    }
+    return devId;
+}
+
+async function enqueueOperation(type, payload) {
+    const op = {
+        id: 'op_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9),
+        deviceId: getDeviceId(),
+        type,
+        payload,
+        createdAt: Date.now(),
+        status: 'pending',
+        attempts: 0
+    };
+
+    await localDb.put('outbox', op);
+    if (typeof syncEngine !== 'undefined' && syncEngine.kick) {
+        syncEngine.kick();
+    }
+    return op;
+}
+
+const syncEngine = {
+    isOnline: navigator.onLine,
+    syncing: false,
+    retryTimer: null,
+    attempts: 0,
+
+    async updateUI() {
+        const pill = document.getElementById('syncStatusPill');
+        const label = document.getElementById('syncStatusLabel');
+        if (!pill || !label) return;
+
+        const allOps = await localDb.getAll('outbox');
+        const pending = allOps.filter(o => o.status === 'pending' || o.status === 'syncing');
+        const failed = allOps.filter(o => o.status === 'failed' || o.status === 'conflict');
+
+        pill.className = 'sync-pill';
+
+        if (failed.length > 0) {
+            pill.classList.add('sync-alert');
+            label.textContent = `⚠️ ${failed.length} sync issue${failed.length > 1 ? 's' : ''}`;
+            pill.title = failed.map(f => `${f.type}: ${f.errorMessage || f.errorCode}`).join('\n');
+        } else if (!this.isOnline) {
+            pill.classList.add('offline');
+            label.textContent = pending.length > 0
+                ? `🔴 Offline (${pending.length} saved locally)`
+                : '🔴 Offline';
+            pill.title = 'Offline — actions are safely saved in local database';
+        } else if (this.syncing || pending.length > 0) {
+            pill.classList.add('syncing');
+            label.textContent = `🟡 Syncing (${pending.length} pending)...`;
+            pill.title = 'Synchronizing changes with company database...';
+        } else {
+            pill.classList.add('online-synced');
+            label.textContent = '🟢 Synced';
+            pill.title = 'Online — All changes synchronized with company database';
+        }
+    },
+
+    async probeConnectivity() {
+        if (!navigator.onLine) {
+            this.isOnline = false;
+            return false;
+        }
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const res = await fetch(`${API_BASE_URL}/health`, {
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            this.isOnline = res.ok;
+            return res.ok;
+        } catch (e) {
+            this.isOnline = false;
+            return false;
+        }
+    },
+
+    async kick() {
+        if (this.syncing) return;
+        clearTimeout(this.retryTimer);
+        this.syncing = true;
+        await this.updateUI();
+
+        try {
+            const reachable = await this.probeConnectivity();
+            if (!reachable) {
+                this.syncing = false;
+                await this.updateUI();
+                this.scheduleRetry();
+                return;
+            }
+
+            await this.pushOutbox();
+            await this.pullChanges();
+            this.attempts = 0;
+        } catch (err) {
+            console.warn('[sync] Cycle encountered an issue:', err);
+            this.scheduleRetry();
+        } finally {
+            this.syncing = false;
+            await this.updateUI();
+        }
+    },
+
+    async pushOutbox() {
+        const allOps = await localDb.getAll('outbox');
+        const pending = allOps.filter(o => o.status === 'pending');
+        if (pending.length === 0) return;
+
+        const batch = pending.slice(0, 50);
+        for (const op of batch) {
+            op.status = 'syncing';
+            await localDb.put('outbox', op);
+        }
+        await this.updateUI();
+
+        const res = await fetch(`${API_BASE_URL}/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                deviceId: getDeviceId(),
+                operations: batch
+            })
+        });
+
+        if (!res.ok) {
+            throw new Error(`Sync HTTP error ${res.status}`);
+        }
+
+        const data = await res.json();
+        const accepted = new Set(data.accepted || []);
+        const rejectedMap = new Map((data.rejected || []).map(r => [r.id, r]));
+
+        for (const op of batch) {
+            if (accepted.has(op.id)) {
+                await localDb.delete('outbox', op.id);
+            } else if (rejectedMap.has(op.id)) {
+                const rej = rejectedMap.get(op.id);
+                op.status = 'failed';
+                op.errorCode = rej.code || 'REJECTED';
+                op.errorMessage = rej.message || 'Operation rejected by server';
+                op.attempts = (op.attempts || 0) + 1;
+                await localDb.put('outbox', op);
+                showToast(`⚠️ Sync notice: ${op.errorMessage}`, 'warning');
+            } else {
+                op.status = 'pending';
+                await localDb.put('outbox', op);
+            }
+        }
+    },
+
+    async pullChanges() {
+        const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
+        const res = await fetch(`${API_BASE_URL}/sync?since=${lastSyncSeq}`, { cache: 'no-store' });
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        if (data.requiresBootstrap) {
+            const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+            if (snapRes.ok) {
+                const snap = await snapRes.json();
+                await this.mergeSnapshot(snap);
+                await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+            }
+            return;
+        }
+
+        if (Array.isArray(data.changes) && data.changes.length > 0) {
+            await this.applyDeltaChanges(data.changes);
+            await localDb.setMeta('lastSyncSeq', data.currentSeq || 0);
+        }
+    },
+
+    async applyDeltaChanges(changes) {
+        const allOps = await localDb.getAll('outbox');
+        const pendingEntityIds = new Set(
+            allOps.filter(o => o.status === 'pending' || o.status === 'syncing')
+                .map(o => o.payload?.productId || o.payload?.id)
+                .filter(Boolean)
+        );
+
+        let modified = false;
+        for (const ch of changes) {
+            if (ch.entityType === 'product') {
+                if (pendingEntityIds.has(ch.entityId)) continue; // conflict protection
+                const prod = ch.data;
+                const idx = state.products.findIndex(p => p.id === ch.entityId);
+                if (ch.action === 'DELETE') {
+                    if (idx !== -1) { state.products.splice(idx, 1); modified = true; }
+                    await localDb.delete('products', ch.entityId);
+                } else if (idx !== -1) {
+                    state.products[idx] = { ...state.products[idx], ...prod };
+                    await localDb.put('products', state.products[idx]);
+                    modified = true;
+                } else {
+                    state.products.push(prod);
+                    await localDb.put('products', prod);
+                    modified = true;
+                }
+            } else if (ch.entityType === 'category') {
+                const cat = ch.data;
+                const idx = state.categories.findIndex(c => c.id === ch.entityId);
+                if (ch.action === 'DELETE') {
+                    if (idx !== -1) { state.categories.splice(idx, 1); modified = true; }
+                    await localDb.delete('categories', ch.entityId);
+                } else if (idx !== -1) {
+                    state.categories[idx] = { ...state.categories[idx], ...cat };
+                    await localDb.put('categories', state.categories[idx]);
+                    modified = true;
+                } else {
+                    state.categories.push(cat);
+                    await localDb.put('categories', cat);
+                    modified = true;
+                }
+            } else if (ch.entityType === 'activity') {
+                const act = ch.data;
+                if (!state.activities.some(a => a.id === act.id)) {
+                    state.activities.unshift(act);
+                    await localDb.put('activities', act);
+                    modified = true;
+                }
+            }
+        }
+
+        if (modified) {
+            refreshAll();
+        }
+    },
+
+    async mergeSnapshot(snapshot) {
+        const allOps = await localDb.getAll('outbox');
+        const pendingEntityIds = new Set(
+            allOps.filter(o => o.status === 'pending' || o.status === 'syncing')
+                .map(o => o.payload?.productId || o.payload?.id)
+                .filter(Boolean)
+        );
+
+        if (Array.isArray(snapshot.categories)) {
+            state.categories = snapshot.categories;
+            await localDb.putAll('categories', state.categories);
+        }
+
+        if (Array.isArray(snapshot.products)) {
+            const merged = snapshot.products.map(sp => {
+                if (pendingEntityIds.has(sp.id)) {
+                    return state.products.find(p => p.id === sp.id) || sp;
+                }
+                return sp;
+            });
+            state.products = merged;
+            await localDb.putAll('products', state.products);
+        }
+
+        if (Array.isArray(snapshot.activities)) {
+            state.activities = snapshot.activities;
+            await localDb.putAll('activities', state.activities);
+        }
+
+        refreshAll();
+    },
+
+    scheduleRetry() {
+        clearTimeout(this.retryTimer);
+        this.attempts++;
+        const base = Math.min(60000, 1000 * Math.pow(1.8, Math.min(this.attempts, 7)));
+        const jitter = Math.floor(Math.random() * 1500);
+        this.retryTimer = setTimeout(() => this.kick(), base + jitter);
+    }
+};
+
+// ==================== STORAGE ====================
+async function loadState() {
+    try {
+        const [cats, prods, acts, sets] = await Promise.all([
+            localDb.getAll('categories'),
+            localDb.getAll('products'),
+            localDb.getAll('activities'),
+            localDb.getAll('settings')
+        ]);
+
+        if (cats.length > 0 || prods.length > 0) {
+            state.categories = cats;
+            state.products = prods;
+            state.activities = acts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            if (sets.length > 0) {
+                const settingsObj = {};
+                sets.forEach(s => settingsObj[s.key] = s.value);
+                state.settings = { ...state.settings, ...settingsObj };
+            }
+        } else {
+            // One-time legacy migration from localStorage
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed.categories || parsed.products) {
+                    state = { ...state, ...parsed };
+                    await saveState();
+                }
+            }
         }
     } catch (e) {
-        console.error('Failed to load state:', e);
+        console.error('Failed to load state from IndexedDB:', e);
     }
 }
 
-function saveState() {
+async function saveState() {
     try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        // Fallback snapshot in localStorage
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+
+        // Durable persistence in IndexedDB local replica
+        await Promise.all([
+            localDb.putAll('categories', state.categories),
+            localDb.putAll('products', state.products),
+            localDb.putAll('activities', state.activities.slice(0, 500))
+        ]);
     } catch (e) {
-        console.error('Failed to save state:', e);
-        showToast(tr('data.storageError'), 'error');
+        console.error('Failed to save state to IndexedDB:', e);
     }
+    syncEngine.updateUI();
 }
 
 function exportData() {
@@ -406,6 +841,7 @@ function addCategory(name) {
     const cat = { id: generateId(), name: name.trim(), createdAt: Date.now() };
     state.categories.push(cat);
     saveState();
+    enqueueOperation('CREATE_CATEGORY', { id: cat.id, name: cat.name, createdAt: cat.createdAt });
     addActivity({ type: 'create', categoryId: cat.id, categoryName: cat.name, notes: 'Category created' });
     showToast(tr('category.created'), 'success');
     refreshAll();
@@ -419,6 +855,7 @@ function updateCategory(id, name) {
     const oldName = cat.name;
     cat.name = name.trim();
     saveState();
+    enqueueOperation('UPDATE_CATEGORY', { id, name: cat.name });
     addActivity({ type: 'update', categoryId: id, categoryName: cat.name, notes: `Renamed from "${oldName}"` });
     showToast(tr('category.updated'), 'success');
     refreshAll();
@@ -432,6 +869,7 @@ function deleteCategory(id) {
         state.products = state.products.filter(p => p.categoryId !== id);
         state.categories = state.categories.filter(c => c.id !== id);
         saveState();
+        enqueueOperation('DELETE_CATEGORY', { id });
         addActivity({ type: 'delete', categoryId: id, categoryName: cat ? cat.name : 'Unknown', notes: `Deleted ${prods.length} products` });
         showToast(tr('category.deleted'), 'success');
         refreshAll();
@@ -454,6 +892,16 @@ function addProduct(data) {
     };
     state.products.push(prod);
     saveState();
+    enqueueOperation('CREATE_PRODUCT', {
+        id: prod.id,
+        categoryId: prod.categoryId,
+        name: prod.name,
+        quantity: prod.quantity,
+        sold: prod.sold,
+        price: prod.price,
+        notes: prod.notes,
+        createdAt: prod.createdAt
+    });
     addActivity({
         type: 'create',
         productId: prod.id,
@@ -477,6 +925,15 @@ function updateProduct(id, data) {
     prod.price = data.price ? parseFloat(data.price) : null;
     prod.notes = data.notes || '';
     saveState();
+    enqueueOperation('UPDATE_PRODUCT', {
+        id,
+        categoryId: prod.categoryId,
+        name: prod.name,
+        quantity: prod.quantity,
+        sold: prod.sold,
+        price: prod.price,
+        notes: prod.notes
+    });
     addActivity({
         type: 'update',
         productId: id,
@@ -495,6 +952,7 @@ function deleteProduct(id) {
         const prod = getProduct(id);
         state.products = state.products.filter(p => p.id !== id);
         saveState();
+        enqueueOperation('DELETE_PRODUCT', { id });
         addActivity({
             type: 'delete',
             productId: id,
@@ -533,6 +991,14 @@ function recordSale(productId, quantity = 1, notes = '') {
         previousSold: prevSold
     });
 
+    enqueueOperation('SALE', {
+        productId: prod.id,
+        quantity: quantity,
+        notes: notes || `Sold ${quantity} unit(s)`,
+        timestamp: act.timestamp,
+        activityId: act.id
+    });
+
     showToast(tr('sale.sold', { quantity, name: prod.name }), 'success');
     refreshAll();
     return act;
@@ -554,6 +1020,13 @@ function undoSale(activityId) {
     act.undoneAt = Date.now();
     saveState();
 
+    enqueueOperation('RESTOCK', {
+        productId: prod.id,
+        quantity: act.quantity,
+        notes: `Undo sale: ${act.notes || 'Sale reversed'}`,
+        timestamp: Date.now()
+    });
+
     addActivity({
         type: 'return',
         productId: prod.id,
@@ -573,7 +1046,8 @@ function addStock(productId, amount, notes = '') {
     if (!prod) return;
     prod.quantity += amount;
     saveState();
-    addActivity({
+
+    const act = addActivity({
         type: 'update',
         productId: prod.id,
         productName: prod.name,
@@ -582,6 +1056,15 @@ function addStock(productId, amount, notes = '') {
         quantity: amount,
         notes: notes || `Restocked +${amount}`
     });
+
+    enqueueOperation('RESTOCK', {
+        productId: prod.id,
+        quantity: amount,
+        notes: notes || `Restocked +${amount}`,
+        timestamp: Date.now(),
+        activityId: act.id
+    });
+
     showToast(tr('restock.added', { amount }), 'success');
     refreshAll();
 }
@@ -591,6 +1074,7 @@ function dailyReset() {
     confirmAction(tr('reset.title'), tr('reset.confirm'), () => {
         state.settings.lastResetDate = Date.now();
         saveState();
+        enqueueOperation('UPDATE_SETTINGS', { key: 'general', value: state.settings });
         addActivity({ type: 'update', notes: 'Daily reset performed' });
         showToast(tr('reset.done'), 'success');
         refreshAll();
@@ -1890,8 +2374,9 @@ function loadDemoData() {
 }
 
 // ==================== INIT ====================
-function init() {
-    loadState();
+async function init() {
+    await localDb.init();
+    await loadState();
     currency.load();                  // hydrate cached active code + rates
     if (!state.categories.length && !state.products.length) {
         loadDemoData();
@@ -1902,14 +2387,30 @@ function init() {
 
     // Populate category filter
     const filter = document.getElementById('productCategoryFilter');
-    filter.innerHTML = '<option value="">All Categories</option>';
-    state.categories.forEach(c => {
-        filter.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
-    });
+    if (filter) {
+        filter.innerHTML = '<option value="">All Categories</option>';
+        state.categories.forEach(c => {
+            filter.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
+        });
+    }
 
-    // Kick off background fetch of CBU rates — stale-while-revalidate.
-    // If the proxy URL is still the placeholder, this no-ops silently.
+    // Network status event listeners
+    window.addEventListener('online', () => {
+        syncEngine.isOnline = true;
+        syncEngine.kick();
+    });
+    window.addEventListener('offline', () => {
+        syncEngine.isOnline = false;
+        syncEngine.updateUI();
+    });
+    window.addEventListener('focus', () => syncEngine.kick());
+
+    // Kick off background fetch of CBU rates
     currency.fetchRates();
+
+    // Start background sync engine & schedule periodic cycle
+    syncEngine.kick();
+    setInterval(() => syncEngine.kick(), 30000);
 }
 
 // Start application when DOM is ready

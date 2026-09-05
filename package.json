@@ -1,8 +1,5 @@
 {
   "scripts": {
     "dev": "npx live-server"
-  },
-  "dependencies": {
-    "firebase": "^12.13.0"
   }
 }

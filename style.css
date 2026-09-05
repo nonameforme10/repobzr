@@ -358,6 +358,54 @@ body {
     white-space: nowrap;
 }
 
+/* Offline-First Sync Indicator Pill */
+.sync-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 6px 12px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    white-space: nowrap;
+    cursor: default;
+    transition: var(--transition-fast);
+}
+
+.sync-pill .sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #10b981;
+    flex-shrink: 0;
+    transition: background-color 0.25s ease;
+}
+
+.sync-pill.online-synced .sync-dot {
+    background: #10b981;
+}
+
+.sync-pill.syncing .sync-dot {
+    background: #f59e0b;
+    animation: syncDotPulse 1.2s infinite;
+}
+
+.sync-pill.offline .sync-dot {
+    background: #ef4444;
+}
+
+.sync-pill.sync-alert .sync-dot {
+    background: #dc2626;
+    animation: syncDotPulse 0.8s infinite;
+}
+
+@keyframes syncDotPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+}
+
 /* Content scroll */
 .content-scroll {
     flex: 1;
