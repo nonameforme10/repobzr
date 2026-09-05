@@ -77,7 +77,7 @@ async function runMigrations() {
       if (!appliedVersions.has(file)) {
         console.log(`[db migrations] Applying migration: ${file}...`);
         const filePath = path.join(migrationsDir, file);
-        const sql = fs.readFileSync(filePath, 'utf8');
+        const sql = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, '');
 
         await client.query('BEGIN');
         try {

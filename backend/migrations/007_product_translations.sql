@@ -1,4 +1,4 @@
-﻿-- Migration: 007_product_translations.sql
+-- Migration: 007_product_translations.sql
 -- Description: Add multilingual translations JSONB column to products with GIN index
 
 -- 1. Add translations column (stores { "uz": "...", "ru": "...", "en": "...", "hasTypo": boolean, "corrected": "..." })
