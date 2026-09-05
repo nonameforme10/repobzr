@@ -1648,11 +1648,15 @@ const fx = (() => {
             if (chart) { chart.destroy(); chart = null; }
             if (empty) {
                 empty.hidden = false;
+                empty.style.display = 'flex';
                 empty.querySelector('span').textContent = 'Exchange rate history unavailable';
             }
             return;
         }
-        if (empty) empty.hidden = true;
+        if (empty) {
+            empty.hidden = true;
+            empty.style.display = 'none';
+        }
 
         const t = getChartTheme();
         const lang = (window.i18n && window.i18n.getLang()) || 'en';
