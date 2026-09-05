@@ -41,7 +41,7 @@
         /* ============================ ENGLISH ============================ */
         en: {
             // Brand
-            'brand.name': 'SalesTrack',
+            'brand.name': 'Bazar',
             'brand.tagline': 'Merchant Dashboard',
 
             // Navigation / sidebar actions
@@ -224,7 +224,7 @@
 
         /* ============================ RUSSIAN ============================ */
         ru: {
-            'brand.name':    'SalesTrack',
+            'brand.name':    'Bazar',
             'brand.tagline': 'Панель торговца',
 
             'nav.dashboard':     'Панель',
@@ -392,7 +392,7 @@
 
         /* ============================ UZBEK (Latin) ============================ */
         uz: {
-            'brand.name':    'SalesTrack',
+            'brand.name':    'Bazar',
             'brand.tagline': 'Savdogar paneli',
 
             'nav.dashboard':     'Boshqaruv paneli',

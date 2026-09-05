@@ -1456,12 +1456,20 @@ function isDarkTheme() {
 
 function setTheme(theme, persist = true) {
     const next = theme === 'dark' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', next);
+    const root = document.documentElement;
+    root.classList.add('no-transitions');
+    root.setAttribute('data-theme', next);
     if (persist) {
         try { localStorage.setItem('salestrack-theme', next); } catch (e) { /* storage may be blocked */ }
     }
-    // Re-render charts so colors match the new theme
-    if (typeof updateCharts === 'function') updateCharts();
+    // Re-enable transitions and update charts in next idle turn so click interaction (INP) is instantaneous
+    requestAnimationFrame(() => {
+        root.classList.remove('no-transitions');
+        setTimeout(() => {
+            if (typeof updateCharts === 'function') updateCharts();
+            if (typeof fx !== 'undefined' && fx.refresh) fx.refresh();
+        }, 30);
+    });
 }
 
 function setupLanguageSwitcher() {
@@ -1862,9 +1870,12 @@ function getChartColors(count) {
 }
 
 function updateCharts() {
-    updateDashCategoryChart();
-    updateDashTrendChart();
-    updateAnalyticsCharts();
+    if (currentPage === 'dashboard') {
+        updateDashCategoryChart();
+        updateDashTrendChart();
+    } else if (currentPage === 'analytics') {
+        updateAnalyticsCharts();
+    }
 }
 
 function updateDashCategoryChart() {
@@ -2376,7 +2387,9 @@ function navigateTo(page) {
 
     // Refresh charts when entering dashboard or analytics
     if (page === 'dashboard' || page === 'analytics') {
-        setTimeout(updateCharts, 100);
+        requestAnimationFrame(() => {
+            setTimeout(updateCharts, 60);
+        });
     }
 }
 
@@ -2472,15 +2485,14 @@ function setupEventListeners() {
         refreshAll();
     });
 
-    // Re-render whenever the currency or fetched rates change
-    document.addEventListener('currency:change', () => {
+    // Update revenue display and switcher pills when active currency or rates change
+    const onCurrencyUpdated = () => {
         updateCurrencySwitcherUI();
-        refreshAll();
-    });
-    document.addEventListener('currency:rates', () => {
-        updateCurrencySwitcherUI();
-        refreshAll();
-    });
+        const revEl = document.getElementById('dashRevenue');
+        if (revEl) revEl.textContent = formatCurrency(getTodayRevenue());
+    };
+    document.addEventListener('currency:change', onCurrencyUpdated);
+    document.addEventListener('currency:rates', onCurrencyUpdated);
 
     // Track system theme changes if user hasn't explicitly chosen one
     if (window.matchMedia) {
