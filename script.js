@@ -1041,8 +1041,8 @@ function closeModal() {
     document.getElementById('modalOverlay').classList.remove('open');
 }
 
-document.getElementById('modalClose').addEventListener('click', closeModal);
-document.getElementById('modalOverlay').addEventListener('click', (e) => {
+document.getElementById('modalClose')?.addEventListener('click', closeModal);
+document.getElementById('modalOverlay')?.addEventListener('click', (e) => {
     if (e.target === document.getElementById('modalOverlay')) closeModal();
 });
 
@@ -1470,6 +1470,7 @@ function escapeHtml(text) {
 // ---------- Categories ----------
 function renderCategories() {
     const grid = document.getElementById('categoriesGrid');
+    if (!grid) return;
     if (!state.categories.length) {
         grid.innerHTML = `<div class="empty-state">${tr('category.empty')}</div>`;
         return;
@@ -1631,7 +1632,8 @@ function renderProducts() {
 // ---------- Activity ----------
 function renderActivity() {
     const tbody = document.getElementById('activityTableBody');
-    const filter = document.getElementById('activityFilter').value;
+    if (!tbody) return;
+    const filter = document.getElementById('activityFilter')?.value || '';
     let acts = [...state.activities];
     if (filter) acts = acts.filter(a => a.type === filter);
 
@@ -1668,27 +1670,37 @@ function editNotePrompt(id) {
 
 // ---------- Analytics ----------
 function renderAnalytics() {
+    const topEl = document.getElementById('insightTopProduct');
+    const lowEl = document.getElementById('insightLowProduct');
+    const fastEl = document.getElementById('insightFastProduct');
+    const slowEl = document.getElementById('insightSlowProduct');
+    if (!topEl && !lowEl && !fastEl && !slowEl) return;
+
     const catStats = getCategoryStats();
     const prods = [...state.products].sort((a, b) => b.sold - a.sold);
 
-    document.getElementById('insightTopProduct').textContent = prods.length ? `${prods[0].name} (${prods[0].sold} sold)` : '-';
-    document.getElementById('insightLowProduct').textContent = prods.length > 1 ? `${prods[prods.length - 1].name} (${prods[prods.length - 1].sold} sold)` : '-';
+    if (topEl) topEl.textContent = prods.length ? `${prods[0].name} (${prods[0].sold} sold)` : '-';
+    if (lowEl) lowEl.textContent = prods.length > 1 ? `${prods[prods.length - 1].name} (${prods[prods.length - 1].sold} sold)` : '-';
 
     // Fast moving: highest sold with low stock ratio
-    const fast = prods.filter(p => p.sold > 0).sort((a, b) => {
-        const ar = a.quantity / (a.sold + 1);
-        const br = b.quantity / (b.sold + 1);
-        return ar - br;
-    })[0];
-    document.getElementById('insightFastProduct').textContent = fast ? `${fast.name}` : '-';
+    if (fastEl) {
+        const fast = prods.filter(p => p.sold > 0).sort((a, b) => {
+            const ar = a.quantity / (a.sold + 1);
+            const br = b.quantity / (b.sold + 1);
+            return ar - br;
+        })[0];
+        fastEl.textContent = fast ? `${fast.name}` : '-';
+    }
 
     // Slow moving: high stock, low sales
-    const slow = prods.filter(p => p.quantity > 0).sort((a, b) => {
-        const ar = a.sold / (a.quantity + 1);
-        const br = b.sold / (b.quantity + 1);
-        return ar - br;
-    })[0];
-    document.getElementById('insightSlowProduct').textContent = slow ? `${slow.name}` : '-';
+    if (slowEl) {
+        const slow = prods.filter(p => p.quantity > 0).sort((a, b) => {
+            const ar = a.sold / (a.quantity + 1);
+            const br = b.sold / (b.quantity + 1);
+            return ar - br;
+        })[0];
+        slowEl.textContent = slow ? `${slow.name}` : '-';
+    }
 }
 
 // ==================== CHARTS ====================
@@ -2754,14 +2766,14 @@ function setupEventListeners() {
         sidebarOverlay?.classList.remove('active');
     };
 
-    document.getElementById('menuToggle').addEventListener('click', () => {
+    document.getElementById('menuToggle')?.addEventListener('click', () => {
         if (sidebar?.classList.contains('open')) {
             closeSidebar();
         } else {
             openSidebar();
         }
     });
-    document.getElementById('sidebarToggle').addEventListener('click', closeSidebar);
+    document.getElementById('sidebarToggle')?.addEventListener('click', closeSidebar);
     sidebarOverlay?.addEventListener('click', closeSidebar);
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && sidebar?.classList.contains('open')) {
@@ -2777,19 +2789,19 @@ function setupEventListeners() {
     document.getElementById('productCategoryFilter')?.addEventListener('change', renderProducts);
     document.getElementById('productSort')?.addEventListener('change', renderProducts);
     document.getElementById('activityFilter')?.addEventListener('change', renderActivity);
-    document.getElementById('globalSearch').addEventListener('input', () => {
+    document.getElementById('globalSearch')?.addEventListener('input', () => {
         if (currentPage === 'products') renderProducts();
     });
 
     // Export / Import / Reset
-    document.getElementById('exportBtn').addEventListener('click', exportData);
-    document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
-    document.getElementById('importFile').addEventListener('change', (e) => {
+    document.getElementById('exportBtn')?.addEventListener('click', exportData);
+    document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importFile')?.click());
+    document.getElementById('importFile')?.addEventListener('change', (e) => {
         if (e.target.files[0]) importData(e.target.files[0]);
         e.target.value = '';
     });
-    document.getElementById('resetDailyBtn').addEventListener('click', dailyReset);
-    document.getElementById('clearActivityBtn').addEventListener('click', () => {
+    document.getElementById('resetDailyBtn')?.addEventListener('click', dailyReset);
+    document.getElementById('clearActivityBtn')?.addEventListener('click', () => {
         confirmAction(tr('activity.clearHistory'), tr('activity.confirmClear'), () => {
             state.activities = [];
             saveState();
@@ -2847,8 +2859,10 @@ function setupEventListeners() {
 
     // Update date — uses current i18n language so the weekday/month names follow the UI
     const renderDate = () => {
+        const dateEl = document.getElementById('currentDate');
+        if (!dateEl) return;
         const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : undefined;
-        document.getElementById('currentDate').textContent =
+        dateEl.textContent =
             new Date().toLocaleDateString(lang, { weekday: 'short', month: 'short', day: 'numeric' });
     };
     setInterval(renderDate, 60000);
