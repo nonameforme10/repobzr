@@ -1840,11 +1840,39 @@ const syncEngine = {
     if (!res.ok) return;
 
     const data = await res.json();
-    if (data.requiresBootstrap) {
+
+    // ── SERVER RESET DETECTION ──────────────────────────────────────────────
+    // If the server's currentSeq dropped to 0 (DB was wiped) while we have
+    // a non-zero lastSyncSeq, we must immediately clear local state.
+    // Also handles requiresBootstrap signal from the server.
+    const serverCurrentSeq = Number(data.currentSeq || 0);
+    if (data.requiresBootstrap || (lastSyncSeq > 0 && serverCurrentSeq === 0)) {
+      // Wipe local state first so the UI is instantly empty
+      await Promise.all([
+        localDb.clear('products'),
+        localDb.clear('categories'),
+        localDb.clear('activities'),
+        localDb.clear('outbox')
+      ]);
+      await localDb.setMeta('lastSyncSeq', 0);
+      products = [];
+      categories = [];
+      sessions.sales = 0;
+      sessions.revenue = 0;
+      sessions.extraProfit = 0;
+      const elSales = document.getElementById('hdr-sales');
+      const elRev   = document.getElementById('hdr-revenue');
+      const elProf  = document.getElementById('hdr-profit');
+      if (elSales) elSales.textContent = '0';
+      if (elRev)   elRev.textContent   = fmt(0);
+      if (elProf)  elProf.textContent  = `+${fmt(0)}`;
+      renderGrid();
+
+      // Now fetch the fresh snapshot from the server
       const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
       if (snapRes.ok) {
         const snap = await snapRes.json();
-        if (Array.isArray(snap.products)) {
+        if (Array.isArray(snap.products) && snap.products.length > 0) {
           await localDb.putAll('products', snap.products);
           await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
           await loadProductsFromStorage();
