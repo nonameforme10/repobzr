@@ -41,9 +41,9 @@ function isValidQty(qty, max = 100000) {
 }
 
 function isValidPrice(price) {
-  if (price === null || price === undefined || price === '') return true;
+  if (price === null || price === undefined || price === '') return false;
   const p = Number(price);
-  return Number.isFinite(p) && p >= 0 && p <= 1000000000;
+  return Number.isFinite(p) && p > 0 && p <= 1000000000;
 }
 
 /**
@@ -55,7 +55,7 @@ async function getSnapshot() {
   try {
     const [categoriesRes, productsRes, activitiesRes, settingsRes, seqRes] = await Promise.all([
       client.query('SELECT id, name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
-      client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
+      client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, image, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query('SELECT id, type, timestamp, product_id AS "productId", product_name AS "productName", category_id AS "categoryId", category_name AS "categoryName", quantity::float, notes, previous_quantity::float AS "previousQuantity", previous_sold::float AS "previousSold" FROM activities ORDER BY timestamp DESC LIMIT 500'),
       client.query('SELECT key, value FROM settings'),
       client.query('SELECT COALESCE(MAX(seq), 0)::bigint AS max_seq FROM changes')
@@ -207,25 +207,30 @@ async function processSyncBatch(deviceId, operations = []) {
             throw { code: 'PRODUCT_DELETED', message: `Cannot sell soft-deleted product ${productId}` };
           }
 
-          if (product.quantity < saleQty) {
-            // Reject: Insufficient stock (never allow negative inventory)
-            const rejectInfo = {
-              code: 'INSUFFICIENT_STOCK',
-              message: `Requested ${saleQty}, but available stock is ${product.quantity}`,
-              availableStock: product.quantity
-            };
+          // If product.quantity !== null, stock is tracked: enforce availability
+          if (product.quantity !== null && product.quantity !== undefined) {
+            if (product.quantity <= 0 || product.quantity < saleQty) {
+              // Reject: Insufficient stock (never allow negative inventory)
+              const rejectInfo = {
+                code: 'INSUFFICIENT_STOCK',
+                message: `Requested ${saleQty}, but available stock is ${product.quantity}`,
+                availableStock: product.quantity
+              };
 
-            await client.query(
-              'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-              [op.id, deviceId, op.type, op.createdAt || now, now, { rejected: rejectInfo }, currentHash]
-            );
-            await client.query('COMMIT');
-            rejected.push({ id: op.id, ...rejectInfo });
-            continue;
+              await client.query(
+                'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [op.id, deviceId, op.type, op.createdAt || now, now, { rejected: rejectInfo }, currentHash]
+              );
+              await client.query('COMMIT');
+              rejected.push({ id: op.id, ...rejectInfo });
+              continue;
+            }
           }
 
-          // Apply stock decrement, sold increment, and version update
-          const newQty = product.quantity - saleQty;
+          // Apply stock decrement if tracked, otherwise preserve null (untracked inventory)
+          const newQty = (product.quantity !== null && product.quantity !== undefined)
+            ? (product.quantity - saleQty)
+            : null;
           const newSold = product.sold + saleQty;
           const newVersion = (product.version || 1) + 1;
 
@@ -300,7 +305,9 @@ async function processSyncBatch(deviceId, operations = []) {
             throw { code: 'PRODUCT_DELETED', message: `Cannot restock soft-deleted product ${productId}` };
           }
 
-          const newQty = product.quantity + restockQty;
+          const newQty = (product.quantity !== null && product.quantity !== undefined)
+            ? (product.quantity + restockQty)
+            : restockQty;
           const newVersion = (product.version || 1) + 1;
 
           await client.query(
@@ -327,27 +334,33 @@ async function processSyncBatch(deviceId, operations = []) {
           );
 
         } else if (op.type === 'CREATE_PRODUCT') {
-          const { id, categoryId, name, quantity, sold, price, notes, createdAt } = payload;
+          const { id, categoryId, name, quantity, sold, price, notes, image, createdAt } = payload;
           if (!isValidId(id)) throw { code: 'INVALID_PAYLOAD', message: 'Valid product id required' };
           if (!isValidName(name)) throw { code: 'INVALID_PAYLOAD', message: 'Product name must be 1-200 characters' };
           if (categoryId && !isValidId(categoryId)) throw { code: 'INVALID_PAYLOAD', message: 'Invalid categoryId' };
           if (!isValidNotes(notes)) throw { code: 'INVALID_PAYLOAD', message: 'Notes must be under 1,000 characters' };
-          if (!isValidPrice(price)) throw { code: 'INVALID_PAYLOAD', message: 'Price must be a non-negative finite number <= 1,000,000,000' };
+          if (!isValidPrice(price)) throw { code: 'INVALID_PAYLOAD', message: 'Base catalog price is required and must be a positive number > 0' };
 
-          const initialQty = Number(quantity);
-          const initialSold = Number(sold);
-          if (quantity !== undefined && (!Number.isFinite(initialQty) || initialQty < 0 || initialQty > 1000000 || !Number.isInteger(initialQty))) {
-            throw { code: 'INVALID_PAYLOAD', message: 'Product quantity must be a non-negative finite integer' };
+          let initialQty = null;
+          if (quantity !== undefined && quantity !== null && quantity !== '') {
+            const q = Number(quantity);
+            if (!Number.isFinite(q) || q < 0 || q > 1000000 || !Number.isInteger(q)) {
+              throw { code: 'INVALID_PAYLOAD', message: 'Product quantity must be a non-negative finite integer' };
+            }
+            initialQty = q;
           }
+
+          const initialSold = Number(sold);
           if (sold !== undefined && (!Number.isFinite(initialSold) || initialSold < 0 || !Number.isInteger(initialSold))) {
             throw { code: 'INVALID_PAYLOAD', message: 'Product sold must be a non-negative finite integer' };
           }
 
-          const sanitizedPrice = (price !== null && price !== undefined && price !== '') ? Number(price) : null;
+          const sanitizedPrice = Number(price);
+          const imageRef = (typeof image === 'string' && image.trim().length > 0) ? image.trim() : null;
 
           await client.query(
-            `INSERT INTO products (id, category_id, name, quantity, sold, price, notes, is_deleted, version, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, 1, $8, $9)
+            `INSERT INTO products (id, category_id, name, quantity, sold, price, notes, image, is_deleted, version, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE, 1, $9, $10)
              ON CONFLICT (id) DO UPDATE SET
                category_id = EXCLUDED.category_id,
                name = EXCLUDED.name,
@@ -355,27 +368,28 @@ async function processSyncBatch(deviceId, operations = []) {
                sold = EXCLUDED.sold,
                price = EXCLUDED.price,
                notes = EXCLUDED.notes,
+               image = EXCLUDED.image,
                is_deleted = FALSE,
                version = products.version + 1,
                updated_at = EXCLUDED.updated_at`,
-            [id, categoryId || null, name.trim(), initialQty || 0, initialSold || 0, sanitizedPrice, notes ? notes.trim() : '', createdAt || now, now]
+            [id, categoryId || null, name.trim(), initialQty, initialSold || 0, sanitizedPrice, notes ? notes.trim() : '', imageRef, createdAt || now, now]
           );
 
           await client.query(
             'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-            ['product', id, 'CREATE', { id, categoryId, name: name.trim(), quantity: initialQty || 0, sold: initialSold || 0, price: sanitizedPrice, notes, isDeleted: false, version: 1, createdAt: createdAt || now, updatedAt: now }, now]
+            ['product', id, 'CREATE', { id, categoryId: categoryId || null, name: name.trim(), quantity: initialQty, sold: initialSold || 0, price: sanitizedPrice, notes: notes ? notes.trim() : '', image: imageRef, isDeleted: false, version: 1, createdAt: createdAt || now, updatedAt: now }, now]
           );
 
         } else if (op.type === 'UPDATE_PRODUCT') {
-          const { id, categoryId, name, quantity, sold, price, notes, expectedVersion } = payload;
+          const { id, categoryId, name, quantity, sold, price, notes, image, expectedVersion } = payload;
           if (!isValidId(id)) throw { code: 'INVALID_PAYLOAD', message: 'Product id required for update' };
           if (name !== undefined && !isValidName(name)) throw { code: 'INVALID_PAYLOAD', message: 'Product name must be 1-200 characters' };
           if (categoryId && !isValidId(categoryId)) throw { code: 'INVALID_PAYLOAD', message: 'Invalid categoryId' };
           if (!isValidNotes(notes)) throw { code: 'INVALID_PAYLOAD', message: 'Notes must be under 1,000 characters' };
-          if (!isValidPrice(price)) throw { code: 'INVALID_PAYLOAD', message: 'Price must be a non-negative finite number <= 1,000,000,000' };
+          if (price !== undefined && !isValidPrice(price)) throw { code: 'INVALID_PAYLOAD', message: 'Base catalog price must be a positive number > 0' };
 
           const prodRes = await client.query(
-            'SELECT id, name, category_id, quantity::float, sold::float, price::float, is_deleted, version FROM products WHERE id = $1 FOR UPDATE',
+            'SELECT id, name, category_id, quantity::float, sold::float, price::float, notes, image, is_deleted, version FROM products WHERE id = $1 FOR UPDATE',
             [id]
           );
 
@@ -400,28 +414,45 @@ async function processSyncBatch(deviceId, operations = []) {
             }
           }
 
+          let updatedQty = product.quantity;
+          if (quantity !== undefined) {
+            if (quantity === null || quantity === '') {
+              updatedQty = null;
+            } else {
+              const q = Number(quantity);
+              if (!Number.isFinite(q) || q < 0 || q > 1000000 || !Number.isInteger(q)) {
+                throw { code: 'INVALID_PAYLOAD', message: 'Product quantity must be a non-negative finite integer' };
+              }
+              updatedQty = q;
+            }
+          }
+
           const newVersion = (product.version || 1) + 1;
-          const sanitizedPrice = (price !== null && price !== undefined && price !== '') ? Number(price) : (price === null ? null : undefined);
+          const sanitizedPrice = (price !== undefined) ? Number(price) : product.price;
+          const imageRef = (image !== undefined) ? (typeof image === 'string' && image.trim().length > 0 ? image.trim() : null) : product.image;
 
           await client.query(
             `UPDATE products SET
                category_id = COALESCE($1, category_id),
                name = COALESCE($2, name),
-               quantity = COALESCE($3, quantity),
+               quantity = $3,
                sold = COALESCE($4, sold),
-               price = CASE WHEN $5::boolean THEN $6::float ELSE price END,
-               notes = COALESCE($7, notes),
-               version = $8,
-               updated_at = $9
-             WHERE id = $10`,
+               price = $5,
+               notes = CASE WHEN $6::boolean THEN $7::text ELSE notes END,
+               image = CASE WHEN $8::boolean THEN $9::text ELSE image END,
+               version = $10,
+               updated_at = $11
+             WHERE id = $12`,
             [
               categoryId,
               name ? name.trim() : null,
-              quantity !== undefined ? Number(quantity) : null,
+              updatedQty,
               sold !== undefined ? Number(sold) : null,
-              price !== undefined,
               sanitizedPrice,
-              notes !== undefined ? notes.trim() : null,
+              notes !== undefined,
+              notes !== undefined ? (notes ? notes.trim() : '') : null,
+              image !== undefined,
+              imageRef,
               newVersion,
               now,
               id
@@ -430,7 +461,7 @@ async function processSyncBatch(deviceId, operations = []) {
 
           await client.query(
             'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-            ['product', id, 'UPDATE', { id, categoryId, name: name ? name.trim() : product.name, quantity: quantity !== undefined ? Number(quantity) : product.quantity, sold: sold !== undefined ? Number(sold) : product.sold, price: price !== undefined ? sanitizedPrice : product.price, notes, version: newVersion, isDeleted: false, updatedAt: now }, now]
+            ['product', id, 'UPDATE', { id, categoryId: categoryId || product.category_id, name: name ? name.trim() : product.name, quantity: updatedQty, sold: sold !== undefined ? Number(sold) : product.sold, price: sanitizedPrice, notes: notes !== undefined ? notes : product.notes, image: imageRef, version: newVersion, isDeleted: false, updatedAt: now }, now]
           );
 
         } else if (op.type === 'DELETE_PRODUCT') {

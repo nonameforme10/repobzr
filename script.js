@@ -30,6 +30,137 @@ let state = {
 let chartInstances = {};
 let currentPage = 'dashboard';
 
+// ==================== IMAGE STORAGE ABSTRACTION ====================
+/**
+ * Offline-first image handling with client-side compression and pluggable remote storage.
+ * - Local mode: Compresses images using canvas to max 1200px / WebP/JPEG 0.85
+ *   and produces a compact Data URL (~50KB-180KB) for resilient IndexedDB storage.
+ * - Remote mode: When a storage API endpoint is provided, uploads via FormData to remote S3/Cloudinary/REST API
+ *   and stores the hosted CDN URL.
+ */
+const imageStorage = {
+    // Pluggable endpoint for remote ImageKit cloud storage API
+    storageApiUrl: (typeof window !== 'undefined' && window.SALESTRACK_STORAGE_API_URL) || `${API_BASE_URL}/storage/upload`,
+
+    /**
+     * Validate and process image file
+     * @param {File} file
+     * @returns {Promise<string>} Data URL or remote ImageKit CDN URL
+     */
+    async upload(file) {
+        if (!file) throw new Error('No file provided');
+
+        // 1. Validation: MIME type
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (!validTypes.includes(file.type)) {
+            throw new Error(tr('product.imageInvalid'));
+        }
+
+        // 2. Validation: Maximum raw size (5MB)
+        const MAX_SIZE = 5 * 1024 * 1024;
+        if (file.size > MAX_SIZE) {
+            throw new Error(tr('product.imageInvalid'));
+        }
+
+        // 3. Compress first on client canvas: max 1200px, 0.85 quality WebP/JPEG
+        const compressedDataUrl = await this.compressImageToDataUrl(file, 1200, 0.85);
+
+        // 4. If remote storage API configured, upload to ImageKit via backend
+        if (this.storageApiUrl) {
+            try {
+                const res = await fetch(this.storageApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: compressedDataUrl,
+                        fileName: file.name || `product_${Date.now()}.webp`,
+                        folder: '/products'
+                    })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const url = data.url || data.secure_url || data.imageUrl;
+                    if (url) return url;
+                } else {
+                    console.warn('[imageStorage] Remote upload returned status', res.status);
+                }
+            } catch (err) {
+                console.warn('[imageStorage] Remote upload failed, falling back to local compressed Data URL:', err);
+            }
+        }
+
+        // Fallback: return compressed local Data URL
+        return compressedDataUrl;
+    },
+
+    /**
+     * Resizes and compresses image file onto an offscreen canvas
+     */
+    async compressImageToDataUrl(file, maxDimension = 1200, quality = 0.85) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let { width, height } = img;
+                    if (width > maxDimension || height > maxDimension) {
+                        if (width > height) {
+                            height = Math.round((height * maxDimension) / width);
+                            width = maxDimension;
+                        } else {
+                            width = Math.round((width * maxDimension) / height);
+                            height = maxDimension;
+                        }
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    try {
+                        const dataUrl = canvas.toDataURL('image/webp', quality);
+                        if (dataUrl.startsWith('data:image/webp')) {
+                            return resolve(dataUrl);
+                        }
+                    } catch (err) {}
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => reject(new Error(tr('product.imageInvalid')));
+                img.src = e.target.result;
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+    },
+
+    /**
+     * Remove image reference hook
+     */
+    async remove(imageRef) {
+        if (!imageRef) return;
+        if (this.storageApiUrl && imageRef.startsWith('http')) {
+            try {
+                await fetch(`${this.storageApiUrl}?ref=${encodeURIComponent(imageRef)}`, { method: 'DELETE' });
+            } catch (err) {
+                console.warn('[imageStorage] Remote delete failed:', err);
+            }
+        }
+    },
+
+    /**
+     * Format / validate URL reference
+     */
+    fromUrl(url) {
+        if (typeof url === 'string' && (url.startsWith('data:image/') || url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'))) {
+            return url.trim();
+        }
+        return null;
+    }
+};
+
 // ==================== CURRENCY (CBU rates via proxy) ====================
 const CURRENCY_STORAGE_KEY = 'salestrack-currency';
 const CURRENCY_RATES_KEY   = 'salestrack-rates';
@@ -139,6 +270,34 @@ const currency = (() => {
 // ==================== LOCAL-FIRST INDEXEDDB & SYNC ENGINE ====================
 const DB_NAME = 'SalesTrackDB';
 const DB_VERSION = 1;
+
+// ==================== CROSS-TAB / CROSS-PANEL BROADCAST CHANNEL ====================
+const catalogChannel = (typeof window !== 'undefined' && 'BroadcastChannel' in window)
+    ? new BroadcastChannel('salestrack_channel')
+    : null;
+
+function notifyCatalogChange(type, data = {}) {
+    if (catalogChannel) {
+        try {
+            catalogChannel.postMessage({ type, timestamp: Date.now(), ...data });
+        } catch (e) {
+            console.warn('[channel] Broadcast failed:', e);
+        }
+    }
+}
+
+if (catalogChannel) {
+    catalogChannel.onmessage = async (e) => {
+        const { type, productName, quantity, total } = e.data || {};
+        if (type === 'SALE_RECORDED' || type === 'CATALOG_CHANGED' || type === 'PRODUCT_UPDATED') {
+            await loadState();
+            refreshAll();
+            if (type === 'SALE_RECORDED' && productName) {
+                showToast(`🛍️ POS Sale: ${productName} × ${quantity || 1} ($${Number(total || 0).toFixed(2)})`, 'success', 4500);
+            }
+        }
+    };
+}
 
 const localDb = {
     db: null,
@@ -550,6 +709,7 @@ const syncEngine = {
 
         if (modified) {
             refreshAll();
+            notifyCatalogChange('CATALOG_CHANGED', { reason: 'DELTA_SYNC' });
         }
     },
 
@@ -613,6 +773,7 @@ const syncEngine = {
         }
 
         refreshAll();
+        notifyCatalogChange('CATALOG_CHANGED', { reason: 'SNAPSHOT_SYNC' });
     },
 
     scheduleRetry() {
@@ -963,15 +1124,26 @@ function deleteCategory(id) {
 
 // ==================== PRODUCT CRUD ====================
 function addProduct(data) {
-    if (!data.name.trim()) return showToast(tr('product.nameRequired'), 'error');
-    if (!data.categoryId) return showToast(tr('product.categoryRequired'), 'error');
+    if (!data.name || !data.name.trim()) return showToast(tr('product.nameRequired'), 'error');
+    const priceNum = parseFloat(data.price);
+    if (!data.price || isNaN(priceNum) || priceNum <= 0) {
+        return showToast(tr('product.priceRequired'), 'error');
+    }
+
+    let qty = null;
+    if (data.quantity !== undefined && data.quantity !== null && data.quantity.toString().trim() !== '') {
+        const q = parseInt(data.quantity, 10);
+        if (!isNaN(q) && q >= 0) qty = q;
+    }
+
     const prod = {
         id: generateId(),
         name: data.name.trim(),
-        categoryId: data.categoryId,
-        quantity: parseInt(data.quantity) || 0,
+        categoryId: null,
+        quantity: qty,
         sold: 0,
-        price: data.price ? parseFloat(data.price) : null,
+        price: priceNum,
+        image: data.image || null,
         notes: data.notes || '',
         createdAt: Date.now()
     };
@@ -979,11 +1151,12 @@ function addProduct(data) {
     saveState();
     enqueueOperation('CREATE_PRODUCT', {
         id: prod.id,
-        categoryId: prod.categoryId,
+        categoryId: null,
         name: prod.name,
         quantity: prod.quantity,
         sold: prod.sold,
         price: prod.price,
+        image: prod.image,
         notes: prod.notes,
         createdAt: prod.createdAt
     });
@@ -991,33 +1164,55 @@ function addProduct(data) {
         type: 'create',
         productId: prod.id,
         productName: prod.name,
-        categoryId: prod.categoryId,
-        categoryName: getCategoryName(prod.categoryId),
+        categoryId: null,
+        categoryName: '',
         notes: 'Product created'
     });
     showToast(tr('product.added'), 'success');
     refreshAll();
     closeModal();
+    notifyCatalogChange('PRODUCT_CREATED', { product: prod });
 }
 
 function updateProduct(id, data) {
     const prod = getProduct(id);
     if (!prod) return;
-    if (!data.name.trim()) return showToast(tr('product.nameRequired'), 'error');
+    if (!data.name || !data.name.trim()) return showToast(tr('product.nameRequired'), 'error');
+    const priceNum = parseFloat(data.price);
+    if (!data.price || isNaN(priceNum) || priceNum <= 0) {
+        return showToast(tr('product.priceRequired'), 'error');
+    }
+
     prod.name = data.name.trim();
-    prod.categoryId = data.categoryId;
-    prod.quantity = parseInt(data.quantity) || 0;
-    prod.price = data.price ? parseFloat(data.price) : null;
+    prod.price = priceNum;
+
+    // Quantity semantics:
+    // Empty string or null explicitly sets quantity to null (untracked inventory).
+    // Valid integer >= 0 sets tracked stock.
+    // If undefined in data, preserves existing quantity.
+    if (data.quantity !== undefined) {
+        if (data.quantity === null || data.quantity.toString().trim() === '') {
+            prod.quantity = null;
+        } else {
+            const q = parseInt(data.quantity, 10);
+            if (!isNaN(q) && q >= 0) prod.quantity = q;
+        }
+    }
+
+    if (data.image !== undefined) {
+        prod.image = data.image;
+    }
     prod.notes = data.notes || '';
     const expVer = prod.version || 1;
     saveState();
     enqueueOperation('UPDATE_PRODUCT', {
         id,
-        categoryId: prod.categoryId,
+        categoryId: prod.categoryId || null,
         name: prod.name,
         quantity: prod.quantity,
         sold: prod.sold,
         price: prod.price,
+        image: prod.image,
         notes: prod.notes,
         expectedVersion: expVer
     });
@@ -1025,31 +1220,35 @@ function updateProduct(id, data) {
         type: 'update',
         productId: id,
         productName: prod.name,
-        categoryId: prod.categoryId,
-        categoryName: getCategoryName(prod.categoryId),
+        categoryId: prod.categoryId || null,
+        categoryName: '',
         notes: 'Product updated'
     });
     showToast(tr('product.updated'), 'success');
     refreshAll();
     closeModal();
+    notifyCatalogChange('PRODUCT_UPDATED', { product: prod });
 }
 
 function deleteProduct(id) {
-    confirmAction(tr('product.delete'), tr('product.confirmDelete'), () => {
+    confirmAction(tr('common.delete'), tr('product.confirmDelete'), () => {
         const prod = getProduct(id);
+        const name = prod ? prod.name : '';
+        const catId = prod ? prod.categoryId : null;
         state.products = state.products.filter(p => p.id !== id);
         saveState();
         enqueueOperation('DELETE_PRODUCT', { id });
         addActivity({
             type: 'delete',
             productId: id,
-            productName: prod ? prod.name : 'Unknown',
-            categoryId: prod ? prod.categoryId : null,
-            categoryName: prod ? getCategoryName(prod.categoryId) : 'Unknown',
+            productName: name,
+            categoryId: catId,
+            categoryName: getCategoryName(catId),
             notes: 'Product deleted'
         });
         showToast(tr('product.deleted'), 'success');
         refreshAll();
+        notifyCatalogChange('PRODUCT_DELETED', { productId: id });
     });
 }
 
@@ -1057,20 +1256,28 @@ function deleteProduct(id) {
 function recordSale(productId, quantity = 1, notes = '') {
     const prod = getProduct(productId);
     if (!prod) return showToast(tr('product.notFound'), 'error');
-    if (prod.quantity < quantity) return showToast(tr('product.noStock'), 'error');
+
+    // Quantity semantics:
+    // null = untracked: allow unlimited sales, do not decrement quantity.
+    // 0 = out of stock: reject sale.
+    // >0 = tracked: check availability and decrement.
+    if (prod.quantity !== null && prod.quantity !== undefined) {
+        if (prod.quantity <= 0 || prod.quantity < quantity) {
+            return showToast(tr('product.noStock'), 'error');
+        }
+        prod.quantity -= quantity;
+    }
 
     const prevQty = prod.quantity;
     const prevSold = prod.sold;
-
-    prod.quantity -= quantity;
-    prod.sold += quantity;
+    prod.sold = (prod.sold || 0) + quantity;
     saveState();
 
     const act = addActivity({
         type: 'sale',
         productId: prod.id,
         productName: prod.name,
-        categoryId: prod.categoryId,
+        categoryId: prod.categoryId || null,
         categoryName: getCategoryName(prod.categoryId),
         quantity: quantity,
         notes: notes || `Sold ${quantity} unit(s)`,
@@ -1088,6 +1295,7 @@ function recordSale(productId, quantity = 1, notes = '') {
 
     showToast(tr('sale.sold', { quantity, name: prod.name }), 'success');
     refreshAll();
+    notifyCatalogChange('SALE_RECORDED', { productId: prod.id, productName: prod.name, quantity, total: (prod.price * quantity) });
     return act;
 }
 
@@ -1126,19 +1334,24 @@ function undoSale(activityId) {
 
     showToast(tr('sale.undone'), 'success');
     refreshAll();
+    notifyCatalogChange('CATALOG_CHANGED', { reason: 'UNDO_SALE', productId: prod.id });
 }
 
 function addStock(productId, amount, notes = '') {
     const prod = getProduct(productId);
     if (!prod) return;
-    prod.quantity += amount;
+    if (prod.quantity === null || prod.quantity === undefined) {
+        prod.quantity = amount;
+    } else {
+        prod.quantity += amount;
+    }
     saveState();
 
     const act = addActivity({
         type: 'update',
         productId: prod.id,
         productName: prod.name,
-        categoryId: prod.categoryId,
+        categoryId: prod.categoryId || null,
         categoryName: getCategoryName(prod.categoryId),
         quantity: amount,
         notes: notes || `Restocked +${amount}`
@@ -1148,12 +1361,13 @@ function addStock(productId, amount, notes = '') {
         productId: prod.id,
         quantity: amount,
         notes: notes || `Restocked +${amount}`,
-        timestamp: Date.now(),
+        timestamp: act.timestamp,
         activityId: act.id
     });
 
-    showToast(tr('restock.added', { amount }), 'success');
+    showToast(tr('product.updated'), 'success');
     refreshAll();
+    notifyCatalogChange('PRODUCT_UPDATED', { product: prod });
 }
 
 // ==================== DAILY RESET ====================
@@ -1182,25 +1396,40 @@ function refreshAll() {
 function renderDashboard() {
     const resetTime = getResetTime();
     const todayActivities = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= resetTime);
-    const soldToday = todayActivities.reduce((s, a) => s + a.quantity, 0);
+    const soldToday = todayActivities.reduce((s, a) => s + (a.quantity || 0), 0);
     const totalRevenue = getTodayRevenue();
-    const catStats = getCategoryStats();
 
-    document.getElementById('dashSoldToday').textContent = soldToday;
-    document.getElementById('dashTotalCategories').textContent = state.categories.length;
-    document.getElementById('dashTotalProducts').textContent = state.products.length;
-    document.getElementById('dashRevenue').textContent = formatCurrency(totalRevenue);
+    const trackedStock = state.products.reduce((acc, p) => (p.quantity !== null && p.quantity !== undefined ? acc + p.quantity : acc), 0);
 
-    const sortedCats = [...catStats].sort((a, b) => b.sold - a.sold);
-    document.getElementById('dashBestCategory').textContent = sortedCats.length ? sortedCats[0].name : '-';
+    const soldTodayEl = document.getElementById('dashSoldToday');
+    if (soldTodayEl) soldTodayEl.textContent = soldToday;
+
+    const trackedStockEl = document.getElementById('dashTrackedStock');
+    if (trackedStockEl) trackedStockEl.textContent = trackedStock;
+
+    const totalProdEl = document.getElementById('dashTotalProducts');
+    if (totalProdEl) totalProdEl.textContent = state.products.length;
+
+    const revEl = document.getElementById('dashRevenue');
+    if (revEl) revEl.textContent = formatCurrency(totalRevenue);
+
+    const sortedProds = [...state.products].sort((a, b) => (b.sold || 0) - (a.sold || 0));
+    const bestProductEl = document.getElementById('dashBestProduct');
+    if (bestProductEl) {
+        bestProductEl.textContent = (sortedProds.length && sortedProds[0].sold > 0)
+            ? `${sortedProds[0].name} (${sortedProds[0].sold})`
+            : (sortedProds.length ? sortedProds[0].name : '-');
+    }
 
     // Recent activity (last 5)
     const recent = state.activities.slice(0, 5);
     const list = document.getElementById('dashActivityList');
-    if (!recent.length) {
-        list.innerHTML = `<div class="empty-state">${tr('dash.noRecent')}</div>`;
-    } else {
-        list.innerHTML = recent.map(a => renderActivityItem(a)).join('');
+    if (list) {
+        if (!recent.length) {
+            list.innerHTML = `<div class="empty-state">${tr('dash.noRecent')}</div>`;
+        } else {
+            list.innerHTML = recent.map(a => renderActivityItem(a)).join('');
+        }
     }
 }
 
@@ -1298,9 +1527,10 @@ function renderCategories() {
 // ---------- Products ----------
 function renderProducts() {
     const grid = document.getElementById('productsGrid');
-    const catFilter = document.getElementById('productCategoryFilter').value;
-    const sortMode = document.getElementById('productSort').value;
-    const search = document.getElementById('globalSearch').value.toLowerCase();
+    if (!grid) return;
+    const catFilter = document.getElementById('productCategoryFilter')?.value || '';
+    const sortMode = document.getElementById('productSort')?.value || 'name';
+    const search = (document.getElementById('globalSearch')?.value || '').toLowerCase();
 
     let prods = [...state.products];
     if (catFilter) prods = prods.filter(p => p.categoryId === catFilter);
@@ -1308,8 +1538,12 @@ function renderProducts() {
 
     prods.sort((a, b) => {
         if (sortMode === 'name') return a.name.localeCompare(b.name);
-        if (sortMode === 'sold') return b.sold - a.sold;
-        if (sortMode === 'stock') return b.quantity - a.quantity;
+        if (sortMode === 'sold') return (b.sold || 0) - (a.sold || 0);
+        if (sortMode === 'stock') {
+            const aQty = (a.quantity !== null && a.quantity !== undefined) ? a.quantity : -1;
+            const bQty = (b.quantity !== null && b.quantity !== undefined) ? b.quantity : -1;
+            return bQty - aQty;
+        }
         if (sortMode === 'price') return (b.price || 0) - (a.price || 0);
         return 0;
     });
@@ -1328,14 +1562,28 @@ function renderProducts() {
     const restock  = tr('product.restock');
 
     grid.innerHTML = prods.map(p => {
-        const stockPct = p.quantity + p.sold > 0 ? (p.quantity / (p.quantity + p.sold)) * 100 : 0;
-        const stockClass = stockPct > 50 ? 'high' : stockPct > 20 ? 'medium' : 'low';
+        const isUntracked = (p.quantity === null || p.quantity === undefined);
+        const stockPct = (!isUntracked && (p.quantity + p.sold > 0)) ? (p.quantity / (p.quantity + p.sold)) * 100 : 0;
+        const stockClass = isUntracked ? '' : (stockPct > 50 ? 'high' : stockPct > 20 ? 'medium' : 'low');
+
+        const stockDisplay = isUntracked
+            ? `<div class="product-stat-value stock untracked" title="${tr('product.untracked')}">—</div>`
+            : (p.quantity === 0
+                ? `<div class="product-stat-value stock" style="color: var(--danger);" title="${tr('product.outOfStock')}">0</div>`
+                : `<div class="product-stat-value stock">${p.quantity}</div>`);
+
+        const imgHtml = p.image ? `
+            <div class="product-card-thumb-wrap">
+                <img src="${escapeHtml(p.image)}" alt="${escapeHtml(p.name)}" class="product-card-thumb" loading="lazy" onerror="this.parentElement.style.display='none'">
+            </div>
+        ` : '';
+
         return `
             <div class="product-card glass">
+                ${imgHtml}
                 <div class="product-header">
                     <div>
                         <div class="product-title">${escapeHtml(p.name)}</div>
-                        <div class="product-category">${escapeHtml(getCategoryName(p.categoryId))}</div>
                     </div>
                     <div class="product-actions-top">
                         <button class="btn btn-icon btn-sm btn-secondary" onclick="openEditProduct('${p.id}')" title="${editLbl}">
@@ -1348,11 +1596,11 @@ function renderProducts() {
                 </div>
                 <div class="product-stats-row">
                     <div class="product-stat">
-                        <div class="product-stat-value stock">${p.quantity}</div>
+                        ${stockDisplay}
                         <div class="product-stat-label">${lStock}</div>
                     </div>
                     <div class="product-stat">
-                        <div class="product-stat-value sold">${p.sold}</div>
+                        <div class="product-stat-value sold">${p.sold || 0}</div>
                         <div class="product-stat-label">${lSold}</div>
                     </div>
                     <div class="product-stat">
@@ -1360,9 +1608,10 @@ function renderProducts() {
                         <div class="product-stat-label">${lPrice}</div>
                     </div>
                 </div>
+                ${!isUntracked ? `
                 <div class="stock-bar">
                     <div class="stock-bar-fill ${stockClass}" style="width: ${stockPct}%"></div>
-                </div>
+                </div>` : ''}
                 ${p.notes ? `<div class="product-notes">${escapeHtml(p.notes)}</div>` : ''}
                 <div class="product-actions">
                     <button class="btn btn-primary btn-sm" onclick="openSellModal('${p.id}')">
@@ -1882,9 +2131,9 @@ function updateDashCategoryChart() {
     const ctx = document.getElementById('dashCategoryChart');
     if (!ctx) return;
     destroyChart('dashCategory');
-    const stats = getCategoryStats().filter(c => c.sold > 0).sort((a, b) => b.sold - a.sold);
+    const prods = [...state.products].filter(p => (p.sold || 0) > 0).sort((a, b) => b.sold - a.sold).slice(0, 8);
     const t = getChartTheme();
-    if (!stats.length) {
+    if (!prods.length) {
         chartInstances.dashCategory = new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -1901,10 +2150,10 @@ function updateDashCategoryChart() {
     chartInstances.dashCategory = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: stats.map(c => c.name),
+            labels: prods.map(p => p.name),
             datasets: [{
-                data: stats.map(c => c.sold),
-                backgroundColor: getChartColors(stats.length),
+                data: prods.map(p => p.sold),
+                backgroundColor: getChartColors(prods.length),
                 borderWidth: 2,
                 borderColor: t.surface
             }]
@@ -1997,20 +2246,20 @@ function updateDashTrendChart() {
 
 function updateAnalyticsCharts() {
     const t = getChartTheme();
-    // Pie chart - category distribution
+    // Pie chart - product sales distribution
     const pieCtx = document.getElementById('analyticsPieChart');
     if (pieCtx) {
         destroyChart('analyticsPie');
-        const stats = getCategoryStats().filter(c => c.sold > 0);
-        const total = stats.reduce((s, c) => s + c.sold, 0);
-        if (stats.length && total > 0) {
+        const prods = [...state.products].filter(p => (p.sold || 0) > 0).sort((a, b) => b.sold - a.sold).slice(0, 10);
+        const total = prods.reduce((s, p) => s + p.sold, 0);
+        if (prods.length && total > 0) {
             chartInstances.analyticsPie = new Chart(pieCtx, {
                 type: 'pie',
                 data: {
-                    labels: stats.map(c => c.name),
+                    labels: prods.map(p => p.name),
                     datasets: [{
-                        data: stats.map(c => c.sold),
-                        backgroundColor: getChartColors(stats.length),
+                        data: prods.map(p => p.sold),
+                        backgroundColor: getChartColors(prods.length),
                         borderWidth: 2,
                         borderColor: t.surface
                     }]
@@ -2223,28 +2472,111 @@ function submitEditCategory(id) {
     updateCategory(id, name);
 }
 
-function openAddProduct() {
-    const catOptions = state.categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-    if (!catOptions) {
-        showToast(tr('category.first'), 'warning');
-        return navigateTo('categories');
+let currentModalImage = null;
+
+function renderImageUploadArea() {
+    const container = document.getElementById('imageUploadContainer');
+    if (!container) return;
+
+    if (currentModalImage) {
+        container.innerHTML = `
+            <div class="image-preview-card">
+                <img src="${escapeHtml(currentModalImage)}" alt="Preview" class="image-preview-thumb">
+                <div class="image-preview-info">
+                    <div class="image-preview-title">${tr('product.imageLabel')}</div>
+                    <div class="image-preview-meta">Image attached</div>
+                    <div class="image-preview-actions">
+                        <button type="button" class="btn btn-outline btn-sm" onclick="triggerImageFilePicker()">${tr('product.imageChange')}</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="clearModalImage()">${tr('product.imageRemove')}</button>
+                    </div>
+                </div>
+            </div>
+            <input type="file" id="prodImageFileInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display: none;">
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="image-upload-zone" id="imageDropzone" onclick="triggerImageFilePicker()">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div class="image-upload-label">${tr('product.imageLabel')}</div>
+                <div class="image-upload-hint">${tr('product.imageDropzone')}</div>
+            </div>
+            <input type="file" id="prodImageFileInput" accept="image/jpeg,image/png,image/webp,image/gif" style="display: none;">
+        `;
     }
+
+    const fileInput = document.getElementById('prodImageFileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (file) await handleSelectedImageFile(file);
+        });
+    }
+
+    const dropzone = document.getElementById('imageDropzone');
+    if (dropzone) {
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.add('drag-over');
+            });
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropzone.classList.remove('drag-over');
+            });
+        });
+        dropzone.addEventListener('drop', async (e) => {
+            const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (file) await handleSelectedImageFile(file);
+        });
+    }
+}
+
+function triggerImageFilePicker() {
+    const fileInput = document.getElementById('prodImageFileInput');
+    if (fileInput) fileInput.click();
+}
+
+async function handleSelectedImageFile(file) {
+    try {
+        const imageRef = await imageStorage.upload(file);
+        currentModalImage = imageRef;
+        renderImageUploadArea();
+    } catch (err) {
+        showToast(err.message || tr('product.imageInvalid'), 'error');
+    }
+}
+
+function clearModalImage() {
+    currentModalImage = null;
+    renderImageUploadArea();
+}
+
+function openAddProduct() {
+    currentModalImage = null;
     openModal(tr('product.add'), `
         <div class="form-group">
             <label class="form-label">${tr('product.nameLabel')}</label>
             <input type="text" class="form-input" id="prodNameInput" placeholder="${tr('product.namePlaceholder')}">
         </div>
         <div class="form-group">
-            <label class="form-label">${tr('product.categoryLabel')}</label>
-            <select class="form-select" id="prodCatInput">${catOptions}</select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">${tr('product.quantityLabel')}</label>
-            <input type="number" class="form-input" id="prodQtyInput" value="0" min="0">
+            <div class="image-upload-wrapper" id="imageUploadContainer"></div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.priceLabel')}</label>
-            <input type="number" class="form-input" id="prodPriceInput" placeholder="${tr('product.pricePlaceholder')}" min="0" step="0.01">
+            <input type="number" class="form-input" id="prodPriceInput" placeholder="${tr('product.pricePlaceholder')}" min="0.01" step="0.01" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">${tr('product.quantityLabel')}</label>
+            <input type="number" class="form-input" id="prodQtyInput" placeholder="${tr('product.quantityPlaceholder')}" min="0">
+            <div class="form-hint">${tr('product.quantityHint')}</div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.notesLabel')}</label>
@@ -2254,28 +2586,31 @@ function openAddProduct() {
         <button class="btn btn-secondary" onclick="closeModal()">${tr('common.cancel')}</button>
         <button class="btn btn-primary" onclick="submitProduct()">${tr('product.add')}</button>
     `);
+    renderImageUploadArea();
+    setTimeout(() => document.getElementById('prodNameInput')?.focus(), 100);
 }
 
 function openEditProduct(id) {
     const prod = getProduct(id);
     if (!prod) return;
-    const catOptions = state.categories.map(c => `<option value="${c.id}" ${c.id === prod.categoryId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+    currentModalImage = prod.image || null;
+    const qtyVal = (prod.quantity !== null && prod.quantity !== undefined) ? prod.quantity : '';
     openModal(tr('product.edit'), `
         <div class="form-group">
             <label class="form-label">${tr('product.nameLabel')}</label>
             <input type="text" class="form-input" id="prodNameInput" value="${escapeHtml(prod.name)}">
         </div>
         <div class="form-group">
-            <label class="form-label">${tr('product.categoryLabel')}</label>
-            <select class="form-select" id="prodCatInput">${catOptions}</select>
-        </div>
-        <div class="form-group">
-            <label class="form-label">${tr('product.quantityLabel')}</label>
-            <input type="number" class="form-input" id="prodQtyInput" value="${prod.quantity}" min="0">
+            <div class="image-upload-wrapper" id="imageUploadContainer"></div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.priceLabel')}</label>
-            <input type="number" class="form-input" id="prodPriceInput" value="${prod.price || ''}" min="0" step="0.01">
+            <input type="number" class="form-input" id="prodPriceInput" value="${prod.price !== null && prod.price !== undefined ? prod.price : ''}" min="0.01" step="0.01" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">${tr('product.quantityLabel')}</label>
+            <input type="number" class="form-input" id="prodQtyInput" value="${qtyVal}" placeholder="${tr('product.quantityPlaceholder')}" min="0">
+            <div class="form-hint">${tr('product.quantityHint')}</div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('product.notesLabel')}</label>
@@ -2285,14 +2620,15 @@ function openEditProduct(id) {
         <button class="btn btn-secondary" onclick="closeModal()">${tr('common.cancel')}</button>
         <button class="btn btn-primary" onclick="submitEditProduct('${id}')">${tr('common.save')}</button>
     `);
+    renderImageUploadArea();
 }
 
 function submitProduct() {
     addProduct({
         name: document.getElementById('prodNameInput').value,
-        categoryId: document.getElementById('prodCatInput').value,
         quantity: document.getElementById('prodQtyInput').value,
         price: document.getElementById('prodPriceInput').value,
+        image: currentModalImage,
         notes: document.getElementById('prodNotesInput').value
     });
 }
@@ -2300,9 +2636,9 @@ function submitProduct() {
 function submitEditProduct(id) {
     updateProduct(id, {
         name: document.getElementById('prodNameInput').value,
-        categoryId: document.getElementById('prodCatInput').value,
         quantity: document.getElementById('prodQtyInput').value,
         price: document.getElementById('prodPriceInput').value,
+        image: currentModalImage,
         notes: document.getElementById('prodNotesInput').value
     });
 }
@@ -2310,11 +2646,14 @@ function submitEditProduct(id) {
 function openSellModal(productId) {
     const prod = getProduct(productId);
     if (!prod) return;
+    const isUntracked = (prod.quantity === null || prod.quantity === undefined);
+    const maxAttr = isUntracked ? '' : `max="${prod.quantity}"`;
+    const stockHint = isUntracked ? tr('product.untracked') : prod.quantity;
     openModal(`${tr('sale.title')}: ${escapeHtml(prod.name)}`, `
         <div class="form-group">
             <label class="form-label">${tr('sale.quantity')}</label>
-            <input type="number" class="form-input" id="sellQtyInput" value="1" min="1" max="${prod.quantity}">
-            <div class="form-hint">${tr('product.inStock')}: ${prod.quantity}</div>
+            <input type="number" class="form-input" id="sellQtyInput" value="1" min="1" ${maxAttr}>
+            <div class="form-hint">${tr('product.inStock')}: ${stockHint}</div>
         </div>
         <div class="form-group">
             <label class="form-label">${tr('sale.notes')}</label>
@@ -2431,13 +2770,13 @@ function setupEventListeners() {
     });
 
     // Add buttons
-    document.getElementById('addCategoryBtn').addEventListener('click', openAddCategory);
-    document.getElementById('addProductBtn').addEventListener('click', openAddProduct);
+    document.getElementById('addCategoryBtn')?.addEventListener('click', openAddCategory);
+    document.getElementById('addProductBtn')?.addEventListener('click', openAddProduct);
 
     // Filters
-    document.getElementById('productCategoryFilter').addEventListener('change', renderProducts);
-    document.getElementById('productSort').addEventListener('change', renderProducts);
-    document.getElementById('activityFilter').addEventListener('change', renderActivity);
+    document.getElementById('productCategoryFilter')?.addEventListener('change', renderProducts);
+    document.getElementById('productSort')?.addEventListener('change', renderProducts);
+    document.getElementById('activityFilter')?.addEventListener('change', renderActivity);
     document.getElementById('globalSearch').addEventListener('input', () => {
         if (currentPage === 'products') renderProducts();
     });

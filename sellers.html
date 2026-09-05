@@ -477,6 +477,10 @@
     color: var(--danger);
   }
 
+  .pos-card-stock.stock-untracked .stock-num {
+    color: var(--ink-muted);
+  }
+
   .pos-card-footer {
     padding: 12px 16px 16px;
   }
@@ -1083,6 +1087,23 @@
         </div>
       </div>
 
+      <!-- Admin Panel Navigation -->
+      <a href="admin.html" class="pos-admin-link" title="Open Admin Panel">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        <span>Admin Panel</span>
+      </a>
+
+      <!-- Sync Status Pill -->
+      <div class="sync-pill online-synced" id="posSyncPill" title="POS Synchronization status">
+        <span class="sync-dot"></span>
+        <span class="sync-label" id="posSyncLabel">Synced</span>
+      </div>
+
       <!-- Theme Toggle -->
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
         <svg class="theme-icon icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1103,7 +1124,7 @@
         <circle cx="11" cy="11" r="8"/>
         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
-      <input type="text" class="pos-search-input" id="search" placeholder="Search products, SKU or category...">
+      <input type="text" class="pos-search-input" id="search" placeholder="Search products or SKU...">
     </div>
 
     <div class="pos-filter-group">
@@ -1113,7 +1134,7 @@
     </div>
 
     <div class="toolbar-right">
-      <span class="count-pill" id="product-count">8 products</span>
+      <span class="count-pill" id="product-count">—</span>
     </div>
   </div>
 
@@ -1198,76 +1219,400 @@
 <div class="pos-toast-container" id="toasts"></div>
 
 <script>
-// ── DATA ──────────────────────────────────────────────────────────────────
-const PRODUCTS = [
-  {
-    id: 'CT-1024', name: 'Winter Coat', sku: 'CT-1024',
-    price: 160, stock: 12, category: 'Outerwear', size: 'M/L/XL', color: 'Navy',
-    img: 'https://images.unsplash.com/photo-1539533018447-63fcce2678e3?w=600&q=80',
-    badge: null
+// ── CONSTANTS & DB ────────────────────────────────────────────────────────
+const DB_NAME = 'SalesTrackDB';
+const DB_VERSION = 1;
+const API_BASE_URL = (typeof window !== 'undefined' && window.SALESTRACK_API_URL) || '/api';
+
+const localDb = {
+  db: null,
+  async init() {
+    return new Promise((resolve) => {
+      if (this.db) return resolve(this.db);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('products')) db.createObjectStore('products', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('activities')) db.createObjectStore('activities', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('outbox')) {
+          const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
+          outboxStore.createIndex('status', 'status', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      req.onsuccess = (e) => {
+        this.db = e.target.result;
+        resolve(this.db);
+      };
+      req.onerror = (e) => {
+        console.error('[pos idb] Failed to open IndexedDB:', e.target.error);
+        resolve(null);
+      };
+    });
   },
-  {
-    id: 'JK-0371', name: 'Leather Jacket', sku: 'JK-0371',
-    price: 280, stock: 3, category: 'Jackets', size: 'S/M/L', color: 'Black',
-    img: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80',
-    badge: 'low'
+
+  async getAll(storeName) {
+    if (!this.db) return [];
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      } catch (e) { resolve([]); }
+    });
   },
-  {
-    id: 'DR-5512', name: 'Summer Dress', sku: 'DR-5512',
-    price: 95, stock: 18, category: 'Dresses', size: 'XS–XL', color: 'Floral',
-    img: 'https://images.unsplash.com/photo-1572804013427-4d7ca7268217?w=600&q=80',
-    badge: 'new'
+
+  async put(storeName, value) {
+    if (!this.db) return;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.put(value);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) { resolve(); }
+    });
   },
-  {
-    id: 'SN-2201', name: 'Wool Sneakers', sku: 'SN-2201',
-    price: 125, stock: 0, category: 'Footwear', size: '40–46', color: 'Grey',
-    img: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80',
-    badge: 'out'
+
+  async putAll(storeName, items) {
+    if (!this.db || !Array.isArray(items)) return;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        for (const item of items) store.put(item);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) { resolve(); }
+    });
   },
-  {
-    id: 'TR-0088', name: 'Slim Trousers', sku: 'TR-0088',
-    price: 89, stock: 7, category: 'Bottoms', size: 'W28–W36', color: 'Charcoal',
-    img: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=600&q=80',
-    badge: null
+
+  async delete(storeName, key) {
+    if (!this.db) return;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.delete(key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) { resolve(); }
+    });
   },
-  {
-    id: 'BL-4400', name: 'Linen Blazer', sku: 'BL-4400',
-    price: 210, stock: 2, category: 'Blazers', size: 'S/M/L/XL', color: 'Beige',
-    img: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600&q=80',
-    badge: 'low'
+
+  async getMeta(key) {
+    if (!this.db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction('meta', 'readonly');
+        const store = tx.objectStore('meta');
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result ? req.result.value : null);
+        req.onerror = () => resolve(null);
+      } catch (e) { resolve(null); }
+    });
   },
-  {
-    id: 'SC-9901', name: 'Cashmere Scarf', sku: 'SC-9901',
-    price: 68, stock: 24, category: 'Accessories', size: 'One Size', color: 'Cream',
-    img: 'https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?w=600&q=80',
-    badge: null
-  },
-  {
-    id: 'SH-3310', name: 'Oxford Shirt', sku: 'SH-3310',
-    price: 75, stock: 9, category: 'Shirts', size: 'XS–XXL', color: 'White',
-    img: 'https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=600&q=80',
-    badge: null
+
+  async setMeta(key, value) {
+    if (!this.db) return;
+    return this.put('meta', { key, value });
   }
-];
+};
+
+function getDeviceId() {
+  let devId = null;
+  try { devId = localStorage.getItem('salestrack_device_id'); } catch (e) {}
+  if (!devId) {
+    devId = 'pos_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+    try { localStorage.setItem('salestrack_device_id', devId); } catch (e) {}
+  }
+  return devId;
+}
+
+async function enqueueOperation(type, payload) {
+  const op = {
+    id: 'op_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9),
+    deviceId: getDeviceId(),
+    type,
+    payload,
+    createdAt: Date.now(),
+    status: 'pending',
+    attempts: 0
+  };
+  await localDb.put('outbox', op);
+  if (typeof syncEngine !== 'undefined' && syncEngine.kick) {
+    syncEngine.kick();
+  }
+  return op;
+}
+
+// ── CROSS-PANEL BROADCAST CHANNEL ─────────────────────────────────────────
+const catalogChannel = (typeof window !== 'undefined' && 'BroadcastChannel' in window)
+  ? new BroadcastChannel('salestrack_channel')
+  : null;
+
+function notifyCatalog(type, data = {}) {
+  if (catalogChannel) {
+    try {
+      catalogChannel.postMessage({ type, timestamp: Date.now(), ...data });
+    } catch (e) {
+      console.warn('[pos channel] Broadcast failed:', e);
+    }
+  }
+}
+
+if (catalogChannel) {
+  catalogChannel.onmessage = async (e) => {
+    const { type, product } = e.data || {};
+    if (type === 'PRODUCT_CREATED' || type === 'PRODUCT_UPDATED' || type === 'PRODUCT_DELETED' || type === 'CATALOG_CHANGED') {
+      await loadProductsFromStorage();
+      renderGrid();
+      if (type === 'PRODUCT_CREATED' && product?.name) {
+        showToast(`New product added: ${product.name}`, 'info');
+      } else if (type === 'PRODUCT_UPDATED' && product?.name) {
+        showToast(`Product updated: ${product.name}`, 'info');
+      } else if (type === 'PRODUCT_DELETED') {
+        showToast(`Product removed from catalog`, 'info');
+      }
+    }
+  };
+}
+
+// ── BACKGROUND SYNC ENGINE ────────────────────────────────────────────────
+const syncEngine = {
+  isOnline: navigator.onLine,
+  syncing: false,
+  retryTimer: null,
+  attempts: 0,
+
+  async updateUI() {
+    const pill = document.getElementById('posSyncPill');
+    const label = document.getElementById('posSyncLabel');
+    if (!pill || !label) return;
+
+    const allOps = await localDb.getAll('outbox');
+    const pending = allOps.filter(o => o.status === 'pending' || o.status === 'syncing');
+    const failed = allOps.filter(o => o.status === 'failed' || o.status === 'conflict');
+
+    pill.className = 'sync-pill';
+    if (failed.length > 0) {
+      pill.classList.add('sync-alert');
+      label.textContent = `⚠️ ${failed.length} sync issue${failed.length > 1 ? 's' : ''}`;
+    } else if (!this.isOnline) {
+      pill.classList.add('offline');
+      label.textContent = pending.length > 0
+        ? `🔴 Offline (${pending.length})`
+        : '🔴 Offline';
+    } else if (this.syncing || pending.length > 0) {
+      pill.classList.add('syncing');
+      label.textContent = `🟡 Syncing (${pending.length})...`;
+    } else {
+      pill.classList.add('online-synced');
+      label.textContent = '🟢 Synced';
+    }
+  },
+
+  async kick() {
+    if (this.syncing) return;
+    clearTimeout(this.retryTimer);
+    this.syncing = true;
+    await this.updateUI();
+
+    try {
+      const isReachable = await this.probeConnectivity();
+      if (!isReachable) {
+        this.syncing = false;
+        await this.updateUI();
+        this.scheduleRetry();
+        return;
+      }
+
+      await this.pushOutbox();
+      await this.pullChanges();
+      this.attempts = 0;
+    } catch (err) {
+      console.warn('[pos sync] Error:', err);
+      this.scheduleRetry();
+    } finally {
+      this.syncing = false;
+      await this.updateUI();
+    }
+  },
+
+  async probeConnectivity() {
+    if (!navigator.onLine) {
+      this.isOnline = false;
+      return false;
+    }
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const res = await fetch(`${API_BASE_URL}/health`, { cache: 'no-store', signal: controller.signal });
+      clearTimeout(timeoutId);
+      this.isOnline = res.ok;
+      return res.ok;
+    } catch (e) {
+      this.isOnline = false;
+      return false;
+    }
+  },
+
+  async pushOutbox() {
+    const allOps = await localDb.getAll('outbox');
+    const pending = allOps.filter(o => o.status === 'pending');
+    if (pending.length === 0) return;
+
+    const batch = pending.slice(0, 50);
+    for (const op of batch) {
+      op.status = 'syncing';
+      await localDb.put('outbox', op);
+    }
+    await this.updateUI();
+
+    const res = await fetch(`${API_BASE_URL}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        deviceId: getDeviceId(),
+        operations: batch
+      })
+    });
+
+    if (!res.ok) throw new Error(`Sync error ${res.status}`);
+
+    const data = await res.json();
+    const accepted = new Set(data.accepted || []);
+    const rejectedMap = new Map((data.rejected || []).map(r => [r.id, r]));
+
+    for (const op of batch) {
+      if (accepted.has(op.id)) {
+        await localDb.delete('outbox', op.id);
+      } else if (rejectedMap.has(op.id)) {
+        const rej = rejectedMap.get(op.id);
+        op.status = 'failed';
+        op.errorCode = rej.code || 'REJECTED';
+        op.errorMessage = rej.message || 'Rejected by server';
+        await localDb.put('outbox', op);
+
+        if (op.type === 'SALE' && rej.code === 'INSUFFICIENT_STOCK') {
+          const prodId = op.payload?.productId;
+          const saleQty = Number(op.payload?.quantity) || 0;
+          const prod = products.find(p => p.id === prodId);
+          if (prod && prod.stock !== null && prod.stock !== undefined) {
+            prod.stock += saleQty;
+            await localDb.put('products', { ...prod, quantity: prod.stock });
+            updateCardStock(prod.id);
+          }
+          showToast(`🚨 Sale rejected: Insufficient stock on server.`, 'error', 7000);
+        }
+      } else {
+        op.status = 'pending';
+        await localDb.put('outbox', op);
+      }
+    }
+  },
+
+  async pullChanges() {
+    const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
+    const res = await fetch(`${API_BASE_URL}/sync?since=${lastSyncSeq}`, { cache: 'no-store' });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    if (data.requiresBootstrap) {
+      const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+      if (snapRes.ok) {
+        const snap = await snapRes.json();
+        if (Array.isArray(snap.products)) {
+          await localDb.putAll('products', snap.products);
+          await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+          await loadProductsFromStorage();
+          renderGrid();
+        }
+      }
+      return;
+    }
+
+    if (Array.isArray(data.changes) && data.changes.length > 0) {
+      let modified = false;
+      for (const ch of data.changes) {
+        if (ch.entityType === 'product') {
+          if (ch.action === 'DELETE' || ch.data?.isDeleted) {
+            await localDb.delete('products', ch.entityId);
+            modified = true;
+          } else if (ch.data) {
+            const allProds = await localDb.getAll('products');
+            const existing = allProds.find(p => p.id === ch.entityId);
+            const merged = existing ? { ...existing, ...ch.data } : ch.data;
+            await localDb.put('products', merged);
+            modified = true;
+          }
+        }
+      }
+      await localDb.setMeta('lastSyncSeq', data.currentSeq || 0);
+      if (modified) {
+        await loadProductsFromStorage();
+        renderGrid();
+      }
+    }
+  },
+
+  scheduleRetry() {
+    clearTimeout(this.retryTimer);
+    this.attempts++;
+    const base = Math.min(60000, 1000 * Math.pow(1.8, Math.min(this.attempts, 7)));
+    const jitter = Math.floor(Math.random() * 1500);
+    this.retryTimer = setTimeout(() => this.kick(), base + jitter);
+  }
+};
 
 // ── STATE ─────────────────────────────────────────────────────────────────
-let products = PRODUCTS.map(p => ({ ...p }));
+let products = [];
 let sessions = { sales: 0, revenue: 0, extraProfit: 0 };
 let activeProduct = null;
 let confirmLock = false;
 let searchVal = '';
 let filterVal = 'all';
-let syncQueue = [];
+
+async function loadProductsFromStorage() {
+  const dbProds = await localDb.getAll('products');
+  products = dbProds.map(p => ({
+    id: p.id,
+    name: p.name,
+    sku: p.sku || ('SKU-' + (p.id ? p.id.slice(-6).toUpperCase() : '000000')),
+    price: Number(p.price) || 0,
+    stock: (p.quantity !== undefined && p.quantity !== null && p.quantity !== '') ? Number(p.quantity) : null,
+    image: p.image || p.img || null,
+    sold: Number(p.sold) || 0,
+    notes: p.notes || '',
+    version: p.version || 1
+  }));
+}
 
 // ── RENDER ────────────────────────────────────────────────────────────────
 function fmt(n) {
   return '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function renderCard(p) {
-  const isOut = p.stock === 0;
-  const isLow = p.stock > 0 && p.stock <= 3;
-  const badge = p.badge || (isOut ? 'out' : isLow ? 'low' : null);
+  const isUntracked = p.stock === null || p.stock === undefined;
+  const isOut = !isUntracked && p.stock === 0;
+  const isLow = !isUntracked && p.stock > 0 && p.stock <= 3;
+  const badge = isOut ? 'out' : isLow ? 'low' : null;
 
   const badgeMap = {
     low: '<span class="card-badge badge-low">Low stock</span>',
@@ -1275,26 +1620,23 @@ function renderCard(p) {
     new: '<span class="card-badge badge-new">New</span>'
   };
 
+  const imgSrc = p.image || 'assets/logo.webp';
+
   return `
     <div class="pos-card ${isOut ? 'out-of-stock' : ''}" id="card-${p.id}">
       <div class="sync-indicator" id="sync-${p.id}"></div>
       <div class="pos-card-img-wrap">
-        <img src="${p.img}" alt="${p.name}" class="pos-card-img" loading="lazy">
+        <img src="${imgSrc}" alt="${escapeHtml(p.name)}" class="pos-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.webp';">
         ${badge ? badgeMap[badge] || '' : ''}
       </div>
       <div class="pos-card-body">
-        <div class="pos-card-name">${p.name}</div>
-        <div class="pos-card-sku">SKU: ${p.sku}</div>
-        <div class="pos-card-meta">
-          ${p.category ? `<span class="pos-meta-tag category">${p.category}</span>` : ''}
-          ${p.size     ? `<span class="pos-meta-tag">${p.size}</span>`     : ''}
-          ${p.color    ? `<span class="pos-meta-tag">${p.color}</span>`    : ''}
-        </div>
+        <div class="pos-card-name">${escapeHtml(p.name)}</div>
+        <div class="pos-card-sku">SKU: ${escapeHtml(p.sku)}</div>
         <div class="pos-card-price-row">
           <div class="pos-card-price">${fmt(p.price)}</div>
-          <div class="pos-card-stock ${isOut ? 'stock-out' : isLow ? 'stock-low' : ''}">
-            <span class="stock-num" id="stock-${p.id}">${p.stock}</span>
-            in stock
+          <div class="pos-card-stock ${isUntracked ? 'stock-untracked' : isOut ? 'stock-out' : isLow ? 'stock-low' : ''}">
+            <span class="stock-num" id="stock-${p.id}">${isUntracked ? '—' : p.stock}</span>
+            ${isUntracked ? 'untracked' : 'in stock'}
           </div>
         </div>
       </div>
@@ -1312,16 +1654,34 @@ function renderCard(p) {
 function renderGrid() {
   const q = searchVal.toLowerCase();
   let visible = products.filter(p => {
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || (p.category && p.category.toLowerCase().includes(q));
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.sku && p.sku.toLowerCase().includes(q));
+    const isUntracked = p.stock === null || p.stock === undefined;
     const matchFilter = filterVal === 'all' ||
-      (filterVal === 'in-stock' && p.stock > 0) ||
-      (filterVal === 'low' && p.stock > 0 && p.stock <= 3);
+      (filterVal === 'in-stock' && (isUntracked || p.stock > 0)) ||
+      (filterVal === 'low' && !isUntracked && p.stock > 0 && p.stock <= 3);
     return matchSearch && matchFilter;
   });
 
   const grid = document.getElementById('product-grid');
   const count = document.getElementById('product-count');
   count.textContent = `${visible.length} product${visible.length !== 1 ? 's' : ''}`;
+
+  if (!products.length) {
+    grid.innerHTML = `
+      <div class="pos-empty">
+        <div class="pos-empty-icon">📦</div>
+        <div class="pos-empty-title">No products in catalog</div>
+        <div class="pos-empty-sub">Create your first products in the Admin Panel to start selling.</div>
+        <a href="admin.html" class="pos-empty-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Open Admin Panel
+        </a>
+      </div>`;
+    return;
+  }
 
   if (!visible.length) {
     grid.innerHTML = `
@@ -1338,16 +1698,18 @@ function renderGrid() {
 function updateCardStock(productId) {
   const p = products.find(x => x.id === productId);
   if (!p) return;
+  const isUntracked = p.stock === null || p.stock === undefined;
   const card = document.getElementById(`card-${p.id}`);
   const stockEl = document.getElementById(`stock-${p.id}`);
-  if (stockEl) stockEl.textContent = p.stock;
+  if (stockEl) stockEl.textContent = isUntracked ? '—' : p.stock;
   if (card) {
     const stockContainer = card.querySelector('.pos-card-stock');
     if (stockContainer) {
-      stockContainer.className = `pos-card-stock ${p.stock === 0 ? 'stock-out' : (p.stock <= 3 ? 'stock-low' : '')}`;
+      stockContainer.className = `pos-card-stock ${isUntracked ? 'stock-untracked' : p.stock === 0 ? 'stock-out' : (p.stock <= 3 ? 'stock-low' : '')}`;
+      stockContainer.innerHTML = `<span class="stock-num" id="stock-${p.id}">${isUntracked ? '—' : p.stock}</span>${isUntracked ? 'untracked' : 'in stock'}`;
     }
     const btn = card.querySelector('.sold-btn');
-    if (p.stock === 0) {
+    if (!isUntracked && p.stock === 0) {
       card.classList.add('out-of-stock');
       if (btn) btn.disabled = true;
     }
@@ -1357,9 +1719,10 @@ function updateCardStock(productId) {
 // ── MODAL ─────────────────────────────────────────────────────────────────
 function openModal(productId) {
   activeProduct = products.find(p => p.id === productId);
-  if (!activeProduct || activeProduct.stock === 0) return;
+  const isUntracked = activeProduct && (activeProduct.stock === null || activeProduct.stock === undefined);
+  if (!activeProduct || (!isUntracked && activeProduct.stock === 0)) return;
 
-  document.getElementById('modal-sku').textContent = `${activeProduct.name} · SKU: ${activeProduct.sku}`;
+  document.getElementById('modal-sku').textContent = `${activeProduct.name}${activeProduct.sku ? ` · SKU: ${activeProduct.sku}` : ''}`;
   document.getElementById('qty-input').value = 1;
   document.getElementById('price-input').value = activeProduct.price.toFixed(2);
 
@@ -1422,16 +1785,16 @@ function updateSummary() {
 
 function validateQty() {
   if (!activeProduct) return true;
-  const qty = parseInt(document.getElementById('qty-input').value);
+  const qty = parseInt(document.getElementById('qty-input').value) || 0;
   const warn = document.getElementById('qty-warn');
   const ctrl = document.getElementById('qty-control');
   const maxLbl = document.getElementById('qty-max-label');
-  const stock = activeProduct.stock;
+  const isUntracked = activeProduct.stock === null || activeProduct.stock === undefined;
 
-  if (qty > stock) {
+  if (!isUntracked && qty > activeProduct.stock) {
     warn.classList.add('visible');
     ctrl.classList.add('error');
-    maxLbl.textContent = stock;
+    maxLbl.textContent = activeProduct.stock;
     return false;
   } else {
     warn.classList.remove('visible');
@@ -1449,7 +1812,8 @@ document.getElementById('qty-dec').addEventListener('click', () => {
 document.getElementById('qty-inc').addEventListener('click', () => {
   const inp = document.getElementById('qty-input');
   const v = parseInt(inp.value) || 1;
-  if (!activeProduct || v < activeProduct.stock) {
+  const isUntracked = !activeProduct || activeProduct.stock === null || activeProduct.stock === undefined;
+  if (isUntracked || v < activeProduct.stock) {
     inp.value = v + 1; updateSummary(); validateQty();
   }
 });
@@ -1467,11 +1831,12 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
   const qty   = parseInt(document.getElementById('qty-input').value) || 0;
   const price = parseFloat(document.getElementById('price-input').value);
   const p     = activeProduct;
+  const isUntracked = p.stock === null || p.stock === undefined;
 
   // Validate
   if (qty < 1) { showToast('Enter a valid quantity.', 'warn'); return; }
-  if (qty > p.stock) { showToast(`Only ${p.stock} items in stock.`, 'warn'); return; }
-  if (isNaN(price) || price < 0) { showToast('Enter a valid selling price.', 'warn'); return; }
+  if (!isUntracked && qty > p.stock) { showToast(`Only ${p.stock} items in stock.`, 'warn'); return; }
+  if (isNaN(price) || price <= 0) { showToast('Enter a valid selling price.', 'warn'); return; }
 
   confirmLock = true;
   document.getElementById('btn-confirm').disabled = true;
@@ -1492,11 +1857,62 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
     syncStatus:     'saved'
   };
 
-  // Update local state immediately
-  p.stock -= qty;
+  // Update local state immediately (preserve null if untracked)
+  if (!isUntracked) {
+    p.stock -= qty;
+  }
+  p.sold = (p.sold || 0) + qty;
   sessions.sales++;
   sessions.revenue += tx.totalSaleValue;
   sessions.extraProfit += tx.priceDiff > 0 ? tx.priceDiff : 0;
+
+  // Persist updated product to local replica IndexedDB
+  await localDb.put('products', {
+    id: p.id,
+    name: p.name,
+    sku: p.sku,
+    price: p.price,
+    quantity: p.stock,
+    sold: p.sold,
+    image: p.image,
+    notes: p.notes,
+    version: (p.version || 1) + 1,
+    updatedAt: Date.now()
+  });
+
+  // Save activity record to IndexedDB
+  const activityId = 'act_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 7);
+  await localDb.put('activities', {
+    id: activityId,
+    type: 'sale',
+    timestamp: Date.now(),
+    productId: p.id,
+    productName: p.name,
+    quantity: qty,
+    sellingPrice: price,
+    totalSaleValue: tx.totalSaleValue,
+    priceDiff: tx.priceDiff,
+    notes: `POS sale (${qty}x @ $${price.toFixed(2)})`
+  });
+
+  // Enqueue SALE operation for PostgreSQL sync engine
+  await enqueueOperation('SALE', {
+    productId: p.id,
+    quantity: qty,
+    sellingPrice: price,
+    notes: `POS sale: ${qty}x @ $${price.toFixed(2)}`,
+    timestamp: Date.now(),
+    activityId
+  });
+
+  // Broadcast sale to open Admin tabs
+  notifyCatalog('SALE_RECORDED', {
+    productId: p.id,
+    productName: p.name,
+    quantity: qty,
+    price: price,
+    total: tx.totalSaleValue
+  });
 
   // Update header stats
   document.getElementById('hdr-sales').textContent = sessions.sales;
@@ -1507,8 +1923,7 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
   closeModal();
 
   // Show sync indicator
-  showSync(p.id, 'syncing');
-  queueSync(tx, p.id);
+  showSync(p.id, 'synced');
 
   // Build toast detail
   const diff = tx.priceDiff;
@@ -1518,7 +1933,7 @@ document.getElementById('btn-confirm').addEventListener('click', async () => {
   showToast(`${p.name} × ${qty} · Sold for ${fmt(price * qty)}`, 'success', profitLine);
 });
 
-// ── SYNC SIMULATION ───────────────────────────────────────────────────────
+// ── SYNC INDICATOR ────────────────────────────────────────────────────────
 function showSync(productId, status) {
   const el = document.getElementById(`sync-${productId}`);
   if (!el) return;
@@ -1528,24 +1943,6 @@ function showSync(productId, status) {
   if (status === 'synced') {
     setTimeout(() => el.classList.remove('visible'), 3000);
   }
-}
-
-function queueSync(tx, productId) {
-  syncQueue.push({ tx, productId });
-  setTimeout(() => {
-    // Simulate network sync
-    const success = Math.random() > 0.1; // 90% success rate demo
-    if (success) {
-      showSync(productId, 'synced');
-    } else {
-      showSync(productId, 'failed');
-      showToast('Sync failed — will retry when connected.', 'warn');
-      setTimeout(() => {
-        showSync(productId, 'syncing');
-        setTimeout(() => showSync(productId, 'synced'), 1500);
-      }, 5000);
-    }
-  }, 1200 + Math.random() * 800);
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────
@@ -1608,7 +2005,6 @@ if (themeBtn) {
   });
 }
 
-// Track system theme changes if user hasn't explicitly set a preference
 if (window.matchMedia) {
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   const listener = (e) => {
@@ -1620,8 +2016,49 @@ if (window.matchMedia) {
   else if (mq.addListener) mq.addListener(listener);
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────
-renderGrid();
+// ── INITIALIZATION ────────────────────────────────────────────────────────
+async function init() {
+  await localDb.init();
+  await loadProductsFromStorage();
+  renderGrid();
+
+  // Hydrate session stats from today's activities
+  try {
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const acts = await localDb.getAll('activities');
+    const todaySales = acts.filter(a => a.type === 'sale' && a.timestamp >= todayStart);
+    sessions.sales = todaySales.length;
+    sessions.revenue = todaySales.reduce((acc, a) => acc + (Number(a.totalSaleValue) || (Number(a.sellingPrice || 0) * (a.quantity || 1))), 0);
+    sessions.extraProfit = todaySales.reduce((acc, a) => acc + (Math.max(0, Number(a.priceDiff) || 0)), 0);
+    document.getElementById('hdr-sales').textContent = sessions.sales;
+    document.getElementById('hdr-revenue').textContent = fmt(sessions.revenue);
+    document.getElementById('hdr-profit').textContent = `+${fmt(sessions.extraProfit)}`;
+  } catch (e) {
+    console.warn('[pos stats] Failed to hydrate session stats:', e);
+  }
+
+  syncEngine.updateUI();
+
+  // Network and window listeners
+  window.addEventListener('online', () => {
+    syncEngine.isOnline = true;
+    syncEngine.kick();
+  });
+  window.addEventListener('offline', () => {
+    syncEngine.isOnline = false;
+    syncEngine.updateUI();
+  });
+  window.addEventListener('focus', () => {
+    loadProductsFromStorage().then(renderGrid);
+    syncEngine.kick();
+  });
+
+  // Start background sync
+  syncEngine.kick();
+  setInterval(() => syncEngine.kick(), 25000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

@@ -11,6 +11,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cbuService = require('./services/cbu');
 const syncService = require('./services/syncService');
+const imageStorageService = require('./services/imageStorageService');
 const db = require('./db');
 
 const app = express();
@@ -23,9 +24,9 @@ app.set('trust proxy', 1);
 // 1. Security Headers
 app.use(helmet());
 
-// 2. Request Body Parsing (1MB for sync operation batches)
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// 2. Request Body Parsing (10MB to accommodate image uploads and sync operation batches)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 3. Structured JSON Request Logger Middleware
 app.use((req, res, next) => {
@@ -186,6 +187,68 @@ apiRouter.get('/history', historyHandler);
 // Backward-compatible aliases within /api
 apiRouter.get('/getCbuRates', ratesHandler);
 apiRouter.get('/getCbuHistory', historyHandler);
+
+// Storage Rate Limiter
+const storageUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
+  message: { error: 'Too many image upload requests, please try again in a moment.' }
+});
+
+// 1. ImageKit Image Upload
+apiRouter.post('/storage/upload', storageUploadLimiter, async (req, res, next) => {
+  try {
+    const { image, fileName, folder } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: 'Image data is required' });
+    }
+
+    const result = await imageStorageService.uploadImage({
+      file: image,
+      fileName,
+      folder: folder || '/products'
+    });
+
+    res.status(200).json({
+      ok: true,
+      url: result.url,
+      fileId: result.fileId,
+      name: result.name,
+      size: result.size,
+      thumbnailUrl: result.thumbnailUrl
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 2. ImageKit Image Deletion
+apiRouter.delete('/storage', async (req, res, next) => {
+  try {
+    const { fileId } = req.query;
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId query parameter is required' });
+    }
+
+    const deleted = await imageStorageService.deleteImage(fileId);
+    res.status(200).json({ ok: deleted });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 3. ImageKit Client Authentication Parameters
+apiRouter.get('/storage/auth', (req, res) => {
+  try {
+    const params = imageStorageService.getAuthParams();
+    res.status(200).json(params);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Mount router at /api
 app.use('/api', apiRouter);
