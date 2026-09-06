@@ -1247,6 +1247,356 @@
     font-size: 0.75rem;
   }
 
+  /* ── INSTANT SELL BUTTON ── */
+  .btn-instant-sell {
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    color: var(--ink-muted);
+    padding: 9px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-instant-sell:hover {
+    background: var(--bg-surface-2);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* ── STICKY BOTTOM CART BAR ── */
+  .pos-cart-bar {
+    position: fixed;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+    left: 16px;
+    right: 16px;
+    z-index: 1000;
+    background: var(--bg-surface);
+    border: 1.5px solid var(--accent);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(184, 134, 11, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    gap: 12px;
+    animation: cartSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes cartSlideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @media (min-width: 1024px) {
+    .pos-cart-bar {
+      bottom: 24px;
+      right: 28px;
+      left: auto;
+      min-width: 360px;
+      max-width: 440px;
+    }
+  }
+  .cart-bar-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    flex: 1;
+    min-width: 0;
+  }
+  .cart-bar-icon-wrap {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .cart-badge-count {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--accent);
+    color: var(--ink-invert);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    border-radius: var(--radius-pill);
+    padding: 1px 6px;
+    min-width: 18px;
+    text-align: center;
+    box-shadow: var(--shadow-xs);
+  }
+  [data-theme="dark"] .cart-badge-count {
+    color: #0E0D0B;
+  }
+  .cart-bar-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .cart-bar-title {
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cart-bar-amount {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    white-space: nowrap;
+  }
+  .cart-bar-checkout-btn {
+    padding: 10px 16px;
+    background: var(--accent);
+    color: var(--ink-invert);
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: var(--transition-fast);
+    box-shadow: 0 2px 8px rgba(184, 134, 11, 0.3);
+  }
+  [data-theme="dark"] .cart-bar-checkout-btn {
+    color: #0E0D0B;
+  }
+  .cart-bar-checkout-btn:hover {
+    background: var(--accent-strong);
+    transform: translateY(-1px);
+  }
+
+  /* ── HEADER CART BUTTON ── */
+  .hdr-cart-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--ink-strong);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    transition: var(--transition-fast);
+  }
+  .hdr-cart-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .hdr-cart-badge {
+    background: var(--accent);
+    color: var(--ink-invert);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: var(--radius-pill);
+  }
+  [data-theme="dark"] .hdr-cart-badge {
+    color: #0E0D0B;
+  }
+
+  /* ── CART MODAL & LINE ITEMS ── */
+  .pos-cart-modal {
+    max-width: 520px !important;
+  }
+  .cart-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .cart-item-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .cart-item-img {
+    width: 46px;
+    height: 46px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+  }
+  .cart-item-details {
+    flex: 1;
+    min-width: 0;
+  }
+  .cart-item-name {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .cart-item-pricing {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+  }
+  .cart-item-price-input {
+    width: 72px;
+    padding: 2px 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-surface);
+    color: var(--ink-strong);
+    text-align: right;
+  }
+  .cart-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .cart-qty-ctrl {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    overflow: hidden;
+  }
+  .cart-qty-btn {
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
+    color: var(--ink-strong);
+    font-size: 0.9375rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition-fast);
+  }
+  .cart-qty-btn:hover {
+    background: var(--bg-surface-2);
+    color: var(--accent);
+  }
+  .cart-qty-val {
+    width: 24px;
+    text-align: center;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+  }
+  .cart-item-remove-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: transparent;
+    color: var(--danger);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    transition: var(--transition-fast);
+  }
+  .cart-item-remove-btn:hover {
+    opacity: 1;
+    background: rgba(220, 53, 69, 0.12);
+  }
+  .cart-item-subtotal {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .btn-add-more-products {
+    width: 100%;
+    padding: 9px 12px;
+    background: transparent;
+    border: 1px dashed var(--accent);
+    color: var(--accent-strong);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-add-more-products:hover {
+    background: var(--accent-soft);
+  }
+  .disc-chip {
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    color: var(--ink-strong);
+    padding: 4px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+  .disc-chip:hover, .disc-chip.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  /* ── AUDIT SYNC STATUS PILLS ── */
+  .audit-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .audit-status-pending {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+  .audit-status-synced {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .audit-status-rejected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+  }
+
   /* ── EMPTY STATE ── */
   .pos-empty {
     grid-column: 1 / -1;
@@ -3203,6 +3553,16 @@
         </div>
       </div>
 
+      <!-- Header Cart Indicator Button -->
+      <button class="hdr-cart-btn" id="hdr-cart-btn" type="button" aria-label="Current Sale" title="Current Sale" style="display:none;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="hdr-cart-badge" id="hdr-cart-badge">0</span>
+      </button>
+
       <!-- Sync Status Pill -->
       <div class="sync-pill online-synced" id="posSyncPill" data-i18n-title="pos.syncStatus" title="POS Synchronization status">
         <span class="sync-dot"></span>
@@ -3840,9 +4200,117 @@
         </div>
       </div>
     </div>
-    <div class="pos-modal-footer">
+    <div class="pos-modal-footer" style="display:flex; gap:10px;">
       <button class="btn-cancel" id="btn-cancel" type="button" data-i18n="pos.cancel">Cancel</button>
-      <button class="btn-confirm" id="btn-confirm" type="button" data-i18n="pos.confirmSale">Confirm Sale</button>
+      <button class="btn-confirm" id="btn-add-cart" type="button" style="display:inline-flex; align-items:center; justify-content:center; gap:6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+        <span id="btn-add-cart-text" data-i18n="pos.addToSale">Savatga qoʻshish</span>
+      </button>
+    </div>
+    <div style="padding: 0 20px 16px; text-align: center;">
+      <button type="button" id="btn-instant-sell" class="btn-instant-sell">
+        <span>⚡ </span><span data-i18n="pos.instantSell">Darhol sotish (1 dona)</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- STICKY BOTTOM CART BAR -->
+<div class="pos-cart-bar" id="pos-cart-bar" style="display:none;">
+  <div class="cart-bar-content" id="cart-bar-trigger">
+    <div class="cart-bar-icon-wrap">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="9" cy="21" r="1"></circle>
+        <circle cx="20" cy="21" r="1"></circle>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+      </svg>
+      <span class="cart-badge-count" id="cart-badge-count">0</span>
+    </div>
+    <div class="cart-bar-info">
+      <div class="cart-bar-title" id="cart-bar-title">0 xil mahsulot</div>
+      <div class="cart-bar-amount" id="cart-bar-amount">0 soʻm</div>
+    </div>
+  </div>
+  <button class="cart-bar-checkout-btn" id="cart-bar-checkout-btn" type="button">
+    <span data-i18n="pos.checkout">Rasmiylashtirish</span>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+  </button>
+</div>
+
+<!-- CURRENT SALE / CART CHECKOUT MODAL -->
+<div class="pos-overlay" id="cart-overlay" role="dialog" aria-modal="true" aria-label="Current Sale">
+  <div class="pos-modal pos-cart-modal" id="cart-modal">
+    <div class="pos-modal-header">
+      <div>
+        <div class="pos-modal-title" data-i18n="pos.currentSale">Joriy sotuv</div>
+        <div class="pos-modal-sub" id="cart-modal-sub">0 ta mahsulot</div>
+      </div>
+      <button class="pos-modal-close" id="cart-modal-close" aria-label="Close" type="button">✕</button>
+    </div>
+    <div class="pos-modal-body" style="max-height: 65vh; overflow-y: auto;">
+      <!-- Item list -->
+      <div class="cart-items-list" id="cart-items-list"></div>
+
+      <!-- Add more items button -->
+      <button type="button" class="btn-add-more-products" id="btn-add-more-products">
+        <span data-i18n="pos.addMore">+ Boshqa mahsulot qoʻshish</span>
+      </button>
+
+      <div class="summary-divider" style="margin: 16px 0 14px;"></div>
+
+      <!-- Handmade Discount Section -->
+      <div class="form-group" style="margin-bottom: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+          <label class="field-label" for="cart-discount-input" style="margin-bottom:0;" data-i18n="pos.orderDiscount">Umumiy chegirma</label>
+          <span style="font-size:0.75rem; color:var(--ink-muted);" data-i18n="pos.orderDiscountHint">Qoʻlda chegirma ming soʻmda</span>
+        </div>
+        <div class="price-input-wrap">
+          <input class="price-input" type="number" id="cart-discount-input" step="any" min="0" inputmode="decimal" placeholder="0">
+          <span class="price-symbol" data-i18n="pos.thousandSum">ming soʻm</span>
+        </div>
+        <div id="cart-discount-live-preview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
+        <!-- Preset shortcut chips -->
+        <div class="discount-preset-chips" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="disc-chip" data-amt="5">5 ming</button>
+          <button type="button" class="disc-chip" data-amt="10">10 ming</button>
+          <button type="button" class="disc-chip" data-amt="20">20 ming</button>
+          <button type="button" class="disc-chip" data-amt="0" style="color:var(--danger);">Tozalash</button>
+        </div>
+        <!-- Discount validation error banner -->
+        <div id="cart-discount-error" class="qty-warn" style="display:none; margin-top:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span data-i18n="pos.discountExceedsSubtotal">Chegirma jami summadan oshmasligi kerak!</span>
+        </div>
+      </div>
+
+      <!-- Financial Breakdown -->
+      <div class="summary">
+        <div class="summary-row">
+          <span class="s-label">Oraliq jami (Subtotal)</span>
+          <span class="s-val" id="cart-sum-subtotal">0 soʻm</span>
+        </div>
+        <div class="summary-row" id="cart-sum-discount-row">
+          <span class="s-label" data-i18n="pos.orderDiscount">Umumiy chegirma</span>
+          <span class="s-val" id="cart-sum-discount" style="color:var(--danger);">0 soʻm</span>
+        </div>
+        <div class="summary-divider"></div>
+        <div class="summary-row" style="font-size:1.125rem; font-weight:700;">
+          <span class="s-label" style="color:var(--ink-strong);" data-i18n="pos.finalTotal">JAMI TOʻLOV</span>
+          <span class="s-val" id="cart-sum-final" style="color:var(--accent); font-size:1.25rem;">0 soʻm</span>
+        </div>
+        <div class="summary-profit even" id="cart-profit-row" style="margin-top:10px;">
+          <span id="cart-profit-label" data-i18n="pos.priceDiff">Narx farqi</span>
+          <span id="cart-profit-val">0 soʻm</span>
+        </div>
+      </div>
+    </div>
+    <div class="pos-modal-footer">
+      <button class="btn-cancel" id="btn-cart-clear" type="button" data-i18n="pos.clearCart">Savatni tozalash</button>
+      <button class="btn-confirm" id="btn-cart-confirm" type="button" data-i18n="pos.confirmSale">Sotuvni tasdiqlash</button>
     </div>
   </div>
 </div>
@@ -3853,7 +4321,7 @@
 <script>
 // ── CONSTANTS & DB ────────────────────────────────────────────────────────
 const DB_NAME = 'SalesTrackDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const API_BASE_URL = (typeof window !== 'undefined' && window.SALESTRACK_API_URL) || '/api';
 
 const localDb = {
@@ -3873,6 +4341,12 @@ const localDb = {
           outboxStore.createIndex('status', 'status', { unique: false });
         }
         if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('cart')) db.createObjectStore('cart', { keyPath: 'key' });
+        if (!db.objectStoreNames.contains('sales')) {
+          const salesStore = db.createObjectStore('sales', { keyPath: 'id' });
+          salesStore.createIndex('status', 'status', { unique: false });
+          salesStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
       };
       req.onsuccess = (e) => {
         this.db = e.target.result;
@@ -3882,6 +4356,19 @@ const localDb = {
         console.error('[pos idb] Failed to open IndexedDB:', e.target.error);
         resolve(null);
       };
+    });
+  },
+
+  async get(storeName, key) {
+    if (!this.db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      } catch (e) { resolve(null); }
     });
   },
 
@@ -4174,6 +4661,14 @@ const syncEngine = {
     for (const op of batch) {
       if (accepted.has(op.id)) {
         await localDb.delete('outbox', op.id);
+        if (op.type === 'SALE_TRANSACTION' && op.payload?.saleId) {
+          const sale = await localDb.get('sales', op.payload.saleId);
+          if (sale) {
+            sale.status = 'synced';
+            sale.syncedAt = Date.now();
+            await localDb.put('sales', sale);
+          }
+        }
       } else if (rejectedMap.has(op.id)) {
         const rej = rejectedMap.get(op.id);
         op.status = 'failed';
@@ -4181,7 +4676,27 @@ const syncEngine = {
         op.errorMessage = rej.message || 'Rejected by server';
         await localDb.put('outbox', op);
 
-        if (op.type === 'SALE' && rej.code === 'INSUFFICIENT_STOCK') {
+        if (op.type === 'SALE_TRANSACTION') {
+          if (op.payload?.saleId) {
+            const sale = await localDb.get('sales', op.payload.saleId);
+            if (sale) {
+              sale.status = 'rejected';
+              sale.syncError = rej;
+              await localDb.put('sales', sale);
+            }
+          }
+          if (rej.code === 'INSUFFICIENT_STOCK' && rej.productId) {
+            const prod = products.find(p => p.id === rej.productId);
+            if (prod && rej.availableStock !== undefined) {
+              // Authoritative stock reconciliation: set local stock directly to server value
+              prod.stock = Number(rej.availableStock);
+              await localDb.put('products', { ...prod, quantity: prod.stock });
+              updateCardStock(prod.id);
+            }
+            const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+            showToast(t('pos.insufficientStockReconciled', { name: rej.productName || prod?.name || 'Mahsulot', stock: rej.availableStock }), 'error', 8000);
+          }
+        } else if (op.type === 'SALE' && rej.code === 'INSUFFICIENT_STOCK') {
           const prodId = op.payload?.productId;
           const saleQty = Number(op.payload?.quantity) || 0;
           const prod = products.find(p => p.id === prodId);
@@ -4197,6 +4712,9 @@ const syncEngine = {
         op.status = 'pending';
         await localDb.put('outbox', op);
       }
+    }
+    if (typeof renderAuditView === 'function' && currentTab === 'audit') {
+      renderAuditView();
     }
   },
 
@@ -4312,6 +4830,7 @@ const syncEngine = {
 let products = [];
 let sessions = { sales: 0, revenue: 0, extraProfit: 0, cashOut: 0 };
 let activeProduct = null;
+let activeCart = { items: [], discount: 0 };
 let confirmLock = false;
 let searchVal = '';
 let filterVal = 'all';
@@ -4928,114 +5447,672 @@ document.getElementById('price-input').addEventListener('input', () => {
   updateSummary();
 });
 
-// ── CONFIRM SALE ──────────────────────────────────────────────────────────
-document.getElementById('btn-confirm').addEventListener('click', async () => {
-  if (confirmLock || !activeProduct) return;
+// ── CART STATE & MANAGEMENT ──────────────────────────────────────────────
+async function loadCartFromStorage() {
+  try {
+    const saved = await localDb.get('cart', 'active_sale');
+    if (saved && Array.isArray(saved.items)) {
+      activeCart = {
+        items: saved.items.map(it => ({
+          productId: it.productId,
+          productName: it.productName,
+          sku: it.sku || '',
+          image: it.image || null,
+          basePrice: Number(it.basePrice) || 0,
+          salePrice: Number(it.salePrice) || 0,
+          quantity: Math.max(1, Math.floor(Number(it.quantity) || 1)),
+          subtotal: (Number(it.salePrice) || 0) * Math.max(1, Math.floor(Number(it.quantity) || 1))
+        })),
+        discount: Number(saved.discount) || 0
+      };
+    }
+  } catch (e) {
+    console.warn('[pos cart] Failed to load cart from IndexedDB:', e);
+  }
+  renderCartUI();
+}
+
+async function saveCartToStorage() {
+  try {
+    await localDb.put('cart', {
+      key: 'active_sale',
+      items: activeCart.items,
+      discount: activeCart.discount,
+      updatedAt: Date.now()
+    });
+  } catch (e) {
+    console.warn('[pos cart] Failed to save cart to IndexedDB:', e);
+  }
+}
+
+function getCartTotals() {
+  const subtotal = activeCart.items.reduce((sum, it) => sum + (it.subtotal || (it.salePrice * it.quantity)), 0);
+  const baseTotal = activeCart.items.reduce((sum, it) => sum + (it.basePrice * it.quantity), 0);
+  const discountUzs = Math.max(0, Math.floor((Number(activeCart.discount) || 0) * 1000));
+  const isDiscountValid = discountUzs <= subtotal;
+  const total = isDiscountValid ? (subtotal - discountUzs) : subtotal;
+  const priceDiff = total - baseTotal;
+  const totalUnits = activeCart.items.reduce((sum, it) => sum + it.quantity, 0);
+  const itemsCount = activeCart.items.length;
+
+  return {
+    subtotal,
+    baseTotal,
+    discountUzs,
+    discountMing: Number(activeCart.discount) || 0,
+    isDiscountValid,
+    total,
+    priceDiff,
+    totalUnits,
+    itemsCount
+  };
+}
+
+function addToCart(product, qty, salePrice) {
+  if (!product) return false;
+  const q = Math.max(1, Math.floor(Number(qty) || 1));
+  const sp = Math.max(0, Math.floor(Number(salePrice) || 0));
+
+  // Merge rule: if product with same productId AND same salePrice exists, merge quantity
+  const existingIdx = activeCart.items.findIndex(
+    it => it.productId === product.id && it.salePrice === sp
+  );
+
+  const isUntracked = product.stock === null || product.stock === undefined;
+  const currentTotalForProduct = activeCart.items
+    .filter(it => it.productId === product.id)
+    .reduce((sum, it) => sum + it.quantity, 0);
 
   const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
-  const qty      = parseInt(document.getElementById('qty-input').value) || 0;
-  const rawPrice = parseFloat(document.getElementById('price-input').value);
-  const price    = parsePrice(rawPrice);
-  const p        = activeProduct;
-  const isUntracked = p.stock === null || p.stock === undefined;
 
-  // Validate
-  if (qty < 1) { showToast(t('pos.toastValidQty'), 'warn'); return; }
-  if (!isUntracked && qty > p.stock) { showToast(t('pos.toastStockLimit', { stock: p.stock }), 'warn'); return; }
-  if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast(t('pos.toastValidPrice'), 'warn'); return; }
-
-  confirmLock = true;
-  document.getElementById('btn-confirm').disabled = true;
-  document.getElementById('btn-confirm').textContent = t('pos.saving');
-
-  // Transaction record (local session)
-  const tx = {
-    productId:      p.id,
-    productName:    p.name,
-    quantity:       qty,
-    basePrice:      p.price,
-    sellingPrice:   price,
-    totalBaseValue: p.price * qty,
-    totalSaleValue: price * qty,
-    priceDiff:      (price - p.price) * qty,
-    timestamp:      new Date().toISOString(),
-    sellerId:       'seller-01',
-    syncStatus:     'saved'
-  };
-
-  // Update local state immediately (preserve null if untracked)
-  if (!isUntracked) {
-    p.stock -= qty;
+  if (!isUntracked && (currentTotalForProduct + q) > product.stock) {
+    showToast(t('pos.toastStockLimit', { stock: product.stock }), 'warn');
+    return false;
   }
-  p.sold = (p.sold || 0) + qty;
-  sessions.sales++;
-  sessions.revenue += tx.totalSaleValue;
-  sessions.extraProfit += tx.priceDiff > 0 ? tx.priceDiff : 0;
 
-  // Persist updated product to local replica IndexedDB
-  await localDb.put('products', {
-    id: p.id,
-    name: p.name,
-    sku: p.sku,
-    price: p.price,
-    quantity: p.stock,
-    sold: p.sold,
-    image: p.image,
-    notes: p.notes,
-    translations: p.translations || {},
-    version: (p.version || 1) + 1,
-    updatedAt: Date.now()
+  if (existingIdx >= 0) {
+    activeCart.items[existingIdx].quantity += q;
+    activeCart.items[existingIdx].subtotal = activeCart.items[existingIdx].quantity * sp;
+  } else {
+    activeCart.items.push({
+      productId: product.id,
+      productName: product.name,
+      sku: product.sku || '',
+      image: product.image || null,
+      basePrice: product.price,
+      salePrice: sp,
+      quantity: q,
+      subtotal: q * sp
+    });
+  }
+
+  saveCartToStorage();
+  renderCartUI();
+
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const locTitle = getLocalizedProductName(product, currentLang);
+  showToast(`🛒 ${locTitle} × ${q}`, 'info');
+  return true;
+}
+
+function updateCartItemQty(index, newQty) {
+  if (index < 0 || index >= activeCart.items.length) return;
+  const item = activeCart.items[index];
+  const prod = products.find(p => p.id === item.productId);
+  const isUntracked = !prod || prod.stock === null || prod.stock === undefined;
+
+  const targetQty = Math.floor(Number(newQty) || 0);
+  if (targetQty <= 0) {
+    removeCartItem(index);
+    return;
+  }
+
+  const otherLinesQty = activeCart.items
+    .filter((it, idx) => it.productId === item.productId && idx !== index)
+    .reduce((sum, it) => sum + it.quantity, 0);
+
+  if (!isUntracked && prod && (otherLinesQty + targetQty) > prod.stock) {
+    const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+    showToast(t('pos.toastStockLimit', { stock: prod.stock }), 'warn');
+    return;
+  }
+
+  item.quantity = targetQty;
+  item.subtotal = item.quantity * item.salePrice;
+  saveCartToStorage();
+  renderCartUI();
+}
+
+function updateCartItemPrice(index, newPriceMing) {
+  if (index < 0 || index >= activeCart.items.length) return;
+  const rawPrice = parseFloat(newPriceMing);
+  const newPrice = parsePrice(rawPrice);
+  if (isNaN(newPrice) || newPrice < 0) return;
+
+  activeCart.items[index].salePrice = newPrice;
+  activeCart.items[index].subtotal = activeCart.items[index].quantity * newPrice;
+  saveCartToStorage();
+  renderCartUI();
+}
+
+function removeCartItem(index) {
+  if (index < 0 || index >= activeCart.items.length) return;
+  activeCart.items.splice(index, 1);
+  saveCartToStorage();
+  renderCartUI();
+  if (activeCart.items.length === 0) {
+    closeCartModal();
+  }
+}
+
+function clearCart() {
+  activeCart.items = [];
+  activeCart.discount = 0;
+  saveCartToStorage();
+  renderCartUI();
+  closeCartModal();
+}
+
+function openCartModal() {
+  if (!activeCart.items.length) {
+    const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+    showToast(t('pos.emptyCartTitle'), 'info');
+    return;
+  }
+  const overlay = document.getElementById('cart-overlay');
+  if (overlay) {
+    overlay.classList.add('open');
+    renderCartUI();
+  }
+}
+
+function closeCartModal() {
+  const overlay = document.getElementById('cart-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function renderCartUI() {
+  const totals = getCartTotals();
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+
+  // 1. Sticky Bottom Cart Bar
+  const cartBar = document.getElementById('pos-cart-bar');
+  const cartBadgeCount = document.getElementById('cart-badge-count');
+  const cartBarTitle = document.getElementById('cart-bar-title');
+  const cartBarAmount = document.getElementById('cart-bar-amount');
+
+  if (cartBar) {
+    if (totals.itemsCount > 0) {
+      cartBar.style.display = 'flex';
+      if (cartBadgeCount) cartBadgeCount.textContent = totals.totalUnits;
+      if (cartBarTitle) cartBarTitle.textContent = t('pos.cartSummary', { count: totals.itemsCount, units: totals.totalUnits });
+      if (cartBarAmount) cartBarAmount.textContent = fmt(totals.total);
+    } else {
+      cartBar.style.display = 'none';
+    }
+  }
+
+  // 2. Header Cart Button
+  const hdrCartBtn = document.getElementById('hdr-cart-btn');
+  const hdrCartBadge = document.getElementById('hdr-cart-badge');
+  if (hdrCartBtn) {
+    if (totals.itemsCount > 0) {
+      hdrCartBtn.style.display = 'inline-flex';
+      if (hdrCartBadge) hdrCartBadge.textContent = totals.totalUnits;
+    } else {
+      hdrCartBtn.style.display = 'none';
+    }
+  }
+
+  // 3. Inside Cart Modal
+  const modalSub = document.getElementById('cart-modal-sub');
+  if (modalSub) {
+    modalSub.textContent = t('pos.cartSummary', { count: totals.itemsCount, units: totals.totalUnits });
+  }
+
+  const listEl = document.getElementById('cart-items-list');
+  if (listEl) {
+    if (!activeCart.items.length) {
+      listEl.innerHTML = `
+        <div class="pos-empty" style="padding: 24px 16px; min-height: 160px;">
+          <div class="pos-empty-icon" style="font-size: 32px;">🛒</div>
+          <div class="pos-empty-title">${t('pos.emptyCartTitle')}</div>
+          <div class="pos-empty-sub">${t('pos.emptyCartSub')}</div>
+        </div>`;
+    } else {
+      listEl.innerHTML = activeCart.items.map((item, idx) => {
+        const prod = products.find(p => p.id === item.productId);
+        const locName = prod ? getLocalizedProductName(prod, currentLang) : item.productName;
+        const unitMing = item.salePrice >= 1000 ? (item.salePrice / 1000) : item.salePrice;
+        const imgSrc = item.image || (prod && prod.image) || 'assets/logo.webp';
+        return `
+          <div class="cart-item-card" data-idx="${idx}">
+            <img src="${imgSrc}" alt="${escapeHtml(locName)}" class="cart-item-img" onerror="this.onerror=null;this.src='assets/logo.webp';">
+            <div class="cart-item-details">
+              <div class="cart-item-name" title="${escapeHtml(locName)}">${escapeHtml(locName)}</div>
+              <div class="cart-item-pricing">
+                <input type="number" step="any" min="0" class="cart-item-price-input" data-idx="${idx}" value="${unitMing}">
+                <span>ming × ${item.quantity}</span>
+              </div>
+            </div>
+            <div class="cart-item-actions">
+              <div class="cart-qty-ctrl">
+                <button type="button" class="cart-qty-btn btn-cart-dec" data-idx="${idx}">−</button>
+                <span class="cart-qty-val">${item.quantity}</span>
+                <button type="button" class="cart-qty-btn btn-cart-inc" data-idx="${idx}">+</button>
+              </div>
+              <div class="cart-item-subtotal">${fmt(item.subtotal)}</div>
+              <button type="button" class="cart-item-remove-btn" data-idx="${idx}" title="Oʻchirish">✕</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      // Wire interactive events for items
+      listEl.querySelectorAll('.btn-cart-dec').forEach(btn => {
+        btn.onclick = () => {
+          const idx = parseInt(btn.dataset.idx);
+          if (activeCart.items[idx]) updateCartItemQty(idx, activeCart.items[idx].quantity - 1);
+        };
+      });
+      listEl.querySelectorAll('.btn-cart-inc').forEach(btn => {
+        btn.onclick = () => {
+          const idx = parseInt(btn.dataset.idx);
+          if (activeCart.items[idx]) updateCartItemQty(idx, activeCart.items[idx].quantity + 1);
+        };
+      });
+      listEl.querySelectorAll('.cart-item-price-input').forEach(inp => {
+        inp.onchange = () => {
+          const idx = parseInt(inp.dataset.idx);
+          updateCartItemPrice(idx, inp.value);
+        };
+      });
+      listEl.querySelectorAll('.cart-item-remove-btn').forEach(btn => {
+        btn.onclick = () => {
+          const idx = parseInt(btn.dataset.idx);
+          removeCartItem(idx);
+        };
+      });
+    }
+  }
+
+  // 4. Financial breakdown
+  const sumSubtotalEl = document.getElementById('cart-sum-subtotal');
+  const sumDiscountEl = document.getElementById('cart-sum-discount');
+  const sumFinalEl = document.getElementById('cart-sum-final');
+  const profitRow = document.getElementById('cart-profit-row');
+  const profitLbl = document.getElementById('cart-profit-label');
+  const profitVal = document.getElementById('cart-profit-val');
+  const discErrEl = document.getElementById('cart-discount-error');
+  const confirmBtn = document.getElementById('btn-cart-confirm');
+  const discountInput = document.getElementById('cart-discount-input');
+
+  if (sumSubtotalEl) sumSubtotalEl.textContent = fmt(totals.subtotal);
+  if (sumDiscountEl) {
+    sumDiscountEl.textContent = totals.discountUzs > 0 ? `−${fmt(totals.discountUzs)}` : '0 soʻm';
+  }
+  if (sumFinalEl) sumFinalEl.textContent = fmt(totals.total);
+
+  // Sync discount input value if not focused
+  if (discountInput && document.activeElement !== discountInput) {
+    discountInput.value = totals.discountMing > 0 ? totals.discountMing : '';
+  }
+
+  // Live discount preview
+  const discPreviewEl = document.getElementById('cart-discount-live-preview');
+  if (discPreviewEl) {
+    if (totals.discountMing > 0) {
+      discPreviewEl.style.display = 'block';
+      discPreviewEl.textContent = `💰 ${totals.discountMing} ming = ${fmt(totals.discountUzs)} chegirma`;
+    } else {
+      discPreviewEl.style.display = 'none';
+    }
+  }
+
+  // Active state on preset chips
+  document.querySelectorAll('.disc-chip').forEach(chip => {
+    const amt = parseFloat(chip.dataset.amt);
+    if (amt === totals.discountMing) {
+      chip.classList.add('active');
+    } else {
+      chip.classList.remove('active');
+    }
   });
 
-  // Save activity record to IndexedDB
+  // Discount validation guard (Rule: system does NOT silently reduce discount, but blocks checkout if invalid)
+  if (!totals.isDiscountValid && totals.itemsCount > 0) {
+    if (discErrEl) discErrEl.style.display = 'flex';
+    if (confirmBtn) confirmBtn.disabled = true;
+  } else {
+    if (discErrEl) discErrEl.style.display = 'none';
+    if (confirmBtn) confirmBtn.disabled = (!totals.itemsCount || confirmLock);
+  }
+
+  // Price difference vs base catalog
+  if (profitRow && profitLbl && profitVal) {
+    const diff = totals.priceDiff;
+    if (Math.abs(diff) < 0.001) {
+      profitRow.className = 'summary-profit even';
+      profitLbl.textContent = t('pos.priceDiff');
+      profitVal.textContent = '0 soʻm';
+    } else if (diff > 0) {
+      profitRow.className = 'summary-profit profit';
+      profitLbl.textContent = t('pos.priceDiff');
+      profitVal.textContent = `+${fmt(diff)}`;
+    } else {
+      profitRow.className = 'summary-profit discount';
+      profitLbl.textContent = t('pos.priceDiff');
+      profitVal.textContent = `−${fmt(Math.abs(diff))}`;
+    }
+  }
+}
+
+// ── UNIFIED TRANSACTION EXECUTION ─────────────────────────────────────────
+async function executeSaleTransaction({ items, discountUzs = 0, notes = null }) {
+  if (confirmLock || !items || !items.length) return false;
+
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+
+  // Validate stock locally for all items
+  for (const it of items) {
+    const p = products.find(prod => prod.id === it.productId);
+    const isUntracked = !p || p.stock === null || p.stock === undefined;
+    if (it.quantity < 1) {
+      showToast(t('pos.toastValidQty'), 'warn');
+      return false;
+    }
+    if (!isUntracked && it.quantity > p.stock) {
+      showToast(t('pos.toastStockLimit', { stock: p.stock }), 'warn');
+      return false;
+    }
+    if (it.salePrice <= 0 || isNaN(it.salePrice)) {
+      showToast(t('pos.toastValidPrice'), 'warn');
+      return false;
+    }
+  }
+
+  const subtotal = items.reduce((sum, it) => sum + (it.quantity * it.salePrice), 0);
+  const baseTotal = items.reduce((sum, it) => sum + (it.quantity * it.basePrice), 0);
+  const manualDiscount = Math.max(0, Math.floor(Number(discountUzs) || 0));
+
+  if (manualDiscount > subtotal) {
+    showToast(t('pos.discountExceedsSubtotal'), 'warn');
+    return false;
+  }
+
+  const finalTotal = subtotal - manualDiscount;
+  const netPriceDiff = finalTotal - baseTotal;
+  const totalUnits = items.reduce((sum, it) => sum + it.quantity, 0);
+
+  confirmLock = true;
+  const btnCart = document.getElementById('btn-cart-confirm');
+  const btnModal = document.getElementById('btn-confirm');
+  if (btnCart) { btnCart.disabled = true; btnCart.textContent = t('pos.saving'); }
+  if (btnModal) { btnModal.disabled = true; btnModal.textContent = t('pos.saving'); }
+
+  // 1. Generate permanent unique saleId and activityId
+  const saleId = 'sale_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 7);
   const activityId = 'act_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 7);
+
+  // 2. Optimistically update local memory & IndexedDB products
+  for (const it of items) {
+    const p = products.find(prod => prod.id === it.productId);
+    if (p) {
+      const isUntracked = p.stock === null || p.stock === undefined;
+      if (!isUntracked) {
+        p.stock -= it.quantity;
+      }
+      p.sold = (p.sold || 0) + it.quantity;
+      await localDb.put('products', {
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        price: p.price,
+        quantity: p.stock,
+        sold: p.sold,
+        image: p.image,
+        notes: p.notes,
+        translations: p.translations || {},
+        version: (p.version || 1) + 1,
+        updatedAt: Date.now()
+      });
+      updateCardStock(p.id);
+      showSync(p.id, 'synced');
+    }
+  }
+
+  // 3. Save sale to IndexedDB sales store
+  const localSale = {
+    id: saleId,
+    sellerId: 'seller-01',
+    status: 'pending_sync',
+    subtotal,
+    discount: manualDiscount,
+    total: finalTotal,
+    currency: 'UZS',
+    notes: notes || null,
+    items: items.map(i => ({
+      productId: i.productId,
+      productName: i.productName,
+      quantity: i.quantity,
+      basePrice: i.basePrice,
+      salePrice: i.salePrice,
+      subtotal: i.quantity * i.salePrice
+    })),
+    createdAt: Date.now(),
+    timestamp: Date.now(),
+    syncError: null,
+    syncedAt: null
+  };
+  await localDb.put('sales', localSale);
+
+  // 4. Save activity record for audit timeline
+  const firstItem = items[0];
+  const summaryNote = items.length === 1
+    ? `POS sale (${firstItem.quantity}x @ ${fmt(firstItem.salePrice)})`
+    : `POS multi-item sale (${items.length} items, ${totalUnits} units, total: ${fmt(finalTotal)}${manualDiscount > 0 ? `, discount: -${fmt(manualDiscount)}` : ''})`;
+
   await localDb.put('activities', {
     id: activityId,
     type: 'sale',
+    saleId,
     timestamp: Date.now(),
-    productId: p.id,
-    productName: p.name,
-    quantity: qty,
-    sellingPrice: price,
-    totalSaleValue: tx.totalSaleValue,
-    priceDiff: tx.priceDiff,
-    notes: `POS sale (${qty}x @ ${fmt(price)})`
+    productId: firstItem.productId,
+    productName: items.length === 1 ? firstItem.productName : `${firstItem.productName} + ${items.length - 1} more`,
+    quantity: totalUnits,
+    sellingPrice: items.length === 1 ? firstItem.salePrice : Math.round(finalTotal / totalUnits),
+    totalSaleValue: finalTotal,
+    priceDiff: netPriceDiff,
+    subtotal,
+    discount: manualDiscount,
+    itemsCount: items.length,
+    items: items.map(i => ({ ...i })),
+    notes: notes || summaryNote
   });
 
-  // Enqueue SALE operation for PostgreSQL sync engine
-  await enqueueOperation('SALE', {
-    productId: p.id,
-    quantity: qty,
-    sellingPrice: price,
-    notes: `POS sale: ${qty}x @ ${fmt(price)}`,
+  // 5. Enqueue SALE_TRANSACTION operation for sync engine
+  await enqueueOperation('SALE_TRANSACTION', {
+    saleId,
+    sellerId: 'seller-01',
+    items: items.map(i => ({
+      productId: i.productId,
+      quantity: i.quantity,
+      basePrice: i.basePrice,
+      salePrice: i.salePrice
+    })),
+    discount: manualDiscount,
+    notes: notes || summaryNote,
     timestamp: Date.now(),
     activityId
   });
 
-  // Broadcast sale to open Admin tabs
+  // 6. Broadcast sale to open Admin tabs
   notifyCatalog('SALE_RECORDED', {
-    productId: p.id,
-    productName: p.name,
-    quantity: qty,
-    price: price,
-    total: tx.totalSaleValue
+    saleId,
+    itemsCount: items.length,
+    units: totalUnits,
+    total: finalTotal
   });
 
+  // 7. Update session stats
+  sessions.sales += totalUnits;
+  sessions.revenue += finalTotal;
+  sessions.extraProfit += (netPriceDiff > 0 ? netPriceDiff : 0);
   updateHeaderStats();
-  updateCardStock(p.id);
+
+  // 8. Reset UI and locks
   closeModal();
+  closeCartModal();
 
-  // Show sync indicator
-  showSync(p.id, 'synced');
+  confirmLock = false;
+  if (btnCart) { btnCart.disabled = false; btnCart.textContent = t('pos.confirmSale'); }
+  if (btnModal) { btnModal.disabled = false; btnModal.textContent = t('pos.confirmSale'); }
 
-  // Build toast detail
-  const diff = tx.priceDiff;
-  const profitLine = Math.abs(diff) < 0.01 ? t('pos.toastSoldAtBase') :
-    diff > 0 ? t('pos.toastExtraProfit', { amount: fmt(diff) }) : t('pos.toastDiscount', { amount: fmt(Math.abs(diff)) });
+  // 9. Show celebration toast
+  const profitLine = Math.abs(netPriceDiff) < 0.01 ? t('pos.toastSoldAtBase') :
+    netPriceDiff > 0 ? t('pos.toastExtraProfit', { amount: fmt(netPriceDiff) }) : t('pos.toastDiscount', { amount: fmt(Math.abs(netPriceDiff)) });
 
   const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
-  const locName = getLocalizedProductName(p, currentLang);
-  showToast(t('pos.toastSaleSuccess', { name: locName, qty, total: fmt(price * qty) }), 'success', profitLine);
+  if (items.length === 1) {
+    const p = products.find(prod => prod.id === firstItem.productId);
+    const locName = p ? getLocalizedProductName(p, currentLang) : firstItem.productName;
+    showToast(t('pos.toastSaleSuccess', { name: locName, qty: firstItem.quantity, total: fmt(finalTotal) }), 'success', profitLine);
+  } else {
+    showToast(t('pos.toastMultiSaleSuccess', { count: items.length, units: totalUnits, total: fmt(finalTotal) }), 'success', profitLine);
+  }
+
+  return true;
+}
+
+// ── MODAL BUTTONS & WIRING ────────────────────────────────────────────────
+// "Savatga qo'shish" (Add to Sale)
+const btnAddCart = document.getElementById('btn-add-cart');
+if (btnAddCart) {
+  btnAddCart.addEventListener('click', () => {
+    if (!activeProduct) return;
+    const qty = parseInt(document.getElementById('qty-input').value) || 0;
+    const rawPrice = parseFloat(document.getElementById('price-input').value);
+    const price = parsePrice(rawPrice);
+    const p = activeProduct;
+    const isUntracked = p.stock === null || p.stock === undefined;
+    const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+
+    if (qty < 1) { showToast(t('pos.toastValidQty'), 'warn'); return; }
+    if (!isUntracked && qty > p.stock) { showToast(t('pos.toastStockLimit', { stock: p.stock }), 'warn'); return; }
+    if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast(t('pos.toastValidPrice'), 'warn'); return; }
+
+    const added = addToCart(p, qty, price);
+    if (added) closeModal();
+  });
+}
+
+// "Darhol sotish" (Instant Sell 1 item)
+const btnInstantSell = document.getElementById('btn-instant-sell');
+if (btnInstantSell) {
+  btnInstantSell.addEventListener('click', async () => {
+    if (!activeProduct || confirmLock) return;
+    const qty = parseInt(document.getElementById('qty-input').value) || 0;
+    const rawPrice = parseFloat(document.getElementById('price-input').value);
+    const price = parsePrice(rawPrice);
+    const p = activeProduct;
+    const isUntracked = p.stock === null || p.stock === undefined;
+    const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+
+    if (qty < 1) { showToast(t('pos.toastValidQty'), 'warn'); return; }
+    if (!isUntracked && qty > p.stock) { showToast(t('pos.toastStockLimit', { stock: p.stock }), 'warn'); return; }
+    if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast(t('pos.toastValidPrice'), 'warn'); return; }
+
+    await executeSaleTransaction({
+      items: [{
+        productId: p.id,
+        productName: p.name,
+        sku: p.sku || '',
+        image: p.image || null,
+        basePrice: p.price,
+        salePrice: price,
+        quantity: qty,
+        subtotal: qty * price
+      }],
+      discountUzs: 0
+    });
+  });
+}
+
+// Cart checkout confirm button
+const btnCartConfirm = document.getElementById('btn-cart-confirm');
+if (btnCartConfirm) {
+  btnCartConfirm.addEventListener('click', async () => {
+    if (!activeCart.items.length || confirmLock) return;
+    const totals = getCartTotals();
+    if (!totals.isDiscountValid) {
+      const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+      showToast(t('pos.discountExceedsSubtotal'), 'warn');
+      return;
+    }
+    const success = await executeSaleTransaction({
+      items: activeCart.items,
+      discountUzs: totals.discountUzs
+    });
+    if (success) {
+      clearCart();
+    }
+  });
+}
+
+// Clear cart button
+const btnCartClear = document.getElementById('btn-cart-clear');
+if (btnCartClear) {
+  btnCartClear.addEventListener('click', () => {
+    clearCart();
+  });
+}
+
+// Cart modal close buttons
+const cartModalClose = document.getElementById('cart-modal-close');
+if (cartModalClose) {
+  cartModalClose.addEventListener('click', closeCartModal);
+}
+const btnAddMore = document.getElementById('btn-add-more-products');
+if (btnAddMore) {
+  btnAddMore.addEventListener('click', closeCartModal);
+}
+
+// Cart bar clicks open checkout
+const cartBarTrigger = document.getElementById('cart-bar-trigger');
+if (cartBarTrigger) {
+  cartBarTrigger.addEventListener('click', openCartModal);
+}
+const cartBarCheckoutBtn = document.getElementById('cart-bar-checkout-btn');
+if (cartBarCheckoutBtn) {
+  cartBarCheckoutBtn.addEventListener('click', openCartModal);
+}
+
+// Header cart button click
+const hdrCartBtnEl = document.getElementById('hdr-cart-btn');
+if (hdrCartBtnEl) {
+  hdrCartBtnEl.addEventListener('click', openCartModal);
+}
+
+// Discount input live listener
+const cartDiscountInp = document.getElementById('cart-discount-input');
+if (cartDiscountInp) {
+  cartDiscountInp.addEventListener('input', () => {
+    const val = parseFloat(cartDiscountInp.value);
+    activeCart.discount = (!isNaN(val) && val >= 0) ? val : 0;
+    saveCartToStorage();
+    renderCartUI();
+  });
+}
+
+// Preset discount chips listener
+document.querySelectorAll('.disc-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const amt = parseFloat(chip.dataset.amt) || 0;
+    activeCart.discount = amt;
+    if (cartDiscountInp) cartDiscountInp.value = amt > 0 ? amt : '';
+    saveCartToStorage();
+    renderCartUI();
+  });
 });
 
 // ── HEADER STATS UPDATE (DESKTOP + MOBILE) ────────────────────────────────
@@ -5443,11 +6520,21 @@ async function renderAuditView() {
   const todayStart = new Date().setHours(0, 0, 0, 0);
 
   let activities = [];
+  let salesStore = [];
   try {
-    const all = await localDb.getAll('activities');
-    activities = all.filter(a => Number(a.timestamp || 0) >= todayStart);
+    const [allActs, allSales] = await Promise.all([
+      localDb.getAll('activities'),
+      localDb.getAll('sales')
+    ]);
+    activities = allActs.filter(a => Number(a.timestamp || 0) >= todayStart);
+    salesStore = allSales || [];
   } catch (e) {
-    console.warn('[pos audit] Failed to load activities:', e);
+    console.warn('[pos audit] Failed to load activities or sales:', e);
+  }
+
+  const salesMap = new Map();
+  for (const s of salesStore) {
+    if (s && s.id) salesMap.set(s.id, s);
   }
 
   // Update session stats & KPI cards
@@ -5526,6 +6613,23 @@ async function renderAuditView() {
           ? `<span style="color:var(--danger);font-weight:600;">−${fmt(Math.abs(diff))}</span>`
           : '';
 
+      // Check linked sale for sync status & multi-item details
+      const linkedSale = item.saleId ? salesMap.get(item.saleId) : null;
+      const syncStatus = linkedSale ? linkedSale.status : 'synced';
+      const statusBadge = syncStatus === 'pending_sync'
+        ? `<span class="audit-status-badge audit-status-pending">🟡 ${t('pos.statusPendingSync')}</span>`
+        : syncStatus === 'rejected'
+          ? `<span class="audit-status-badge audit-status-rejected">🔴 ${t('pos.statusRejected')}</span>`
+          : `<span class="audit-status-badge audit-status-synced">🟢 ${t('pos.statusSynced')}</span>`;
+
+      const discountTag = item.discount > 0
+        ? `<span style="color:var(--danger);font-size:0.75rem;font-weight:600;">Chegirma: −${fmt(item.discount)}</span>`
+        : '';
+
+      const itemsDesc = (item.itemsCount && item.itemsCount > 1)
+        ? `${item.itemsCount} xil mahsulot · ${qty} dona`
+        : `${qty} × ${unitPrice}`;
+
       return `
         <div class="audit-item">
           <div class="audit-thumb-wrap">
@@ -5533,15 +6637,17 @@ async function renderAuditView() {
           </div>
           <div class="audit-item-info">
             <div class="audit-item-title">${escapeHtml(locTitle)}</div>
-            <div class="audit-item-meta">
+            <div class="audit-item-meta" style="flex-wrap:wrap; gap:6px;">
               <span class="audit-badge audit-badge-sale">Sale</span>
               <span>${timeStr}</span>
+              ${statusBadge}
               ${profitBadge}
+              ${discountTag}
             </div>
           </div>
           <div class="audit-item-amount">
             <div class="audit-amt-val sale-val">+${totalVal}</div>
-            <div class="audit-qty-sub">${qty} × ${unitPrice}</div>
+            <div class="audit-qty-sub">${itemsDesc}</div>
           </div>
         </div>`;
     } else {
@@ -6009,6 +7115,7 @@ function setupCurrencyBar() {
 async function init() {
   await localDb.init();
   await loadProductsFromStorage();
+  await loadCartFromStorage();
   renderGrid();
 
   setupLanguageSwitcher();
@@ -6030,6 +7137,7 @@ async function init() {
     updateFxHeadline();
     syncEngine.updateUI();
     renderGrid();
+    renderCartUI();
     if (currentTab === 'audit') renderAuditView();
     if (currentTab === 'settings') renderSettingsView();
   });

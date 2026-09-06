@@ -1036,8 +1036,10 @@ function getRevenue(productId = null) {
 function getTodayRevenue() {
     const resetTime = getResetTime();
     return state.activities
-        .filter(a => a.type === 'sale' && a.timestamp >= resetTime)
+        .filter(a => a.type === 'sale' && !a.undone && a.timestamp >= resetTime)
         .reduce((sum, a) => {
+            if (a.totalSaleValue != null) return sum + Number(a.totalSaleValue);
+            if (a.sellingPrice != null) return sum + (Number(a.sellingPrice) * (a.quantity || 1));
             const p = getProduct(a.productId);
             return sum + ((p && p.price ? p.price * a.quantity : 0));
         }, 0);
@@ -1763,6 +1765,8 @@ function renderHomeReports() {
     // Compute KPIs for Daily Overview
     const totalUnits = daySales.reduce((acc, s) => acc + (s.quantity || 0), 0);
     const totalRev = daySales.reduce((acc, s) => {
+        if (s.totalSaleValue != null) return acc + Number(s.totalSaleValue);
+        if (s.sellingPrice != null) return acc + (Number(s.sellingPrice) * (s.quantity || 1));
         const p = getProduct(s.productId);
         const price = (p && p.price) ? p.price : (s.unitPrice || 0);
         return acc + (price * (s.quantity || 0));
@@ -1805,7 +1809,9 @@ function renderHomeReports() {
         const name = (prod ? getProductDisplayName(prod) : null) || sale.productName || 'Unknown Product';
         const qty = sale.quantity || 1;
         const price = (prod && prod.price) ? prod.price : (sale.unitPrice || 0);
-        const lineTotal = price * qty;
+        const lineTotal = (sale.totalSaleValue != null)
+            ? Number(sale.totalSaleValue)
+            : ((sale.sellingPrice != null) ? (Number(sale.sellingPrice) * qty) : (price * qty));
         const timeStr = formatTime(sale.timestamp);
         const catName = getCategoryName(sale.categoryId || (prod ? prod.categoryId : null));
 

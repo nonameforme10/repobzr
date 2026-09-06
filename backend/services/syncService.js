@@ -88,6 +88,44 @@ async function getSnapshot() {
       client.query('SELECT COALESCE(MAX(seq), 0)::bigint AS max_seq FROM changes')
     ]);
 
+    let salesRows = [];
+    try {
+      const salesRes = await client.query(`
+        SELECT s.id, s.seller_id AS "sellerId", s.status, s.subtotal::bigint AS subtotal, 
+               s.discount::bigint AS discount, s.total::bigint AS total, s.currency, 
+               s.notes, s.created_at AS "createdAt", s.updated_at AS "updatedAt",
+               COALESCE(json_agg(
+                 json_build_object(
+                   'id', si.id,
+                   'productId', si.product_id,
+                   'productName', si.product_name_snapshot,
+                   'quantity', si.quantity,
+                   'basePrice', si.base_price::bigint,
+                   'salePrice', si.sale_price::bigint,
+                   'subtotal', si.subtotal::bigint,
+                   'allocatedDiscount', si.allocated_discount::bigint
+                 )
+               ) FILTER (WHERE si.id IS NOT NULL), '[]'::json) AS items
+        FROM sales s
+        LEFT JOIN sale_items si ON s.id = si.sale_id
+        WHERE s.is_deleted = FALSE
+        GROUP BY s.id
+        ORDER BY s.created_at DESC
+        LIMIT 200
+      `);
+      salesRows = salesRes.rows.map(r => ({
+        ...r,
+        createdAt: Number(r.createdAt),
+        updatedAt: Number(r.updatedAt),
+        subtotal: Number(r.subtotal),
+        discount: Number(r.discount),
+        total: Number(r.total)
+      }));
+    } catch (e) {
+      // If table doesn't exist yet prior to migration, fallback gracefully
+      salesRows = [];
+    }
+
     const settings = {};
     for (const row of settingsRes.rows) {
       settings[row.key] = row.value;
@@ -97,6 +135,7 @@ async function getSnapshot() {
       categories: categoriesRes.rows,
       products: productsRes.rows,
       activities: activitiesRes.rows.map(r => ({ ...r, timestamp: Number(r.timestamp) })),
+      sales: salesRows,
       settings,
       currentSeq: Number(seqRes.rows[0]?.max_seq || 0),
       serverTime: Date.now()
@@ -205,7 +244,278 @@ async function processSyncBatch(deviceId, operations = []) {
         }
 
         // 2. Process Operation with Authoritative Backend Validation
-        if (op.type === 'SALE') {
+        if (op.type === 'SALE_TRANSACTION') {
+          const { saleId, sellerId, items, discount = 0, notes, timestamp } = payload;
+
+          if (!isValidId(saleId)) {
+            throw { code: 'INVALID_PAYLOAD', message: 'Valid saleId is required' };
+          }
+          if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
+            throw { code: 'INVALID_PAYLOAD', message: 'items must be a non-empty array with max 100 items' };
+          }
+          const manualDiscount = Math.max(0, Math.floor(Number(discount) || 0));
+
+          // 1. Idempotency check: has this saleId already been committed?
+          const existingSale = await client.query('SELECT id, total FROM sales WHERE id = $1', [saleId]);
+          if (existingSale.rows.length > 0) {
+            accepted.push(op.id);
+            await client.query('COMMIT');
+            continue;
+          }
+
+          // 2. Validate individual items in payload
+          for (const item of items) {
+            if (!item || !isValidId(item.productId)) {
+              throw { code: 'INVALID_PAYLOAD', message: 'Valid productId is required for each line item' };
+            }
+            const q = Math.floor(Number(item.quantity) || 0);
+            if (!Number.isInteger(q) || q <= 0 || q > 100000) {
+              throw { code: 'INVALID_PAYLOAD', message: `Invalid quantity ${item.quantity} for product ${item.productId}` };
+            }
+            const sp = Math.floor(Number(item.salePrice) || 0);
+            if (!Number.isFinite(sp) || sp < 0) {
+              throw { code: 'INVALID_PAYLOAD', message: `Invalid salePrice ${item.salePrice} for product ${item.productId}` };
+            }
+          }
+
+          // 3. Lock products in deterministic alphabetical order to avoid deadlocks
+          const sortedProductIds = [...new Set(items.map(i => i.productId))].sort();
+          const prodRes = await client.query(
+            `SELECT id, name, category_id, quantity::float, sold::float, price::bigint, is_deleted, version 
+             FROM products 
+             WHERE id = ANY($1::varchar[]) 
+             ORDER BY id ASC 
+             FOR UPDATE`,
+            [sortedProductIds]
+          );
+
+          const productMap = new Map();
+          for (const row of prodRes.rows) {
+            productMap.set(row.id, row);
+          }
+
+          // Check all products exist and are not deleted
+          for (const pid of sortedProductIds) {
+            const prod = productMap.get(pid);
+            if (!prod) {
+              throw { code: 'PRODUCT_NOT_FOUND', message: `Product ${pid} not found` };
+            }
+            if (prod.is_deleted) {
+              throw { code: 'PRODUCT_DELETED', message: `Cannot sell soft-deleted product ${pid}` };
+            }
+          }
+
+          // Aggregate requested quantities per product (in case cart has separate lines with different prices)
+          const requestedQtyMap = new Map();
+          for (const item of items) {
+            const q = Math.floor(Number(item.quantity));
+            requestedQtyMap.set(item.productId, (requestedQtyMap.get(item.productId) || 0) + q);
+          }
+
+          // 4. Validate stock for all tracked items
+          let stockError = null;
+          for (const [pid, reqQty] of requestedQtyMap.entries()) {
+            const prod = productMap.get(pid);
+            if (prod.quantity !== null && prod.quantity !== undefined) {
+              if (prod.quantity < reqQty) {
+                stockError = {
+                  code: 'INSUFFICIENT_STOCK',
+                  message: `Requested ${reqQty} for "${prod.name}", but available stock is ${prod.quantity}`,
+                  productId: pid,
+                  productName: prod.name,
+                  availableStock: prod.quantity,
+                  requestedQty: reqQty
+                };
+                break;
+              }
+            }
+          }
+
+          if (stockError) {
+            await client.query(
+              'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+              [op.id, deviceId, op.type, op.createdAt || now, now, { rejected: stockError }, currentHash]
+            );
+            await client.query('COMMIT');
+            rejected.push({ id: op.id, ...stockError });
+            continue;
+          }
+
+          // 5. Server calculates line subtotals, overall subtotal, validates manual discount, and computes total
+          let calculatedSubtotal = 0n;
+          const processedItems = [];
+
+          for (const item of items) {
+            const prod = productMap.get(item.productId);
+            const qty = BigInt(Math.floor(Number(item.quantity)));
+            const salePrice = BigInt(Math.floor(Number(item.salePrice)));
+            const basePrice = BigInt(Math.floor(Number(prod.price || 0)));
+            const subtotal = qty * salePrice;
+            calculatedSubtotal += subtotal;
+
+            processedItems.push({
+              id: 'si_' + now.toString(36) + '_' + Math.random().toString(36).substr(2, 7),
+              productId: prod.id,
+              productName: prod.name,
+              categoryId: prod.category_id,
+              quantity: Number(qty),
+              basePrice: Number(basePrice),
+              salePrice: Number(salePrice),
+              subtotal: Number(subtotal)
+            });
+          }
+
+          const subtotalNum = Number(calculatedSubtotal);
+          if (manualDiscount > subtotalNum) {
+            throw {
+              code: 'INVALID_DISCOUNT',
+              message: `Discount (${manualDiscount}) cannot exceed transaction subtotal (${subtotalNum})`
+            };
+          }
+
+          const totalNum = subtotalNum - manualDiscount;
+
+          // 6. Calculate allocated_discount for each line item (proportional allocation with remainder on final item)
+          let allocatedSum = 0;
+          for (let i = 0; i < processedItems.length; i++) {
+            const it = processedItems[i];
+            if (i === processedItems.length - 1) {
+              it.allocatedDiscount = manualDiscount - allocatedSum;
+            } else {
+              const alloc = subtotalNum > 0
+                ? Math.floor((manualDiscount * it.subtotal) / subtotalNum)
+                : 0;
+              it.allocatedDiscount = alloc;
+              allocatedSum += alloc;
+            }
+          }
+
+          // 7. Deduct stock and increment sold for all products
+          for (const [pid, reqQty] of requestedQtyMap.entries()) {
+            const prod = productMap.get(pid);
+            const newQty = (prod.quantity !== null && prod.quantity !== undefined)
+              ? (prod.quantity - reqQty)
+              : null;
+            const newSold = prod.sold + reqQty;
+            const newVersion = (prod.version || 1) + 1;
+
+            await client.query(
+              'UPDATE products SET quantity = $1, sold = $2, version = $3, updated_at = $4 WHERE id = $5',
+              [newQty, newSold, newVersion, now, pid]
+            );
+
+            // Append product update delta to changes
+            await client.query(
+              'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+              ['product', pid, 'UPDATE', { id: pid, quantity: newQty, sold: newSold, version: newVersion, isDeleted: false, updatedAt: now }, now]
+            );
+          }
+
+          // 8. Insert into sales table
+          await client.query(
+            `INSERT INTO sales (id, seller_id, status, subtotal, discount, total, currency, notes, created_at, updated_at, is_deleted)
+             VALUES ($1, $2, 'COMPLETED', $3, $4, $5, 'UZS', $6, $7, $8, FALSE)`,
+            [
+              saleId,
+              sellerId || 'seller-01',
+              subtotalNum,
+              manualDiscount,
+              totalNum,
+              notes ? notes.trim() : null,
+              timestamp || now,
+              now
+            ]
+          );
+
+          // 9. Insert into sale_items table
+          for (const it of processedItems) {
+            await client.query(
+              `INSERT INTO sale_items (id, sale_id, product_id, product_name_snapshot, quantity, base_price, sale_price, subtotal, allocated_discount, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                it.id,
+                saleId,
+                it.productId,
+                it.productName,
+                it.quantity,
+                it.basePrice,
+                it.salePrice,
+                it.subtotal,
+                it.allocatedDiscount,
+                timestamp || now
+              ]
+            );
+          }
+
+          // 10. Insert activity record for audit timeline
+          const totalUnitsSold = processedItems.reduce((sum, i) => sum + i.quantity, 0);
+          const firstProduct = processedItems[0];
+          const summaryNote = processedItems.length === 1
+            ? `POS sale (${firstProduct.quantity}x @ ${firstProduct.salePrice})`
+            : `POS multi-item sale (${processedItems.length} items, ${totalUnitsSold} units, total: ${totalNum} UZS${manualDiscount > 0 ? `, discount: -${manualDiscount}` : ''})`;
+
+          const activityId = payload.activityId || `act_${now}_${Math.random().toString(36).substr(2, 7)}`;
+          await client.query(
+            `INSERT INTO activities (id, type, timestamp, product_id, product_name, category_id, category_name, quantity, notes, previous_quantity, previous_sold)
+             VALUES ($1, 'sale', $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [
+              activityId,
+              timestamp || now,
+              firstProduct.productId,
+              processedItems.length === 1 ? firstProduct.productName : `${firstProduct.productName} + ${processedItems.length - 1} more`,
+              firstProduct.categoryId,
+              'POS Multi-Sale',
+              totalUnitsSold,
+              notes ? notes.trim() : summaryNote,
+              productMap.get(firstProduct.productId).quantity,
+              productMap.get(firstProduct.productId).sold
+            ]
+          );
+
+          // Append activity delta to changes
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['activity', activityId, 'CREATE', {
+              id: activityId,
+              type: 'sale',
+              saleId,
+              timestamp: Number(timestamp || now),
+              quantity: totalUnitsSold,
+              sellingPrice: processedItems.length === 1 ? firstProduct.salePrice : Math.round(totalNum / totalUnitsSold),
+              totalSaleValue: totalNum,
+              subtotal: subtotalNum,
+              discount: manualDiscount,
+              itemsCount: processedItems.length,
+              items: processedItems,
+              notes: notes ? notes.trim() : summaryNote
+            }, now]
+          );
+
+          // Append sale delta to changes
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['sale', saleId, 'CREATE', {
+              id: saleId,
+              sellerId: sellerId || 'seller-01',
+              status: 'COMPLETED',
+              subtotal: subtotalNum,
+              discount: manualDiscount,
+              total: totalNum,
+              items: processedItems,
+              createdAt: Number(timestamp || now)
+            }, now]
+          );
+
+          // Record sync operation idempotency
+          await client.query(
+            'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [op.id, deviceId, op.type, op.createdAt || now, now, { accepted: true, saleId }, currentHash]
+          );
+
+          await client.query('COMMIT');
+          accepted.push(op.id);
+          continue;
+        } else if (op.type === 'SALE') {
           const { productId, quantity, notes, timestamp } = payload;
           const saleQty = Number(quantity);
 
