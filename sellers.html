@@ -1187,7 +1187,7 @@
   /* ── TOAST NOTIFICATIONS ── */
   .pos-toast-container {
     position: fixed;
-    bottom: 24px;
+    top: 80px;
     right: 24px;
     z-index: 2000;
     display: flex;
@@ -1214,6 +1214,7 @@
     gap: 12px;
     pointer-events: all;
     border-left: 3.5px solid var(--accent);
+    cursor: pointer;
   }
 
   .pos-toast.profit-toast { border-left-color: var(--success); }
@@ -1221,8 +1222,8 @@
   .pos-toast.error-toast  { border-left-color: var(--danger); }
 
   @keyframes toast-in {
-    from { opacity: 0; transform: translateX(20px); }
-    to   { opacity: 1; transform: translateX(0); }
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   .toast-icon {
@@ -2415,12 +2416,13 @@
       to   { transform: translateY(0); }
     }
 
-    /* Toast: above any system nav bar */
+    /* Toast: top on mobile / narrow */
     .pos-toast-container {
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+      top: calc(env(safe-area-inset-top, 0px) + 68px);
+      bottom: auto;
       right: 12px;
       left: 12px;
-      max-width: 100%;
+      max-width: calc(100% - 24px);
     }
   }
 
@@ -3486,9 +3488,10 @@
       display: none;
     }
 
-    /* ── TOAST: above fold, not bottom-nav ── */
+    /* ── TOAST: top right below header ── */
     .pos-toast-container {
-      bottom: 28px;
+      top: 80px;
+      bottom: auto;
       right: 28px;
     }
   }
@@ -6193,13 +6196,14 @@ function showToast(message, type = 'success', detail = '') {
       <div class="toast-title">${message}</div>
       ${detail ? `<div class="toast-detail">${detail}</div>` : ''}
     </div>`;
+  t.addEventListener('click', () => t.remove());
   container.appendChild(t);
   setTimeout(() => {
     t.style.opacity = '0';
-    t.style.transform = 'translateX(20px)';
+    t.style.transform = 'translateY(-12px)';
     t.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
     setTimeout(() => t.remove(), 250);
-  }, 4500);
+  }, 3500);
 }
 
 // ── CLOSE / CANCEL ────────────────────────────────────────────────────────
