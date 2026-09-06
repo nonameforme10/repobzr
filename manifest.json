@@ -1,0 +1,21 @@
+{
+  "name": "Bazar POS",
+  "short_name": "Bazar",
+  "description": "Bazar — Offline-first POS and Merchant Dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAF8F3",
+  "theme_color": "#0E0D0B",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32 48x48 64x64",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/assets/logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp"
+    }
+  ]
+}
