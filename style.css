@@ -2732,38 +2732,39 @@ canvas {
     font-weight: 500;
 }
 .ai-trans-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-}
-@media (max-width: 600px) {
-    .ai-trans-grid {
-        grid-template-columns: 1fr;
-    }
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
 }
 .ai-trans-field {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     background: var(--bg-input);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
-    padding: 2px 8px;
+    padding: 3px 10px;
+    transition: border-color var(--transition-fast);
+}
+.ai-trans-field:focus-within {
+    border-color: var(--accent);
 }
 .ai-flag {
     font-size: 0.8125rem;
     font-weight: 600;
     color: var(--ink-muted);
     white-space: nowrap;
+    min-width: 52px;
 }
 .trans-input {
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
     padding: 6px 4px !important;
-    font-size: 0.8125rem !important;
+    font-size: 0.875rem !important;
     color: var(--ink) !important;
     width: 100%;
+    min-width: 0;
 }
 
 /* ============================================================

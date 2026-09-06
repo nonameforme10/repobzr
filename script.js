@@ -3057,15 +3057,15 @@ function getAiTranslationBoxHtml(translations = {}, hasTypo = false, original = 
             <div class="ai-trans-grid">
                 <div class="ai-trans-field">
                     <span class="ai-flag">🇺🇿 UZ</span>
-                    <input type="text" class="form-input trans-input" id="transUzInput" value="${escapeHtml(uzVal)}" placeholder="Oʻzbekcha">
+                    <input type="text" class="form-input trans-input" id="transUzInput" value="${escapeHtml(uzVal)}" placeholder="Oʻzbekcha (masalan: Jinsi kurtka)" title="${escapeHtml(uzVal)}">
                 </div>
                 <div class="ai-trans-field">
                     <span class="ai-flag">🇷🇺 RU</span>
-                    <input type="text" class="form-input trans-input" id="transRuInput" value="${escapeHtml(ruVal)}" placeholder="Русский">
+                    <input type="text" class="form-input trans-input" id="transRuInput" value="${escapeHtml(ruVal)}" placeholder="Русский (например: Джинсовая куртка)" title="${escapeHtml(ruVal)}">
                 </div>
                 <div class="ai-trans-field">
                     <span class="ai-flag">🇬🇧 EN</span>
-                    <input type="text" class="form-input trans-input" id="transEnInput" value="${escapeHtml(enVal)}" placeholder="English">
+                    <input type="text" class="form-input trans-input" id="transEnInput" value="${escapeHtml(enVal)}" placeholder="English (e.g. Denim Jacket)" title="${escapeHtml(enVal)}">
                 </div>
             </div>
         </div>
@@ -3101,9 +3101,9 @@ async function triggerAiTranslation(force = true) {
             const uzInput = document.getElementById('transUzInput');
             const ruInput = document.getElementById('transRuInput');
             const enInput = document.getElementById('transEnInput');
-            if (uzInput) uzInput.value = data.translations.uz || '';
-            if (ruInput) ruInput.value = data.translations.ru || '';
-            if (enInput) enInput.value = data.translations.en || '';
+            if (uzInput) { uzInput.value = data.translations.uz || ''; uzInput.title = data.translations.uz || ''; }
+            if (ruInput) { ruInput.value = data.translations.ru || ''; ruInput.title = data.translations.ru || ''; }
+            if (enInput) { enInput.value = data.translations.en || ''; enInput.title = data.translations.en || ''; }
 
             const banner = document.getElementById('aiTypoBanner');
             if (banner) {

@@ -15,10 +15,37 @@ const SYSTEM_PROMPT = `You are a retail product catalog translation and spelling
 Your task is to take an input product name (which may be in Uzbek Latin/Cyrillic, Russian, or English, and may have typos, slang, or transliteration errors) and:
 1. Identify any typos or inappropriate slips (for example: "Jinsiy" in a clothing store is a typo for "Jinsi" (Jeans)).
 2. Correct the typo if found.
-3. Provide concise, standard retail product titles in:
-   - "uz": Uzbek (Latin alphabet, e.g. "Jinsi", "Qora choy", "Oq qand", "Futbolka")
-   - "ru": Russian (e.g. "Джинсы", "Черный чай", "Белый сахар", "Футболка")
-   - "en": English (e.g. "Jeans", "Black Tea", "White Sugar", "T-Shirt")
+3. Provide concise, standard, professional retail product titles in:
+   - "uz": Uzbek (Latin alphabet, standard retail terminology)
+   - "ru": Russian (natural retail product title, always including the noun, e.g. "Джинсовая куртка", never just an adjective like "Джинсовый")
+   - "en": English (natural, idiomatic retail e-commerce titles, Title Cased, as used by major fashion and retail brands)
+
+CRITICAL RETAIL TERMINOLOGY RULES:
+- DENIM & CLOTHING IN UZBEKISTAN:
+  * "Jinsi kostyum", "jinsi kurtka", "jinsi pidjak", "джинсовка", "джинсовая куртка" refer to a DENIM JACKET (Jean Jacket), NOT a "denim suit"! In English, NEVER output "Denim Suit" for a denim jacket or top outerwear. Translate to English as "Denim Jacket" (or "Jean Jacket").
+  * If the item is explicitly a matching 2-piece set of jacket/top + pants (e.g. "jinsi dvoyka", "jinsi komplekt", "jinsi kostyum shim"), translate to English as "Denim Set" or "Two-Piece Denim Set", NEVER "Denim Suit".
+  * "Jinsi" / "Jinsi shim" / "Джинсы" -> uz: "Jinsi shim" or "Jinsi", ru: "Джинсы", en: "Jeans".
+  * "Jinsi nimcha" / "Джинсовый жилет" -> en: "Denim Vest".
+  * "Jinsi yubka" -> en: "Denim Skirt".
+  * "Jinsi shortik" / "Jinsi shorti" -> en: "Denim Shorts".
+  * "Jinsi kombinezon" -> en: "Denim Overalls" or "Denim Jumpsuit".
+- SUITS, SETS & SPORTSWEAR:
+  * "Sportivny kostyum" / "Sportivka" / "Sport kostyumi" -> en: "Tracksuit" or "Sweatsuit" (NEVER "Sport Suit").
+  * "Dvoyka" / "Kostyum dvoyka" -> en: "Two-Piece Set" (or "Two-Piece Suit" if formal business suit).
+  * "Troyka" / "Kostyum troyka" -> en: "Three-Piece Set" (or "Three-Piece Suit" if formal business suit, NEVER "Troika").
+  * "Kostyum" (alone) -> if formal suit: en: "Suit" (uz: "Kostyum", ru: "Костюм").
+  * "Kostyum-shim" -> en: "Trouser Suit" or "Two-Piece Suit" (ru: "Брючный костюм").
+  * "Klassik kostyum" -> en: "Classic Suit" (ru: "Классический костюм").
+  * "Tolstovka" / "Xudi" -> en: "Hoodie" or "Sweatshirt".
+  * "Vetrovka" -> en: "Windbreaker".
+  * "Kofta" -> en: "Cardigan" or "Sweater".
+  * "Vodolazka" / "Golf" -> en: "Turtleneck".
+  * "Losina" / "Legginsy" -> en: "Leggings".
+  * "Tapochka" -> en: "Slippers" or "Slides".
+  * "Krossovka" -> en: "Sneakers".
+- GENERAL RULES:
+  * Russian titles must be complete noun phrases (e.g. "Джинсовая куртка", "Черная футболка"), NEVER solitary adjectives (never output "Джинсовый" alone).
+  * English titles must sound natural in e-commerce catalogs (Title Case). Never use awkward literal word-for-word translations.
 
 You MUST return ONLY a strict JSON object with NO markdown formatting, matching this exact schema:
 {
@@ -41,6 +68,68 @@ function cleanJsonResponse(text) {
     cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, '').replace(/\n?```$/, '').trim();
   }
   return JSON.parse(cleaned);
+}
+
+/**
+ * Deterministic post-processing to eliminate retail translation blunders like "Denim Suit"
+ */
+function sanitizeTranslations(result, originalInput) {
+  if (!result || !result.translations) return result;
+
+  const t = result.translations;
+  const inputLower = (originalInput || '').toLowerCase();
+
+  // 1. Sanitize English translation
+  if (typeof t.en === 'string') {
+    let en = t.en.trim();
+
+    // Prevent "Denim Suit" / "denim suit"
+    if (/\bdenim suit\b/i.test(en)) {
+      const isExplicitSet = /\b(set|dvoyka|dvojka|komplekt|shim|pants|trousers|two-piece|2-piece)\b/i.test(inputLower);
+      if (isExplicitSet) {
+        en = en.replace(/\bdenim suit\b/gi, 'Denim Set');
+      } else {
+        en = en.replace(/\bdenim suit\b/gi, 'Denim Jacket');
+      }
+    }
+
+    // Prevent "Sport Suit" -> "Tracksuit"
+    if (/\bsport suit\b/i.test(en)) {
+      en = en.replace(/\bsport suit\b/gi, 'Tracksuit');
+    }
+
+    // Prevent "Troika" -> "Three-Piece Set"
+    if (/^troika$/i.test(en.trim())) {
+      en = 'Three-Piece Set';
+    }
+
+    t.en = en;
+  }
+
+  // 2. Sanitize Russian translation
+  if (typeof t.ru === 'string') {
+    let ru = t.ru.trim();
+
+    // Prevent naked solitary adjectives
+    if (/^джинсовый$/i.test(ru)) {
+      ru = 'Джинсовая куртка';
+    } else if (/^спортивный$/i.test(ru)) {
+      ru = 'Спортивный костюм';
+    }
+
+    t.ru = ru;
+  }
+
+  // 3. Sanitize Uzbek translation
+  if (typeof t.uz === 'string') {
+    let uz = t.uz.trim();
+    if (/^jinsi$/i.test(uz) && /\b(kostyum|kurtka|pidjak)\b/i.test(inputLower)) {
+      uz = 'Jinsi kurtka';
+    }
+    t.uz = uz;
+  }
+
+  return result;
 }
 
 /**
@@ -157,7 +246,8 @@ async function translateAndCheckProduct(productName) {
   // Tier 1: OpenRouter (google/gemini-2.5-flash) — fastest & smartest
   try {
     const res = await callOpenRouter('google/gemini-2.5-flash', trimmed);
-    return { provider: 'openrouter:gemini-2.5-flash', ...res };
+    const sanitized = sanitizeTranslations(res, trimmed);
+    return { provider: 'openrouter:gemini-2.5-flash', ...sanitized };
   } catch (err1) {
     console.warn('[aiTranslationService] Tier 1 failed:', err1.message);
   }
@@ -165,7 +255,8 @@ async function translateAndCheckProduct(productName) {
   // Tier 2: Google AI Studio Direct (gemini-2.5-flash)
   try {
     const res = await callGoogleAIStudio(trimmed);
-    return { provider: 'google:gemini-2.5-flash', ...res };
+    const sanitized = sanitizeTranslations(res, trimmed);
+    return { provider: 'google:gemini-2.5-flash', ...sanitized };
   } catch (err2) {
     console.warn('[aiTranslationService] Tier 2 failed:', err2.message);
   }
@@ -173,7 +264,8 @@ async function translateAndCheckProduct(productName) {
   // Tier 3: OpenRouter Free Backup (minimax/minimax-m3:free)
   try {
     const res = await callOpenRouter('minimax/minimax-m3:free', trimmed);
-    return { provider: 'openrouter:minimax-m3:free', ...res };
+    const sanitized = sanitizeTranslations(res, trimmed);
+    return { provider: 'openrouter:minimax-m3:free', ...sanitized };
   } catch (err3) {
     console.error('[aiTranslationService] Tier 3 failed:', err3.message);
     throw new Error('All AI translation providers failed: ' + err3.message);
