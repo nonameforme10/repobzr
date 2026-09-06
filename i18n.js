@@ -359,7 +359,17 @@
             'pos.themeLbl':       'Theme Mode',
             'pos.languageLbl':    'Interface Language',
             'pos.adminLink':      'Open Admin Panel',
-            'pos.appVersion':     'Bazar POS Version'
+            'pos.appVersion':     'Bazar POS Version',
+
+            // POS Currency Bar & Converter
+            'pos.currencyRates':   'CBU Exchange Rates',
+            'pos.currencyCalc':    'Currency Converter',
+            'pos.calc':            'Calculator',
+            'pos.cbuSource':       'cbu.uz official rate',
+            'pos.convertTitle':    'Currency Converter (CBU.UZ)',
+            'pos.convertSubtitle': 'Official exchange rates from Central Bank of Uzbekistan',
+            'pos.officialRateFrom':'From cbu.uz',
+            'pos.equals':          'equals'
         },
 
         /* ============================ RUSSIAN ============================ */
@@ -667,7 +677,17 @@
             'pos.themeLbl':       'Тема оформления',
             'pos.languageLbl':    'Язык интерфейса',
             'pos.adminLink':      'Открыть панель администратора',
-            'pos.appVersion':     'Версия Bazar POS'
+            'pos.appVersion':     'Версия Bazar POS',
+
+            // POS Currency Bar & Converter
+            'pos.currencyRates':   'Курсы валют ЦБ РУз',
+            'pos.currencyCalc':    'Конвертер валют',
+            'pos.calc':            'Калькулятор',
+            'pos.cbuSource':       'Официальный курс cbu.uz',
+            'pos.convertTitle':    'Конвертер валют (CBU.UZ)',
+            'pos.convertSubtitle': 'Официальные курсы Центрального Банка Узбекистана',
+            'pos.officialRateFrom':'По данным cbu.uz',
+            'pos.equals':          'равен'
         },
 
         /* ============================ UZBEK (Latin) ============================ */
@@ -975,7 +995,17 @@
             'pos.themeLbl':       'Mavzu rejimi',
             'pos.languageLbl':    'Interfeys tili',
             'pos.adminLink':      'Admin panelini ochish',
-            'pos.appVersion':     'Bazar POS versiyasi'
+            'pos.appVersion':     'Bazar POS versiyasi',
+
+            // POS Currency Bar & Converter
+            'pos.currencyRates':   'MB valyuta kurslari',
+            'pos.currencyCalc':    'Valyuta hisoblagich',
+            'pos.calc':            'Kalkulyator',
+            'pos.cbuSource':       'cbu.uz rasmiy kursi',
+            'pos.convertTitle':    'Valyuta konvertori (CBU.UZ)',
+            'pos.convertSubtitle': 'Oʻzbekiston Respublikasi Markaziy Banki rasmiy kurslari',
+            'pos.officialRateFrom':'cbu.uz rasmiy kursi boʻyicha',
+            'pos.equals':          'teng'
         }
     };
 

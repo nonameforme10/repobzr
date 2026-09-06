@@ -42,12 +42,12 @@
   }
 </script>
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=11">
+<link rel="stylesheet" href="/style.css?v=12">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="/i18n.js?v=11"></script>
+<script src="/i18n.js?v=12"></script>
 <style>
   /* ── POS SPECIFIC COMPONENT STYLING (THEME-ALIGNED) ── */
 
@@ -1165,8 +1165,337 @@
   .desktop-only { display: flex; }
   .mobile-only { display: none; }
 
-  .pos-mobile-stats {
-    display: none;
+  /* ── ONE-LINE CURRENCY STATS BAR ── */
+  .pos-currency-bar {
+    max-width: 1440px;
+    width: 100%;
+    margin: 8px auto 0;
+    padding: 0 28px;
+    box-sizing: border-box;
+  }
+
+  .currency-bar-inner {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-xs);
+    height: 42px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
+    transition: var(--transition-fast);
+  }
+
+  .currency-bar-inner:hover {
+    border-color: var(--border-strong);
+  }
+
+  .currency-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .currency-bar-left::-webkit-scrollbar { display: none; }
+
+  .currency-bank-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 3px 8px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-xs);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--ink-muted);
+    letter-spacing: 0.04em;
+    user-select: none;
+  }
+
+  .cbu-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    display: inline-block;
+    animation: cbuPulse 2.5s infinite;
+  }
+
+  @keyframes cbuPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  .currency-rates-ticker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .currency-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8125rem;
+    color: var(--ink-strong);
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 3px 6px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-decoration: none;
+    user-select: none;
+  }
+  .currency-chip:hover {
+    background: var(--bg-surface-2);
+    border-color: var(--border-soft);
+  }
+
+  .c-flag {
+    font-size: 0.9375rem;
+    line-height: 1;
+  }
+
+  .c-label {
+    font-weight: 600;
+    color: var(--ink-muted);
+    font-size: 0.75rem;
+  }
+
+  .c-eq {
+    color: var(--ink-subtle);
+    font-size: 0.75rem;
+  }
+
+  .c-val {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-strong);
+    letter-spacing: -0.01em;
+  }
+
+  .c-unit {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+
+  .c-diff {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 4px;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .c-diff.up {
+    color: #10B981;
+    background: rgba(16, 185, 129, 0.12);
+  }
+  .c-diff.down {
+    color: #EF4444;
+    background: rgba(239, 68, 68, 0.12);
+  }
+
+  .c-sep {
+    color: var(--border);
+    font-weight: 700;
+    user-select: none;
+    font-size: 0.875rem;
+  }
+
+  .currency-calc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 5px 11px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    color: var(--ink-strong);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .currency-calc-btn:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  /* FX Converter Modal */
+  .fx-modal-card {
+    max-width: 480px;
+    width: 100%;
+  }
+
+  .fx-headline-banner {
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    text-align: left;
+  }
+
+  .fx-headline-caption {
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    font-weight: 500;
+  }
+
+  .fx-headline-rate {
+    font-size: 1.875rem;
+    font-weight: 800;
+    color: var(--ink-strong);
+    margin: 4px 0 2px;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fx-rate-unit {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+
+  .fx-headline-meta {
+    font-size: 0.75rem;
+    color: var(--ink-subtle);
+    margin-top: 4px;
+  }
+
+  .fx-converter-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .fx-input-row {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    overflow: hidden;
+    transition: var(--transition-fast);
+  }
+
+  .fx-input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  .fx-amount-input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 14px;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: inherit;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .fx-select-wrap {
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--border-soft);
+    background: var(--bg-surface-2);
+  }
+
+  .fx-currency-select {
+    border: none;
+    background: transparent;
+    padding: 10px 12px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+    outline: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .fx-swap-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    margin: 2px 0;
+  }
+
+  .fx-divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-soft);
+  }
+
+  .fx-swap-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.125rem;
+    transition: var(--transition-fast);
+  }
+
+  .fx-swap-btn:hover {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-color: var(--accent);
+    transform: rotate(180deg);
+  }
+
+  .fx-quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .fx-chip {
+    padding: 6px 11px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: var(--bg-surface-2);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .fx-chip:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
   }
 
   /* ── TABLET (769–1024px) ── */
@@ -1205,52 +1534,20 @@
       padding: 0 10px;
     }
 
-    /* Mobile 3-card stats strip — auto-sized columns, no truncation */
-    .pos-mobile-stats {
-      grid-template-columns: repeat(3, 1fr);
+    .pos-currency-bar {
+      padding: 0 12px;
+      margin: 8px auto 0;
+    }
+    .currency-bar-inner {
+      height: 38px;
+      padding: 0 10px;
       gap: 8px;
-      padding: 10px 12px 0;
-      max-width: 1440px;
-      margin: 0 auto;
-      width: 100%;
-      box-sizing: border-box;
     }
-    .m-stat-card {
-      background: var(--bg-surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 8px 6px;
-      text-align: center;
-      box-shadow: var(--shadow-xs);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      min-width: 0;
-      overflow: hidden;
+    .calc-label {
+      display: none;
     }
-    .m-stat-val {
-      font-size: clamp(0.7rem, 2.8vw, 0.9rem);
-      font-weight: 700;
-      color: var(--ink-strong);
-      line-height: 1.2;
-      font-variant-numeric: tabular-nums;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .m-stat-val.profit-val {
-      color: var(--success);
-    }
-    .m-stat-lbl {
-      font-size: clamp(0.55rem, 2vw, 0.65rem);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-      color: var(--ink-muted);
-      margin-top: 2px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .currency-calc-btn {
+      padding: 6px 8px;
     }
 
     /* Toolbar: wrap to two rows on mobile */
@@ -2275,19 +2572,66 @@
 
   <!-- VIEW: HOME (CATALOG & SELLING) -->
   <div class="pos-view active" id="view-home">
-    <!-- MOBILE SESSION STATS STRIP -->
-    <div class="pos-mobile-stats mobile-only">
-      <div class="m-stat-card">
-        <div class="m-stat-val" id="m-hdr-sales">0</div>
-        <div class="m-stat-lbl" data-i18n="pos.salesToday">Sales Today</div>
-      </div>
-      <div class="m-stat-card">
-        <div class="m-stat-val" id="m-hdr-revenue">0 soʻm</div>
-        <div class="m-stat-lbl" data-i18n="pos.revenue">Revenue</div>
-      </div>
-      <div class="m-stat-card m-profit">
-        <div class="m-stat-val profit-val" id="m-hdr-profit">+0 soʻm</div>
-        <div class="m-stat-lbl" data-i18n="pos.extraProfit">Extra Profit</div>
+    <!-- CURRENCY RATES STATS BAR (ONE LINE) -->
+    <div class="pos-currency-bar" id="posCurrencyBar">
+      <div class="currency-bar-inner">
+        <div class="currency-bar-left">
+          <div class="currency-bank-tag" title="Central Bank of Uzbekistan (cbu.uz)">
+            <span class="cbu-dot"></span>
+            <span class="cbu-name">CBU.UZ</span>
+          </div>
+
+          <div class="currency-rates-ticker" id="currencyRatesTicker">
+            <!-- USD -->
+            <button type="button" class="currency-chip" id="chipUsd" data-ccy="USD" title="1 USD to UZS">
+              <span class="c-flag">🇺🇸</span>
+              <span class="c-label">1 USD</span>
+              <span class="c-eq">=</span>
+              <span class="c-val" id="rateValUsd">11 795</span>
+              <span class="c-unit">soʻm</span>
+              <span class="c-diff down" id="rateDiffUsd">−18</span>
+            </button>
+
+            <span class="c-sep">·</span>
+
+            <!-- EUR -->
+            <button type="button" class="currency-chip" id="chipEur" data-ccy="EUR" title="1 EUR to UZS">
+              <span class="c-flag">🇪🇺</span>
+              <span class="c-label">1 EUR</span>
+              <span class="c-eq">=</span>
+              <span class="c-val" id="rateValEur">13 699</span>
+              <span class="c-unit">soʻm</span>
+              <span class="c-diff up" id="rateDiffEur">+22</span>
+            </button>
+
+            <span class="c-sep">·</span>
+
+            <!-- RUB -->
+            <button type="button" class="currency-chip" id="chipRub" data-ccy="RUB" title="1 RUB to UZS">
+              <span class="c-flag">🇷🇺</span>
+              <span class="c-label">1 RUB</span>
+              <span class="c-eq">=</span>
+              <span class="c-val" id="rateValRub">136</span>
+              <span class="c-unit">soʻm</span>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" class="currency-calc-btn" id="btnOpenFxModal" aria-label="Valyuta hisoblagich" data-i18n-title="pos.currencyCalc" title="Currency Converter">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="2" width="16" height="20" rx="2"></rect>
+            <line x1="8" y1="6" x2="16" y2="6"></line>
+            <line x1="16" y1="14" x2="16" y2="18"></line>
+            <path d="M16 10h.01"></path>
+            <path d="M12 10h.01"></path>
+            <path d="M8 10h.01"></path>
+            <path d="M12 14h.01"></path>
+            <path d="M8 14h.01"></path>
+            <path d="M12 18h.01"></path>
+            <path d="M8 18h.01"></path>
+          </svg>
+          <span class="calc-label" data-i18n="pos.calc">Kalkulyator</span>
+        </button>
       </div>
     </div>
 
@@ -2525,6 +2869,81 @@
     </button>
   </nav>
 
+<!-- CURRENCY CONVERTER MODAL (GOOGLE / CBU STYLE) -->
+<div class="pos-overlay" id="fx-modal-overlay" role="dialog" aria-modal="true" aria-label="Currency Converter">
+  <div class="pos-modal fx-modal-card" id="fx-modal-card">
+    <div class="pos-modal-header">
+      <div>
+        <div class="pos-modal-title" data-i18n="pos.convertTitle">Valyuta konvertori (CBU.UZ)</div>
+        <div class="pos-modal-sub" data-i18n="pos.convertSubtitle">Oʻzbekiston Respublikasi Markaziy Banki rasmiy kurslari</div>
+      </div>
+      <button class="pos-modal-close" id="fx-modal-close" aria-label="Close" type="button">✕</button>
+    </div>
+    <div class="pos-modal-body">
+      <!-- Big Google-style headline banner -->
+      <div class="fx-headline-banner">
+        <div class="fx-headline-caption" id="fxHeadCaption">1 AQSH dollari equals</div>
+        <div class="fx-headline-rate">
+          <span id="fxHeadRate">11 795</span>
+          <span class="fx-rate-unit" id="fxHeadUnit">Oʻzbekiston soʻmi</span>
+        </div>
+        <div class="fx-headline-meta" id="fxHeadMeta">cbu.uz rasmiy kursi</div>
+      </div>
+
+      <!-- Two-way interactive converter inputs -->
+      <div class="fx-converter-grid">
+        <!-- Row A -->
+        <div class="fx-input-row">
+          <input type="number" step="any" min="0" class="fx-amount-input" id="fxInputA" value="1" placeholder="1" inputmode="decimal">
+          <div class="fx-select-wrap">
+            <select class="fx-currency-select" id="fxSelectA">
+              <option value="USD" selected>USD — US Dollar</option>
+              <option value="EUR">EUR — Euro</option>
+              <option value="RUB">RUB — Russian Ruble</option>
+              <option value="UZS">UZS — Uzbekistani Som</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Swap button divider -->
+        <div class="fx-swap-divider">
+          <span class="fx-divider-line"></span>
+          <button type="button" class="fx-swap-btn" id="fxSwapBtn" title="Swap currencies" aria-label="Swap currencies">
+            ⇅
+          </button>
+          <span class="fx-divider-line"></span>
+        </div>
+
+        <!-- Row B -->
+        <div class="fx-input-row">
+          <input type="number" step="any" min="0" class="fx-amount-input" id="fxInputB" value="11795" placeholder="11795" inputmode="decimal">
+          <div class="fx-select-wrap">
+            <select class="fx-currency-select" id="fxSelectB">
+              <option value="UZS" selected>UZS — Uzbekistani Som</option>
+              <option value="USD">USD — US Dollar</option>
+              <option value="EUR">EUR — Euro</option>
+              <option value="RUB">RUB — Russian Ruble</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Preset Chips -->
+      <div class="fx-quick-chips">
+        <button type="button" class="fx-chip" data-amt="1" data-cur="USD">$1</button>
+        <button type="button" class="fx-chip" data-amt="10" data-cur="USD">$10</button>
+        <button type="button" class="fx-chip" data-amt="50" data-cur="USD">$50</button>
+        <button type="button" class="fx-chip" data-amt="100" data-cur="USD">$100</button>
+        <button type="button" class="fx-chip" data-amt="500" data-cur="USD">$500</button>
+        <button type="button" class="fx-chip" data-amt="1000" data-cur="USD">$1 000</button>
+        <button type="button" class="fx-chip" data-amt="100000" data-cur="UZS">100k soʻm</button>
+        <button type="button" class="fx-chip" data-amt="1000000" data-cur="UZS">1 mln soʻm</button>
+      </div>
+    </div>
+    <div class="pos-modal-footer">
+      <button class="btn-cancel" id="btn-fx-close" type="button" data-i18n="pos.cancel" style="width:100%;">Close</button>
+    </div>
+  </div>
 </div>
 
 <!-- CASH OUT MODAL (MONEY TAKEN FROM CASSA) -->
@@ -3612,6 +4031,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
     closeCashOutModal();
+    closeFxModal();
   }
 });
 
@@ -4181,6 +4601,287 @@ function setupBottomNavAndTabs() {
   });
 }
 
+// ── CBU CURRENCY EXCHANGE & CONVERTER ─────────────────────────────────────
+const CBU_STORAGE_KEY = 'salestrack_cbu_rates_cache';
+let cbuRates = {
+  USD: 11795,
+  EUR: 13699,
+  RUB: 136,
+  UZS: 1
+};
+let cbuDiffs = {
+  USD: -18,
+  EUR: 22,
+  RUB: 0
+};
+let cbuDate = '';
+
+function formatRateNum(n) {
+  if (!n || isNaN(n)) return '—';
+  return Math.round(n).toLocaleString('ru-RU');
+}
+
+function renderCurrencyBar() {
+  const usdEl = document.getElementById('rateValUsd');
+  const eurEl = document.getElementById('rateValEur');
+  const rubEl = document.getElementById('rateValRub');
+  const diffUsdEl = document.getElementById('rateDiffUsd');
+  const diffEurEl = document.getElementById('rateDiffEur');
+
+  if (usdEl) usdEl.textContent = formatRateNum(cbuRates.USD);
+  if (eurEl) eurEl.textContent = formatRateNum(cbuRates.EUR);
+  if (rubEl) rubEl.textContent = formatRateNum(cbuRates.RUB);
+
+  if (diffUsdEl) {
+    const diff = cbuDiffs.USD || 0;
+    diffUsdEl.textContent = (diff > 0 ? '+' : '') + Math.round(diff);
+    diffUsdEl.className = 'c-diff ' + (diff >= 0 ? 'up' : 'down');
+  }
+
+  if (diffEurEl) {
+    const diff = cbuDiffs.EUR || 0;
+    diffEurEl.textContent = (diff > 0 ? '+' : '') + Math.round(diff);
+    diffEurEl.className = 'c-diff ' + (diff >= 0 ? 'up' : 'down');
+  }
+}
+
+function loadCachedRates() {
+  try {
+    const raw = localStorage.getItem(CBU_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.rates) {
+        cbuRates = { ...cbuRates, ...parsed.rates };
+        if (parsed.diffs) cbuDiffs = { ...cbuDiffs, ...parsed.diffs };
+        if (parsed.date) cbuDate = parsed.date;
+        renderCurrencyBar();
+        return true;
+      }
+    }
+  } catch (e) {}
+  renderCurrencyBar();
+  return false;
+}
+
+async function fetchCbuRates() {
+  try {
+    let data = null;
+    try {
+      const res = await fetch(`${API_BASE_URL}/rates`, { cache: 'no-store' });
+      if (res.ok) data = await res.json();
+    } catch (e) {}
+
+    if (!data || !Array.isArray(data)) {
+      try {
+        const res2 = await fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/', { cache: 'no-store' });
+        if (res2.ok) data = await res2.json();
+      } catch (e) {}
+    }
+
+    if (Array.isArray(data) && data.length > 0) {
+      const findRow = (ccy) => data.find(c => String(c.Ccy || c.code || '').toUpperCase() === ccy);
+      const usd = findRow('USD');
+      const eur = findRow('EUR');
+      const rub = findRow('RUB');
+
+      if (usd && parseFloat(usd.Rate)) {
+        cbuRates.USD = parseFloat(usd.Rate);
+        cbuDiffs.USD = parseFloat(usd.Diff) || 0;
+        cbuDate = usd.Date || '';
+      }
+      if (eur && parseFloat(eur.Rate)) {
+        cbuRates.EUR = parseFloat(eur.Rate);
+        cbuDiffs.EUR = parseFloat(eur.Diff) || 0;
+      }
+      if (rub && parseFloat(rub.Rate)) {
+        cbuRates.RUB = parseFloat(rub.Rate);
+        cbuDiffs.RUB = parseFloat(rub.Diff) || 0;
+      }
+
+      try {
+        localStorage.setItem(CBU_STORAGE_KEY, JSON.stringify({
+          rates: cbuRates,
+          diffs: cbuDiffs,
+          date: cbuDate,
+          timestamp: Date.now()
+        }));
+      } catch (e) {}
+
+      renderCurrencyBar();
+      if (document.getElementById('fx-modal-overlay')?.classList.contains('open')) {
+        updateFxHeadline();
+        syncFxInputs('A');
+      }
+    }
+  } catch (err) {
+    console.warn('[cbu] Failed to fetch rates:', err);
+  }
+}
+
+function getFxRate(code) {
+  if (code === 'UZS') return 1;
+  return cbuRates[code] || 1;
+}
+
+function convertFx(amount, from, to) {
+  if (!isFinite(amount)) return 0;
+  const fromRate = getFxRate(from);
+  const toRate = getFxRate(to);
+  if (!fromRate || !toRate) return 0;
+  return (amount * fromRate) / toRate;
+}
+
+function updateFxHeadline() {
+  const selA = document.getElementById('fxSelectA');
+  const curA = (selA && selA.value) || 'USD';
+  const curB = 'UZS';
+
+  const captionEl = document.getElementById('fxHeadCaption');
+  const rateEl = document.getElementById('fxHeadRate');
+  const unitEl = document.getElementById('fxHeadUnit');
+  const metaEl = document.getElementById('fxHeadMeta');
+
+  const names = {
+    USD: { uz: 'AQSH dollari', ru: 'Доллар США', en: 'US Dollar' },
+    EUR: { uz: 'Yevro', ru: 'Евро', en: 'Euro' },
+    RUB: { uz: 'Rossiya rubli', ru: 'Российский рубль', en: 'Russian Ruble' },
+    UZS: { uz: 'Oʻzbekiston soʻmi', ru: 'Узбекистанский сум', en: 'Uzbekistani Som' }
+  };
+
+  const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  const nameA = (names[curA] && names[curA][lang]) || curA;
+  const nameB = (names[curB] && names[curB][lang]) || curB;
+
+  if (captionEl) captionEl.textContent = `1 ${nameA} ${t('pos.equals')}`;
+  const rate = getFxRate(curA);
+  if (rateEl) rateEl.textContent = formatRateNum(rate);
+  if (unitEl) unitEl.textContent = nameB;
+
+  if (metaEl) {
+    const dStr = cbuDate ? `${cbuDate} · ` : '';
+    metaEl.textContent = `${dStr}${t('pos.officialRateFrom')}`;
+  }
+}
+
+let fxSyncing = false;
+function syncFxInputs(source = 'A') {
+  if (fxSyncing) return;
+  fxSyncing = true;
+  try {
+    const inpA = document.getElementById('fxInputA');
+    const inpB = document.getElementById('fxInputB');
+    const selA = document.getElementById('fxSelectA');
+    const selB = document.getElementById('fxSelectB');
+
+    const curA = selA ? selA.value : 'USD';
+    const curB = selB ? selB.value : 'UZS';
+
+    if (source === 'A') {
+      const valA = parseFloat(inpA.value);
+      const res = convertFx(isFinite(valA) ? valA : 0, curA, curB);
+      inpB.value = curB === 'UZS' ? Math.round(res) : (res ? parseFloat(res.toFixed(4)) : 0);
+    } else {
+      const valB = parseFloat(inpB.value);
+      const res = convertFx(isFinite(valB) ? valB : 0, curB, curA);
+      inpA.value = curA === 'UZS' ? Math.round(res) : (res ? parseFloat(res.toFixed(4)) : 0);
+    }
+  } finally {
+    fxSyncing = false;
+  }
+}
+
+function openFxModal(initialCurrency = 'USD') {
+  const overlay = document.getElementById('fx-modal-overlay');
+  if (!overlay) return;
+
+  const selA = document.getElementById('fxSelectA');
+  const selB = document.getElementById('fxSelectB');
+  if (selA && initialCurrency !== 'UZS') selA.value = initialCurrency;
+  if (selB && initialCurrency !== 'UZS') selB.value = 'UZS';
+
+  updateFxHeadline();
+  syncFxInputs('A');
+
+  overlay.classList.add('open');
+  const inpA = document.getElementById('fxInputA');
+  if (inpA) setTimeout(() => inpA.select(), 60);
+}
+
+function closeFxModal() {
+  const overlay = document.getElementById('fx-modal-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function setupCurrencyBar() {
+  const btnOpen = document.getElementById('btnOpenFxModal');
+  const chipUsd = document.getElementById('chipUsd');
+  const chipEur = document.getElementById('chipEur');
+  const chipRub = document.getElementById('chipRub');
+  const modalClose = document.getElementById('fx-modal-close');
+  const btnClose = document.getElementById('btn-fx-close');
+  const overlay = document.getElementById('fx-modal-overlay');
+
+  if (btnOpen) btnOpen.addEventListener('click', () => openFxModal('USD'));
+  if (chipUsd) chipUsd.addEventListener('click', () => openFxModal('USD'));
+  if (chipEur) chipEur.addEventListener('click', () => openFxModal('EUR'));
+  if (chipRub) chipRub.addEventListener('click', () => openFxModal('RUB'));
+
+  if (modalClose) modalClose.addEventListener('click', closeFxModal);
+  if (btnClose) btnClose.addEventListener('click', closeFxModal);
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeFxModal();
+    });
+  }
+
+  const inpA = document.getElementById('fxInputA');
+  const inpB = document.getElementById('fxInputB');
+  const selA = document.getElementById('fxSelectA');
+  const selB = document.getElementById('fxSelectB');
+  const swapBtn = document.getElementById('fxSwapBtn');
+
+  if (inpA) inpA.addEventListener('input', () => syncFxInputs('A'));
+  if (inpB) inpB.addEventListener('input', () => syncFxInputs('B'));
+
+  if (selA) {
+    selA.addEventListener('change', () => {
+      updateFxHeadline();
+      syncFxInputs('A');
+    });
+  }
+  if (selB) {
+    selB.addEventListener('change', () => {
+      syncFxInputs('A');
+    });
+  }
+
+  if (swapBtn && selA && selB) {
+    swapBtn.addEventListener('click', () => {
+      const tmp = selA.value;
+      selA.value = selB.value;
+      selB.value = tmp;
+      updateFxHeadline();
+      syncFxInputs('A');
+    });
+  }
+
+  // Quick preset chips in FX modal
+  document.querySelectorAll('.fx-quick-chips .fx-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const amt = parseFloat(chip.dataset.amt) || 1;
+      const cur = chip.dataset.cur || 'USD';
+      if (selA && selB) {
+        selA.value = cur;
+        selB.value = cur === 'UZS' ? 'USD' : 'UZS';
+      }
+      if (inpA) inpA.value = amt;
+      updateFxHeadline();
+      syncFxInputs('A');
+    });
+  });
+}
+
 // ── INITIALIZATION ────────────────────────────────────────────────────────
 async function init() {
   await localDb.init();
@@ -4191,6 +4892,10 @@ async function init() {
   setupViewToggle();
   setupBottomNavAndTabs();
 
+  loadCachedRates();
+  setupCurrencyBar();
+  fetchCbuRates();
+
   // Listen to i18n changes
   document.addEventListener('i18n:change', () => {
     if (window.i18n && window.i18n.t) {
@@ -4198,6 +4903,7 @@ async function init() {
     }
     updateLanguageSwitcherUI();
     updateHeaderStats();
+    updateFxHeadline();
     syncEngine.updateUI();
     renderGrid();
     if (currentTab === 'audit') renderAuditView();
@@ -4230,6 +4936,7 @@ async function init() {
   window.addEventListener('online', () => {
     syncEngine.isOnline = true;
     syncEngine.kick();
+    fetchCbuRates();
   });
   window.addEventListener('offline', () => {
     syncEngine.isOnline = false;
@@ -4238,11 +4945,13 @@ async function init() {
   window.addEventListener('focus', () => {
     loadProductsFromStorage().then(renderGrid);
     syncEngine.kick();
+    fetchCbuRates();
   });
 
   // Start background sync
   syncEngine.kick();
   setInterval(() => syncEngine.kick(), 25000);
+  setInterval(fetchCbuRates, 30 * 60 * 1000);
 }
 
 document.addEventListener('DOMContentLoaded', init);
