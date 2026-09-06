@@ -1462,7 +1462,7 @@ async function clearAllData() {
             btn.innerHTML = `<svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg> <span>...</span>`;
         }
         try {
-            // 1. Wipe backend PostgreSQL database
+            // 1. Clear transactions and activities on backend (products & categories are preserved)
             const res = await fetch('/api/reset-database', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
@@ -1471,33 +1471,26 @@ async function clearAllData() {
                 const errJson = await res.json().catch(() => ({}));
                 throw new Error(errJson.error || `Server responded with ${res.status}`);
             }
+            const resData = await res.json().catch(() => ({}));
 
-            // 2. Clear local IndexedDB stores
+            // 2. Clear local activities and outbox (DO NOT clear products or categories!)
             await Promise.all([
-                localDb.clear('products'),
-                localDb.clear('categories'),
                 localDb.clear('activities'),
                 localDb.clear('outbox')
             ]);
-            await localDb.setMeta('lastSyncSeq', 0);
-
-            // 3. Clear localStorage snapshot
-            try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
-
-            // 4. Reset in-memory state
-            state.products = [];
-            state.categories = [];
-            state.activities = [];
-
-            // 5. Update UI & Category Filter
-            refreshAll();
-            const filter = document.getElementById('productCategoryFilter');
-            if (filter) {
-                filter.innerHTML = '<option value="">All Categories</option>';
+            if (resData.currentSeq !== undefined) {
+                await localDb.setMeta('lastSyncSeq', Number(resData.currentSeq));
             }
+
+            // 3. Reset in-memory activities and save state (preserving products and categories!)
+            state.activities = [];
+            saveState();
+
+            // 4. Update UI
+            refreshAll();
             syncEngine.updateUI();
 
-            // 6. Broadcast reset to any open POS/Sellers tabs
+            // 5. Broadcast reset to any open POS/Sellers tabs
             notifyCatalogChange('DATABASE_RESET');
 
             showToast(tr('action.clearAllDataSuccess'), 'success', 4000);
@@ -1512,6 +1505,7 @@ async function clearAllData() {
         }
     });
 }
+
 
 // ==================== RENDERERS ====================
 function refreshAll() {

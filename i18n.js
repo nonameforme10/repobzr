@@ -56,8 +56,8 @@
             'action.exportJson':   'Export JSON',
             'action.importJson':   'Import JSON',
             'action.clearAllData': 'Clear All Data',
-            'action.confirmClearAllData': 'Are you sure you want to delete ALL data from the database and local storage? This will erase all products, categories, sales, and history. This action cannot be undone.',
-            'action.clearAllDataSuccess': 'Database and local data cleared successfully.',
+            'action.confirmClearAllData': 'Are you sure you want to clear sales and activity records? All sales, transactions, and activity history will be deleted. Products and categories will NOT be deleted.',
+            'action.clearAllDataSuccess': 'Sales and activity history cleared successfully. Products preserved.',
 
             // Home & Calendar & Reports
             'home.title':               'Home',
@@ -356,6 +356,12 @@
             'pos.filterAllAudit': 'All Movements',
             'pos.filterSalesOnly':'Sales Only',
             'pos.filterCashOnly': 'Cash Taken Only',
+            'pos.optomSale':      'Optom sale',
+            'pos.whatWasSold':    'What was sold',
+            'pos.price':          'Price',
+            'pos.subtotal':       'Subtotal',
+            'pos.discount':       'Discount',
+            'pos.itemsUnits':     '{count} items · {units} pcs',
 
             // POS Cash Out Floating Action & Modal
             'pos.cashOut':                 'Take Cash Out',
@@ -414,8 +420,8 @@
             'action.exportJson': 'Экспорт JSON',
             'action.importJson': 'Импорт JSON',
             'action.clearAllData': 'Очистить базу данных',
-            'action.confirmClearAllData': 'Вы уверены, что хотите удалить ВСЕ данные из базы данных и локального хранилища? Будут удалены все товары, категории, продажи и история. Это действие нельзя отменить.',
-            'action.clearAllDataSuccess': 'База данных и локальные данные успешно очищены.',
+            'action.confirmClearAllData': 'Вы уверены, что хотите очистить историю продаж и операций? Все продажи, транзакции и история будут удалены. Товары и категории удалены НЕ будут.',
+            'action.clearAllDataSuccess': 'История продаж и операций успешно очищена. Товары сохранены.',
 
             // Home & Calendar & Reports
             'home.title':               'Главная',
@@ -700,6 +706,12 @@
             'pos.filterAllAudit': 'Все записи',
             'pos.filterSalesOnly':'Только продажи',
             'pos.filterCashOnly': 'Только взятие из кассы',
+            'pos.optomSale':      'Оптовая продажа (Optom sale)',
+            'pos.whatWasSold':    'Что продано',
+            'pos.price':          'Цена',
+            'pos.subtotal':       'Подытог',
+            'pos.discount':       'Скидка',
+            'pos.itemsUnits':     '{count} тов. · {units} шт.',
 
             // POS Cash Out Floating Action & Modal
             'pos.cashOut':                 'Взять из кассы',
@@ -758,8 +770,8 @@
             'action.exportJson': 'JSON eksport',
             'action.importJson': 'JSON import',
             'action.clearAllData': 'Bazani tozalash',
-            'action.confirmClearAllData': 'Barcha maʼlumotlarni bazadan va xotiradan butunlay oʻchirmoqchimisiz? Barcha mahsulotlar, toifalar, sotuvlar va tarix oʻchiriladi. Bu amalni ortga qaytarib boʻlmaydi.',
-            'action.clearAllDataSuccess': 'Baza va barcha maʼlumotlar muvaffaqiyatli tozalandi.',
+            'action.confirmClearAllData': 'Sotuvlar va faoliyat tarixini tozalamoqchimisiz? Barcha sotuvlar, tranzaksiyalar va faoliyat tarixi oʻchiriladi. Mahsulotlar va toifalar OʻCHIRILMAYDI.',
+            'action.clearAllDataSuccess': 'Sotuvlar va faoliyat tarixi muvaffaqiyatli tozalandi. Mahsulotlar saqlab qolindi.',
 
             // Home & Calendar & Reports
             'home.title':               'Asosiy',
@@ -1044,6 +1056,12 @@
             'pos.filterAllAudit': 'Barcha harakatlar',
             'pos.filterSalesOnly':'Faqat savdolar',
             'pos.filterCashOnly': 'Faqat kassadan olingan',
+            'pos.optomSale':      'Optom sotuv',
+            'pos.whatWasSold':    'Nima sotildi',
+            'pos.price':          'Narx',
+            'pos.subtotal':       'Oraliq jami',
+            'pos.discount':       'Chegirma',
+            'pos.itemsUnits':     '{count} xil · {units} dona',
 
             // POS Cash Out Floating Action & Modal
             'pos.cashOut':                 'Kassadan pul olish',

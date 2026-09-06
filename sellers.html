@@ -68,7 +68,13 @@
         'pos.convertTitle': 'Currency Converter (CBU.UZ)',
         'pos.convertSubtitle': 'Official exchange rates from Central Bank of Uzbekistan',
         'pos.officialRateFrom': 'From cbu.uz',
-        'pos.equals': 'equals'
+        'pos.equals': 'equals',
+        'pos.optomSale': 'Optom sale',
+        'pos.whatWasSold': 'What was sold',
+        'pos.price': 'Price',
+        'pos.subtotal': 'Subtotal',
+        'pos.discount': 'Discount',
+        'pos.itemsUnits': '{count} items · {units} pcs'
       },
       ru: {
         'pos.navHome': 'Каталог',
@@ -83,7 +89,13 @@
         'pos.convertTitle': 'Конвертер валют (CBU.UZ)',
         'pos.convertSubtitle': 'Официальные курсы Центрального Банка Узбекистана',
         'pos.officialRateFrom': 'По данным cbu.uz',
-        'pos.equals': 'равен'
+        'pos.equals': 'равен',
+        'pos.optomSale': 'Оптовая продажа (Optom sale)',
+        'pos.whatWasSold': 'Что продано',
+        'pos.price': 'Цена',
+        'pos.subtotal': 'Подытог',
+        'pos.discount': 'Скидка',
+        'pos.itemsUnits': '{count} тов. · {units} шт.'
       },
       uz: {
         'pos.navHome': 'Asosiy',
@@ -98,7 +110,13 @@
         'pos.convertTitle': 'Valyuta konvertori (CBU.UZ)',
         'pos.convertSubtitle': 'Oʻzbekiston Respublikasi Markaziy Banki rasmiy kurslari',
         'pos.officialRateFrom': 'cbu.uz rasmiy kursi boʻyicha',
-        'pos.equals': 'teng'
+        'pos.equals': 'teng',
+        'pos.optomSale': 'Optom sotuv',
+        'pos.whatWasSold': 'Nima sotildi',
+        'pos.price': 'Narx',
+        'pos.subtotal': 'Oraliq jami',
+        'pos.discount': 'Chegirma',
+        'pos.itemsUnits': '{count} xil · {units} dona'
       }
     };
     ['en', 'ru', 'uz'].forEach(function (lang) {
@@ -2941,20 +2959,59 @@
     gap: 10px;
   }
 
-  .audit-item {
+  /* ── AUDIT CARD & TIMELINE ── */
+  .audit-card {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    box-shadow: var(--shadow-xs);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    overflow: hidden;
+  }
+
+  .audit-card:hover {
+    border-color: var(--border-strong);
+  }
+
+  .audit-card.is-open {
+    border-color: var(--accent);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  .audit-item {
     padding: 12px 16px;
     display: flex;
     align-items: center;
     gap: 14px;
-    box-shadow: var(--shadow-xs);
-    transition: var(--transition-fast);
+    background: transparent;
+    transition: background var(--transition-fast);
   }
 
-  .audit-item:hover {
-    border-color: var(--border-strong);
+  .audit-card.is-expandable .audit-item {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .audit-card.is-expandable .audit-item:hover {
+    background: var(--bg-input-soft);
+  }
+
+  .audit-chevron-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    color: var(--ink-muted);
+    transition: transform 0.25s ease, color 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 2px;
+  }
+
+  .audit-card.is-open .audit-chevron-btn {
+    transform: rotate(180deg);
+    color: var(--accent);
   }
 
   .audit-thumb-wrap {
@@ -2968,12 +3025,37 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    position: relative;
   }
 
   .audit-thumb-wrap img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  .audit-thumb-optom {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(234, 88, 12, 0.22));
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+
+  .audit-optom-icon {
+    font-size: 1.45rem;
+    line-height: 1;
+  }
+
+  .audit-optom-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.5625rem;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 4px;
+    line-height: 1.1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   }
 
   .audit-icon-cashout {
@@ -3016,6 +3098,12 @@
     color: var(--accent-strong);
   }
 
+  .audit-badge-optom {
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+  }
+
   .audit-badge-cashout {
     background: var(--danger-soft);
     color: var(--danger);
@@ -3045,6 +3133,142 @@
     font-size: 0.75rem;
     color: var(--ink-muted);
     margin-top: 2px;
+  }
+
+  /* ── AUDIT DETAILS DROPDOWN ── */
+  .audit-dropdown {
+    display: none;
+    border-top: 1px dashed var(--border);
+    background: var(--bg-app);
+    padding: 14px 18px 16px;
+    animation: auditFadeDown 0.22s ease-out;
+  }
+
+  .audit-card.is-open .audit-dropdown {
+    display: block;
+  }
+
+  @keyframes auditFadeDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .audit-drop-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 10px;
+  }
+
+  .audit-drop-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .audit-drop-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.875rem;
+    padding: 4px 0;
+  }
+
+  .audit-drop-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .audit-drop-bullet {
+    color: var(--accent);
+    font-size: 0.875rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .audit-drop-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .audit-drop-name {
+    font-weight: 600;
+    color: var(--ink-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .audit-drop-qty {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    margin-top: 1px;
+  }
+
+  .audit-drop-right {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .audit-drop-row.discount-row {
+    background: var(--danger-soft);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    margin-top: 4px;
+  }
+
+  .audit-drop-row.discount-row .audit-drop-name,
+  .audit-drop-row.discount-row .audit-drop-right {
+    color: var(--danger);
+    font-weight: 700;
+  }
+
+  .audit-drop-summary {
+    border-top: 1px dashed var(--border);
+    margin-top: 12px;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .audit-summary-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+  }
+
+  .audit-summary-line.total-line {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    padding-top: 6px;
+    margin-top: 2px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .audit-summary-line.total-line .val {
+    color: var(--accent);
+    font-size: 1rem;
+    font-weight: 800;
   }
 
   .audit-empty {
@@ -4560,21 +4784,18 @@ if (catalogChannel) {
     const { type, product } = e.data || {};
     if (type === 'DATABASE_RESET') {
       await Promise.all([
-        localDb.clear('products'),
-        localDb.clear('categories'),
         localDb.clear('activities'),
         localDb.clear('outbox')
       ]);
-      await localDb.setMeta('lastSyncSeq', 0);
-      products = [];
-      categories = [];
       sessions.sales = 0;
       sessions.revenue = 0;
       sessions.extraProfit = 0;
       sessions.cashOut = 0;
       updateHeaderStats();
-      renderGrid();
+      if (currentTab === 'audit') renderAuditView();
       syncEngine.updateUI();
+      await loadProductsFromStorage();
+      renderGrid();
       return;
     }
     if (type === 'SALE_RECORDED' || type === 'CASH_OUT_RECORDED') {
@@ -4783,41 +5004,52 @@ const syncEngine = {
     const data = await res.json();
 
     // ── SERVER RESET DETECTION ──────────────────────────────────────────────
-    // If the server's currentSeq dropped to 0 (DB was wiped) while we have
-    // a non-zero lastSyncSeq (or we still have local products), we must immediately clear local state.
-    // Also handles requiresBootstrap signal from the server.
+    // If the server's currentSeq dropped to 0 or requiresBootstrap was signaled,
+    // refresh activities/sessions and re-hydrate state from server snapshot.
     const serverCurrentSeq = Number(data.currentSeq || 0);
-    if (data.requiresBootstrap || (lastSyncSeq > 0 && serverCurrentSeq === 0) || (serverCurrentSeq === 0 && products.length > 0)) {
-      // Wipe local state first so the UI is instantly empty
+    if (data.requiresBootstrap || (lastSyncSeq > 0 && serverCurrentSeq === 0)) {
       await Promise.all([
-        localDb.clear('products'),
-        localDb.clear('categories'),
         localDb.clear('activities'),
         localDb.clear('outbox')
       ]);
-      await localDb.setMeta('lastSyncSeq', 0);
-      products = [];
-      categories = [];
       sessions.sales = 0;
       sessions.revenue = 0;
       sessions.extraProfit = 0;
       sessions.cashOut = 0;
       updateHeaderStats();
-      renderGrid();
 
-      // Now fetch the fresh snapshot from the server
+      // Fetch the fresh snapshot from the server
       const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
       if (snapRes.ok) {
         const snap = await snapRes.json();
-        if (Array.isArray(snap.products) && snap.products.length > 0) {
-          await localDb.putAll('products', snap.products);
-          await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+        if (Array.isArray(snap.products)) {
+          await localDb.clear('products');
+          if (snap.products.length > 0) {
+            await localDb.putAll('products', snap.products);
+          }
           await loadProductsFromStorage();
           renderGrid();
         }
-        if (Array.isArray(snap.activities) && snap.activities.length > 0) {
-          await localDb.putAll('activities', snap.activities);
+        if (Array.isArray(snap.categories)) {
+          await localDb.clear('categories');
+          if (snap.categories.length > 0) {
+            await localDb.putAll('categories', snap.categories);
+          }
+          categories = snap.categories;
         }
+        if (Array.isArray(snap.activities)) {
+          await localDb.clear('activities');
+          if (snap.activities.length > 0) {
+            await localDb.putAll('activities', snap.activities);
+          }
+        }
+        if (Array.isArray(snap.sales)) {
+          await localDb.clear('sales');
+          if (snap.sales.length > 0) {
+            await localDb.putAll('sales', snap.sales);
+          }
+        }
+        await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
         await refreshSessionStats();
         if (currentTab === 'audit') renderAuditView();
       }
@@ -4841,23 +5073,37 @@ const syncEngine = {
           }
         } else if (ch.entityType === 'activity') {
           if (ch.data) {
+            const existing = await localDb.get('activities', ch.data.id || ch.entityId);
             const act = {
+              ...(existing || {}),
+              ...ch.data,
               id: ch.data.id || ch.entityId,
-              type: ch.data.type,
-              productId: ch.data.productId,
-              productName: ch.data.productName,
-              categoryId: ch.data.categoryId,
-              categoryName: ch.data.categoryName,
-              quantity: Number(ch.data.quantity || 1),
-              sellingPrice: ch.data.sellingPrice != null ? Number(ch.data.sellingPrice) : undefined,
-              totalSaleValue: ch.data.totalSaleValue != null ? Number(ch.data.totalSaleValue) : undefined,
-              amount: ch.data.amount != null ? Number(ch.data.amount) : undefined,
-              reason: ch.data.reason,
-              notes: ch.data.notes,
-              timestamp: Number(ch.data.timestamp) || Date.now(),
-              batchId: ch.data.batchId
+              type: ch.data.type || existing?.type,
+              saleId: ch.data.saleId || existing?.saleId,
+              productId: ch.data.productId || existing?.productId,
+              productName: ch.data.productName || existing?.productName,
+              categoryId: ch.data.categoryId || existing?.categoryId,
+              categoryName: ch.data.categoryName || existing?.categoryName,
+              quantity: Number(ch.data.quantity != null ? ch.data.quantity : (existing?.quantity || 1)),
+              sellingPrice: ch.data.sellingPrice != null ? Number(ch.data.sellingPrice) : existing?.sellingPrice,
+              totalSaleValue: ch.data.totalSaleValue != null ? Number(ch.data.totalSaleValue) : existing?.totalSaleValue,
+              amount: ch.data.amount != null ? Number(ch.data.amount) : existing?.amount,
+              subtotal: ch.data.subtotal != null ? Number(ch.data.subtotal) : existing?.subtotal,
+              discount: ch.data.discount != null ? Number(ch.data.discount) : existing?.discount,
+              itemsCount: ch.data.itemsCount != null ? Number(ch.data.itemsCount) : existing?.itemsCount,
+              items: (Array.isArray(ch.data.items) && ch.data.items.length) ? ch.data.items : (existing?.items || []),
+              isOptom: ch.data.isOptom !== undefined ? ch.data.isOptom : existing?.isOptom,
+              reason: ch.data.reason || existing?.reason,
+              notes: ch.data.notes || existing?.notes,
+              timestamp: Number(ch.data.timestamp || existing?.timestamp) || Date.now(),
+              batchId: ch.data.batchId || existing?.batchId
             };
             await localDb.put('activities', act);
+            activitiesModified = true;
+          }
+        } else if (ch.entityType === 'sale') {
+          if (ch.data) {
+            await localDb.put('sales', ch.data);
             activitiesModified = true;
           }
         }
@@ -4983,6 +5229,9 @@ async function syncActivitiesFromServer() {
     const snap = await res.json();
     if (Array.isArray(snap.activities) && snap.activities.length > 0) {
       await localDb.putAll('activities', snap.activities);
+    }
+    if (Array.isArray(snap.sales) && snap.sales.length > 0) {
+      await localDb.putAll('sales', snap.sales);
     }
     if (Array.isArray(snap.products) && snap.products.length > 0) {
       await localDb.putAll('products', snap.products);
@@ -6008,6 +6257,8 @@ async function executeSaleTransaction({ items, discountUzs = 0, notes = null }) 
 
   // 4. Save activity record for audit timeline
   const firstItem = items[0];
+  const isOptom = items.length > 1 || manualDiscount > 0;
+  const displayProductName = isOptom ? 'Optom sale' : firstItem.productName;
   const summaryNote = items.length === 1
     ? `POS sale (${firstItem.quantity}x @ ${fmt(firstItem.salePrice)})`
     : `POS multi-item sale (${items.length} items, ${totalUnits} units, total: ${fmt(finalTotal)}${manualDiscount > 0 ? `, discount: -${fmt(manualDiscount)}` : ''})`;
@@ -6018,7 +6269,7 @@ async function executeSaleTransaction({ items, discountUzs = 0, notes = null }) 
     saleId,
     timestamp: Date.now(),
     productId: firstItem.productId,
-    productName: items.length === 1 ? firstItem.productName : `${firstItem.productName} + ${items.length - 1} more`,
+    productName: displayProductName,
     quantity: totalUnits,
     sellingPrice: items.length === 1 ? firstItem.salePrice : Math.round(finalTotal / totalUnits),
     totalSaleValue: finalTotal,
@@ -6027,6 +6278,7 @@ async function executeSaleTransaction({ items, discountUzs = 0, notes = null }) 
     discount: manualDiscount,
     itemsCount: items.length,
     items: items.map(i => ({ ...i })),
+    isOptom,
     notes: notes || summaryNote
   });
 
@@ -6618,6 +6870,23 @@ async function submitCashOut() {
 }
 
 // ── AUDIT VIEW RENDERING ──────────────────────────────────────────────────
+const expandedAuditIds = new Set();
+
+function toggleAuditDetails(cardId) {
+  const card = document.getElementById(`audit-card-${cardId}`);
+  if (!card) return;
+  if (expandedAuditIds.has(cardId)) {
+    expandedAuditIds.delete(cardId);
+    card.classList.remove('is-open');
+    card.querySelector('.audit-item')?.setAttribute('aria-expanded', 'false');
+  } else {
+    expandedAuditIds.add(cardId);
+    card.classList.add('is-open');
+    card.querySelector('.audit-item')?.setAttribute('aria-expanded', 'true');
+  }
+}
+window.toggleAuditDetails = toggleAuditDetails;
+
 async function renderAuditView() {
   const timelineEl = document.getElementById('audit-timeline');
   if (!timelineEl) return;
@@ -6698,29 +6967,84 @@ async function renderAuditView() {
     other: t('pos.reasonOther')
   };
 
-  timelineEl.innerHTML = filtered.map(item => {
+  timelineEl.innerHTML = filtered.map((item, index) => {
     const isSale = item.type === 'sale';
     const date = new Date(Number(item.timestamp) || Date.now());
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     if (isSale) {
+      // 1. Resolve linked sale (with fuzzy match fallback if saleId was omitted in older sync)
+      let linkedSale = item.saleId ? salesMap.get(item.saleId) : null;
+      if (!linkedSale && salesStore.length > 0) {
+        const itemVal = item.totalSaleValue != null ? Number(item.totalSaleValue) : 0;
+        const itemTs = Number(item.timestamp || 0);
+        linkedSale = salesStore.find(s => {
+          if (item.saleId && s.id === item.saleId) return true;
+          const valMatch = itemVal > 0 && Math.abs(Number(s.total || 0) - itemVal) < 100;
+          const timeMatch = itemTs > 0 && Math.abs(Number(s.createdAt || s.timestamp || 0) - itemTs) < 300000;
+          return valMatch && timeMatch;
+        });
+      }
+
+      // 2. Resolve items list
+      let saleItems = [];
+      if (Array.isArray(item.items) && item.items.length > 0) {
+        saleItems = item.items;
+      } else if (linkedSale && Array.isArray(linkedSale.items) && linkedSale.items.length > 0) {
+        saleItems = linkedSale.items;
+      }
+
+      // 3. Resolve discount & subtotal
+      let discount = Number(item.discount || 0);
+      if (!discount && linkedSale && linkedSale.discount) {
+        discount = Number(linkedSale.discount);
+      }
+      if (!discount && item.notes) {
+        const discMatch = item.notes.match(/(?:discount|chegirma):\s*-?([0-9\s]+)/i);
+        if (discMatch) {
+          discount = parseInt(discMatch[1].replace(/\s+/g, ''), 10) || 0;
+        }
+      }
+
       const p = products.find(prod => prod.id === item.productId);
-      const imgSrc = (p && p.image) || 'assets/logo.webp';
       const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
-      const locTitle = p ? getLocalizedProductName(p, currentLang) : (item.productName || 'Sale');
-      const qty = Number(item.quantity) || 1;
+      const isMulti = saleItems.length > 1 || (item.itemsCount && item.itemsCount > 1) || item.isOptom || Boolean(item.productName && item.productName.includes('+')) || Boolean(item.notes && item.notes.includes('multi-item'));
+      const isOptom = isMulti || discount > 0;
+
+      // 4. Title resolution
+      let locTitle = '';
+      if (isOptom) {
+        locTitle = 'Optom sale';
+      } else if (p) {
+        locTitle = getLocalizedProductName(p, currentLang);
+      } else {
+        locTitle = item.productName || 'Sale';
+      }
+
+      const qty = Number(item.quantity) || (saleItems.length ? saleItems.reduce((s, i) => s + (Number(i.quantity) || 1), 0) : 1);
       const effectiveUnitPrice = item.sellingPrice != null ? Number(item.sellingPrice) : (p ? Number(p.price) : 0);
       const unitPrice = effectiveUnitPrice ? fmt(effectiveUnitPrice) : '';
-      const totalVal = item.totalSaleValue != null ? fmt(item.totalSaleValue) : (effectiveUnitPrice ? fmt(effectiveUnitPrice * qty) : unitPrice);
-      const diff = Number(item.priceDiff) || 0;
-      const profitBadge = diff > 0
-        ? `<span style="color:var(--success);font-weight:600;">+${fmt(diff)}</span>`
-        : diff < 0
-          ? `<span style="color:var(--danger);font-weight:600;">−${fmt(Math.abs(diff))}</span>`
-          : '';
+      const totalValNum = item.totalSaleValue != null ? Number(item.totalSaleValue) : (linkedSale ? Number(linkedSale.total) : (effectiveUnitPrice * qty));
+      const totalVal = fmt(totalValNum);
+      const subtotalNum = Number(item.subtotal || (linkedSale ? linkedSale.subtotal : (totalValNum + discount)));
 
-      // Check linked sale for sync status & multi-item details
-      const linkedSale = item.saleId ? salesMap.get(item.saleId) : null;
+      // 5. Thumbnail HTML
+      let thumbHtml = '';
+      if (isOptom) {
+        thumbHtml = `
+          <div class="audit-thumb-wrap audit-thumb-optom">
+            <span class="audit-optom-icon">📦</span>
+            <span class="audit-optom-badge">${qty}x</span>
+          </div>`;
+      } else {
+        const imgSrc = (p && p.image) || 'assets/logo.webp';
+        thumbHtml = `
+          <div class="audit-thumb-wrap">
+            <img src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='assets/logo.webp';">
+          </div>`;
+      }
+
+      // Badges
       const syncStatus = linkedSale ? linkedSale.status : 'synced';
       const statusBadge = syncStatus === 'pending_sync'
         ? `<span class="audit-status-badge audit-status-pending">🟡 ${t('pos.statusPendingSync')}</span>`
@@ -6728,32 +7052,129 @@ async function renderAuditView() {
           ? `<span class="audit-status-badge audit-status-rejected">🔴 ${t('pos.statusRejected')}</span>`
           : `<span class="audit-status-badge audit-status-synced">🟢 ${t('pos.statusSynced')}</span>`;
 
-      const discountTag = item.discount > 0
-        ? `<span style="color:var(--danger);font-size:0.75rem;font-weight:600;">Chegirma: −${fmt(item.discount)}</span>`
+      const optomBadge = isOptom
+        ? `<span class="audit-badge audit-badge-optom">Optom</span>`
         : '';
 
-      const itemsDesc = (item.itemsCount && item.itemsCount > 1)
-        ? `${item.itemsCount} xil mahsulot · ${qty} dona`
-        : `${qty} × ${unitPrice}`;
+      const discountTag = discount > 0
+        ? `<span style="color:var(--danger);font-size:0.75rem;font-weight:600;">Chegirma: −${fmt(discount)}</span>`
+        : '';
+
+      const diff = Number(item.priceDiff) || 0;
+      const profitBadge = diff > 0
+        ? `<span style="color:var(--success);font-weight:600;">+${fmt(diff)}</span>`
+        : diff < 0
+          ? `<span style="color:var(--danger);font-weight:600;">−${fmt(Math.abs(diff))}</span>`
+          : '';
+
+      const itemsDesc = (isMulti && saleItems.length > 1)
+        ? `${saleItems.length} xil · ${qty} dona`
+        : (isMulti && item.itemsCount > 1)
+          ? `${item.itemsCount} xil · ${qty} dona`
+          : `${qty} × ${unitPrice}`;
+
+      // 6. Dropdown Breakdown Items
+      let dropdownItemsHtml = '';
+      if (saleItems.length > 0) {
+        dropdownItemsHtml = saleItems.map(si => {
+          const sip = products.find(prod => prod.id === si.productId);
+          const siName = sip ? getLocalizedProductName(sip, currentLang) : (si.productName || 'Item');
+          const siQty = Number(si.quantity) || 1;
+          const siPrice = Number(si.salePrice || si.basePrice || 0);
+          const siSub = Number(si.subtotal || (siQty * siPrice));
+          return `
+            <div class="audit-drop-row">
+              <div class="audit-drop-left">
+                <span class="audit-drop-bullet">•</span>
+                <div class="audit-drop-details">
+                  <span class="audit-drop-name">${escapeHtml(siName)}</span>
+                  <span class="audit-drop-qty">${siQty} × ${fmt(siPrice)}</span>
+                </div>
+              </div>
+              <div class="audit-drop-right">${fmt(siSub)}</div>
+            </div>`;
+        }).join('');
+      } else {
+        dropdownItemsHtml = `
+          <div class="audit-drop-row">
+            <div class="audit-drop-left">
+              <span class="audit-drop-bullet">•</span>
+              <div class="audit-drop-details">
+                <span class="audit-drop-name">${escapeHtml(p ? getLocalizedProductName(p, currentLang) : (item.productName || 'Sale'))}</span>
+                <span class="audit-drop-qty">${qty} × ${unitPrice}</span>
+              </div>
+            </div>
+            <div class="audit-drop-right">${fmt(subtotalNum || totalValNum)}</div>
+          </div>`;
+      }
+
+      let dropdownDiscountHtml = '';
+      if (discount > 0) {
+        dropdownDiscountHtml = `
+          <div class="audit-drop-row discount-row">
+            <div class="audit-drop-left">
+              <span class="audit-drop-bullet">🏷️</span>
+              <div class="audit-drop-details">
+                <span class="audit-drop-name">${t('pos.discount') || 'Chegirma (Discount)'}</span>
+                <span class="audit-drop-qty">${item.notes && item.notes.includes('discount') ? escapeHtml(item.notes) : 'Order Discount'}</span>
+              </div>
+            </div>
+            <div class="audit-drop-right">−${fmt(discount)}</div>
+          </div>`;
+      }
+
+      const cardId = item.id || `audit_${index}`;
+      const isOpen = expandedAuditIds.has(cardId);
 
       return `
-        <div class="audit-item">
-          <div class="audit-thumb-wrap">
-            <img src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='assets/logo.webp';">
-          </div>
-          <div class="audit-item-info">
-            <div class="audit-item-title">${escapeHtml(locTitle)}</div>
-            <div class="audit-item-meta" style="flex-wrap:wrap; gap:6px;">
-              <span class="audit-badge audit-badge-sale">Sale</span>
-              <span>${timeStr}</span>
-              ${statusBadge}
-              ${profitBadge}
-              ${discountTag}
+        <div class="audit-card is-expandable ${isOpen ? 'is-open' : ''}" id="audit-card-${cardId}">
+          <div class="audit-item" onclick="toggleAuditDetails('${cardId}')" role="button" aria-expanded="${isOpen ? 'true' : 'false'}">
+            ${thumbHtml}
+            <div class="audit-item-info">
+              <div class="audit-item-title">${escapeHtml(locTitle)}</div>
+              <div class="audit-item-meta">
+                <span class="audit-badge audit-badge-sale">Sale</span>
+                ${optomBadge}
+                <span>${timeStr}</span>
+                ${statusBadge}
+                ${profitBadge}
+                ${discountTag}
+              </div>
+            </div>
+            <div class="audit-item-amount">
+              <div class="audit-amt-val sale-val">+${totalVal}</div>
+              <div class="audit-qty-sub">${itemsDesc}</div>
+            </div>
+            <div class="audit-chevron-btn" title="Details">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
             </div>
           </div>
-          <div class="audit-item-amount">
-            <div class="audit-amt-val sale-val">+${totalVal}</div>
-            <div class="audit-qty-sub">${itemsDesc}</div>
+          <div class="audit-dropdown" id="audit-details-${cardId}">
+            <div class="audit-drop-head">
+              <span>${t('pos.whatWasSold') || 'Nima sotildi'}</span>
+              <span>${t('pos.price') || 'Narx'}</span>
+            </div>
+            <div class="audit-drop-list">
+              ${dropdownItemsHtml}
+              ${dropdownDiscountHtml}
+            </div>
+            <div class="audit-drop-summary">
+              <div class="audit-summary-line">
+                <span>${t('pos.subtotal') || 'Oraliq jami'}</span>
+                <span>${fmt(subtotalNum || (totalValNum + discount))}</span>
+              </div>
+              ${discount > 0 ? `
+              <div class="audit-summary-line" style="color:var(--danger);">
+                <span>${t('pos.discount') || 'Chegirma'}</span>
+                <span style="font-weight:700;">−${fmt(discount)}</span>
+              </div>` : ''}
+              <div class="audit-summary-line total-line">
+                <span>${t('pos.finalTotal') || 'JAMI TOʻLOV'}</span>
+                <span class="val">+${totalVal}</span>
+              </div>
+            </div>
           </div>
         </div>`;
     } else {
@@ -6765,20 +7186,22 @@ async function renderAuditView() {
       const notesDesc = item.notes && item.notes !== title ? escapeHtml(item.notes) : '';
 
       return `
-        <div class="audit-item">
-          <div class="audit-thumb-wrap">
-            <span class="audit-icon-cashout">${icon}</span>
-          </div>
-          <div class="audit-item-info">
-            <div class="audit-item-title">${escapeHtml(title)}</div>
-            <div class="audit-item-meta">
-              <span class="audit-badge audit-badge-cashout">${t('pos.auditCashOut')}</span>
-              <span>${timeStr}</span>
-              ${notesDesc ? `<span>· ${notesDesc}</span>` : ''}
+        <div class="audit-card">
+          <div class="audit-item">
+            <div class="audit-thumb-wrap">
+              <span class="audit-icon-cashout">${icon}</span>
             </div>
-          </div>
-          <div class="audit-item-amount">
-            <div class="audit-amt-val cashout-val">−${fmt(amt)}</div>
+            <div class="audit-item-info">
+              <div class="audit-item-title">${escapeHtml(title)}</div>
+              <div class="audit-item-meta">
+                <span class="audit-badge audit-badge-cashout">${t('pos.auditCashOut')}</span>
+                <span>${timeStr}</span>
+                ${notesDesc ? `<span>· ${notesDesc}</span>` : ''}
+              </div>
+            </div>
+            <div class="audit-item-amount">
+              <div class="audit-amt-val cashout-val">−${fmt(amt)}</div>
+            </div>
           </div>
         </div>`;
     }

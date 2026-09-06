@@ -46,6 +46,18 @@ function isValidPrice(price) {
   return Number.isFinite(p) && p > 0 && p <= 1000000000;
 }
 
+let _hasActDetailsCols = null;
+async function checkActivitiesDetailsColumns(client) {
+  if (_hasActDetailsCols !== null) return _hasActDetailsCols;
+  try {
+    const res = await client.query("SELECT 1 FROM information_schema.columns WHERE table_name = 'activities' AND column_name = 'sale_id'");
+    _hasActDetailsCols = res.rows.length > 0;
+  } catch (e) {
+    _hasActDetailsCols = false;
+  }
+  return _hasActDetailsCols;
+}
+
 /**
  * Fetch full authoritative snapshot for initial bootstrap/hydration
  * Omits soft-deleted entities.
@@ -53,8 +65,9 @@ function isValidPrice(price) {
 async function getSnapshot() {
   const client = await pool.connect();
   try {
+    const hasDetails = await checkActivitiesDetailsColumns(client);
     const [categoriesRes, productsRes, activitiesRes, settingsRes, seqRes] = await Promise.all([
-      client.query('SELECT id, name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
+      client.query('SELECT id, category_id AS "categoryId", name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, image, translations, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query(`
         SELECT 
@@ -79,6 +92,7 @@ async function getSnapshot() {
           END AS "reason",
           COALESCE(p.price::float, 0) AS "sellingPrice",
           (COALESCE(p.price::float, 0) * COALESCE(a.quantity::float, 1)) AS "totalSaleValue"
+          ${hasDetails ? `, a.sale_id AS "saleId", COALESCE(a.discount::bigint, 0) AS discount, COALESCE(a.subtotal::bigint, 0) AS subtotal, COALESCE(a.items_count, 1) AS "itemsCount", a.items_json AS items` : ''}
         FROM activities a
         LEFT JOIN products p ON a.product_id = p.id
         ORDER BY a.timestamp DESC 
@@ -450,27 +464,55 @@ async function processSyncBatch(deviceId, operations = []) {
           // 10. Insert activity record for audit timeline
           const totalUnitsSold = processedItems.reduce((sum, i) => sum + i.quantity, 0);
           const firstProduct = processedItems[0];
+          const isOptom = processedItems.length > 1 || manualDiscount > 0;
+          const displayProductName = isOptom ? 'Optom sale' : (firstProduct ? firstProduct.productName : 'Sale');
           const summaryNote = processedItems.length === 1
             ? `POS sale (${firstProduct.quantity}x @ ${firstProduct.salePrice})`
             : `POS multi-item sale (${processedItems.length} items, ${totalUnitsSold} units, total: ${totalNum} UZS${manualDiscount > 0 ? `, discount: -${manualDiscount}` : ''})`;
 
           const activityId = payload.activityId || `act_${now}_${Math.random().toString(36).substr(2, 7)}`;
-          await client.query(
-            `INSERT INTO activities (id, type, timestamp, product_id, product_name, category_id, category_name, quantity, notes, previous_quantity, previous_sold)
-             VALUES ($1, 'sale', $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-            [
-              activityId,
-              timestamp || now,
-              firstProduct.productId,
-              processedItems.length === 1 ? firstProduct.productName : `${firstProduct.productName} + ${processedItems.length - 1} more`,
-              firstProduct.categoryId,
-              'POS Multi-Sale',
-              totalUnitsSold,
-              notes ? notes.trim() : summaryNote,
-              productMap.get(firstProduct.productId).quantity,
-              productMap.get(firstProduct.productId).sold
-            ]
-          );
+          const hasDetails = await checkActivitiesDetailsColumns(client);
+
+          if (hasDetails) {
+            await client.query(
+              `INSERT INTO activities (id, type, timestamp, product_id, product_name, category_id, category_name, quantity, notes, previous_quantity, previous_sold, sale_id, discount, subtotal, items_count, items_json)
+               VALUES ($1, 'sale', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+              [
+                activityId,
+                timestamp || now,
+                firstProduct ? firstProduct.productId : null,
+                displayProductName,
+                firstProduct ? firstProduct.categoryId : null,
+                isOptom ? 'Optom Multi-Sale' : 'POS Sale',
+                totalUnitsSold,
+                notes ? notes.trim() : summaryNote,
+                firstProduct ? (productMap.get(firstProduct.productId)?.quantity ?? 0) : 0,
+                firstProduct ? (productMap.get(firstProduct.productId)?.sold ?? 0) : 0,
+                saleId,
+                manualDiscount,
+                subtotalNum,
+                processedItems.length,
+                JSON.stringify(processedItems)
+              ]
+            );
+          } else {
+            await client.query(
+              `INSERT INTO activities (id, type, timestamp, product_id, product_name, category_id, category_name, quantity, notes, previous_quantity, previous_sold)
+               VALUES ($1, 'sale', $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                activityId,
+                timestamp || now,
+                firstProduct ? firstProduct.productId : null,
+                displayProductName,
+                firstProduct ? firstProduct.categoryId : null,
+                isOptom ? 'Optom Multi-Sale' : 'POS Sale',
+                totalUnitsSold,
+                notes ? notes.trim() : summaryNote,
+                firstProduct ? (productMap.get(firstProduct.productId)?.quantity ?? 0) : 0,
+                firstProduct ? (productMap.get(firstProduct.productId)?.sold ?? 0) : 0
+              ]
+            );
+          }
 
           // Append activity delta to changes
           await client.query(
@@ -480,6 +522,8 @@ async function processSyncBatch(deviceId, operations = []) {
               type: 'sale',
               saleId,
               timestamp: Number(timestamp || now),
+              productId: firstProduct ? firstProduct.productId : null,
+              productName: displayProductName,
               quantity: totalUnitsSold,
               sellingPrice: processedItems.length === 1 ? firstProduct.salePrice : Math.round(totalNum / totalUnitsSold),
               totalSaleValue: totalNum,
@@ -487,6 +531,7 @@ async function processSyncBatch(deviceId, operations = []) {
               discount: manualDiscount,
               itemsCount: processedItems.length,
               items: processedItems,
+              isOptom,
               notes: notes ? notes.trim() : summaryNote
             }, now]
           );
@@ -501,8 +546,11 @@ async function processSyncBatch(deviceId, operations = []) {
               subtotal: subtotalNum,
               discount: manualDiscount,
               total: totalNum,
+              currency: 'UZS',
+              notes: notes ? notes.trim() : null,
               items: processedItems,
-              createdAt: Number(timestamp || now)
+              createdAt: Number(timestamp || now),
+              updatedAt: now
             }, now]
           );
 
