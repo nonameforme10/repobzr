@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bazar-pos-v2';
+const CACHE_NAME = 'bazar-pos-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/admin',
@@ -10,7 +10,9 @@ const ASSETS_TO_CACHE = [
   '/script.js',
   '/i18n.js',
   '/favicon.ico',
-  '/manifest.json'
+  '/manifest.json',
+  '/assets/logo.webp',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 
 self.addEventListener('install', event => {
@@ -60,7 +62,7 @@ self.addEventListener('fetch', event => {
         caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
         return response;
       }).catch(() => {
-        return caches.match(event.request).then(response => {
+        return caches.match(event.request, { ignoreSearch: true }).then(response => {
           if (response) return response;
           
           // Smart offline routing based on hostname
@@ -79,7 +81,7 @@ self.addEventListener('fetch', event => {
 
   // Handle other static assets (Cache First, then Network)
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
+    caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
       if (cachedResponse) {
         // Return from cache, but update it in background (Stale-While-Revalidate)
         fetch(event.request).then(networkResponse => {
