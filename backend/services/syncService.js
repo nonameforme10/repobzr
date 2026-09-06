@@ -67,7 +67,7 @@ async function getSnapshot() {
   try {
     const hasDetails = await checkActivitiesDetailsColumns(client);
     const [categoriesRes, productsRes, activitiesRes, settingsRes, seqRes] = await Promise.all([
-      client.query('SELECT id, category_id AS "categoryId", name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
+      client.query('SELECT id, name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, image, translations, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query(`
         SELECT 

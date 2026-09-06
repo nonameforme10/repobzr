@@ -303,39 +303,70 @@ if (catalogChannel) {
 const localDb = {
     db: null,
     async init() {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             if (this.db) return resolve(this.db);
-            const req = indexedDB.open(DB_NAME, DB_VERSION);
-            req.onupgradeneeded = (e) => {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'id' });
-                if (!db.objectStoreNames.contains('products')) db.createObjectStore('products', { keyPath: 'id' });
-                if (!db.objectStoreNames.contains('activities')) db.createObjectStore('activities', { keyPath: 'id' });
-                if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
-                if (!db.objectStoreNames.contains('outbox')) {
-                    const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
-                    outboxStore.createIndex('status', 'status', { unique: false });
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (!settled) {
+                    settled = true;
+                    console.warn('[idb] Open/Upgrade timed out after 3.5s, proceeding with in-memory/fallback');
+                    resolve(this.db || null);
                 }
-                if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
-                if (!db.objectStoreNames.contains('sales')) {
-                    const salesStore = db.createObjectStore('sales', { keyPath: 'id' });
-                    salesStore.createIndex('status', 'status', { unique: false });
-                    salesStore.createIndex('createdAt', 'createdAt', { unique: false });
+            }, 3500);
+
+            try {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onblocked = (e) => {
+                    console.warn('[idb] DB open/upgrade blocked by existing connection:', e);
+                };
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains('products')) db.createObjectStore('products', { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains('activities')) db.createObjectStore('activities', { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings', { keyPath: 'key' });
+                    if (!db.objectStoreNames.contains('outbox')) {
+                        const outboxStore = db.createObjectStore('outbox', { keyPath: 'id' });
+                        outboxStore.createIndex('status', 'status', { unique: false });
+                    }
+                    if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+                    if (!db.objectStoreNames.contains('sales')) {
+                        const salesStore = db.createObjectStore('sales', { keyPath: 'id' });
+                        salesStore.createIndex('status', 'status', { unique: false });
+                        salesStore.createIndex('createdAt', 'createdAt', { unique: false });
+                    }
+                };
+                req.onsuccess = (e) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    this.db = e.target.result;
+                    this.db.onversionchange = () => {
+                        console.warn('[idb] DB version upgrade requested elsewhere, closing local connection');
+                        try { this.db.close(); } catch (err) {}
+                    };
+                    resolve(this.db);
+                };
+                req.onerror = (e) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    console.error('[idb] Failed to open IndexedDB:', e.target?.error);
+                    resolve(null);
+                };
+            } catch (err) {
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    console.error('[idb] Exception opening IndexedDB:', err);
+                    resolve(null);
                 }
-            };
-            req.onsuccess = (e) => {
-                this.db = e.target.result;
-                resolve(this.db);
-            };
-            req.onerror = (e) => {
-                console.error('[idb] Failed to open IndexedDB:', e.target.error);
-                resolve(null); // fallback gracefully if storage restricted
-            };
+            }
         });
     },
 
     async getAll(storeName) {
-        if (!this.db) return [];
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains(storeName)) return [];
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readonly');
@@ -348,7 +379,7 @@ const localDb = {
     },
 
     async put(storeName, value) {
-        if (!this.db) return;
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains(storeName)) return;
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
@@ -361,7 +392,7 @@ const localDb = {
     },
 
     async putAll(storeName, items) {
-        if (!this.db || !Array.isArray(items)) return;
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains(storeName) || !Array.isArray(items)) return;
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
@@ -376,7 +407,7 @@ const localDb = {
     },
 
     async delete(storeName, key) {
-        if (!this.db) return;
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains(storeName)) return;
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
@@ -389,7 +420,7 @@ const localDb = {
     },
 
     async clear(storeName) {
-        if (!this.db) return;
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains(storeName)) return;
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction(storeName, 'readwrite');
@@ -402,7 +433,7 @@ const localDb = {
     },
 
     async getMeta(key) {
-        if (!this.db) return null;
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains('meta')) return null;
         return new Promise((resolve) => {
             try {
                 const tx = this.db.transaction('meta', 'readonly');
@@ -415,7 +446,7 @@ const localDb = {
     },
 
     async setMeta(key, value) {
-        if (!this.db) return;
+        if (!this.db || !this.db.objectStoreNames || !this.db.objectStoreNames.contains('meta')) return;
         return this.put('meta', { key, value });
     }
 };
