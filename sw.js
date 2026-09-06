@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bazar-pos-v2.1.0';
+const CACHE_NAME = 'bazar-pos-v2.3.0';
 const ASSETS_TO_CACHE = [
   '/',
   '/admin',
@@ -12,6 +12,7 @@ const ASSETS_TO_CACHE = [
   '/favicon.ico',
   '/manifest.json',
   '/assets/logo.webp',
+  '/assets/logo-icon.webp',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 

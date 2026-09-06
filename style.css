@@ -2322,7 +2322,9 @@ canvas {
 }
 
 [data-theme="dark"] .currency-switcher .cs-btn.active {
-    color: #0F1411;
+    color: #0E0D0B;
+    background: #E4BD5A;
+    font-weight: 700;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
@@ -2614,22 +2616,22 @@ canvas {
 
     --ink:              #E5E2DA;
     --ink-strong:       #F2EFE7;
-    --ink-muted:        #A8A49D;
-    --ink-subtle:       #9D9990;
-    --ink-faint:        #4D4A45;
+    --ink-muted:        #BDB8AF;
+    --ink-subtle:       #ADA9A0;
+    --ink-faint:        #99948B;
     --ink-invert:       #0E0D0B;
 
     --accent:           #D4A843;
     --accent-strong:    #E4BD5A;
     --accent-soft:      rgba(212, 168, 67, 0.16);
     --accent-ring:      rgba(212, 168, 67, 0.30);
-    --gold:             #D9A04A;
+    --gold:             #E5A952;
     --gold-soft:        rgba(217, 160, 74, 0.14);
 
-    --success:          #3FB76A;
-    --success-soft:     rgba(63, 183, 106, 0.14);
-    --danger:           #E06464;
-    --danger-soft:      rgba(224, 100, 100, 0.14);
+    --success:          #4ADE80;
+    --success-soft:     rgba(74, 222, 128, 0.16);
+    --danger:           #F87171;
+    --danger-soft:      rgba(248, 113, 113, 0.16);
     --warning:          #D9A04A;
     --warning-soft:     rgba(217, 160, 74, 0.14);
     --info:             #6B96D9;
@@ -2922,6 +2924,7 @@ canvas {
     flex-direction: column;
     user-select: none;
     transition: var(--transition);
+    min-height: 385px;
 }
 
 [data-theme="dark"] .cal-widget {
@@ -3054,6 +3057,7 @@ canvas {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 3px;
+    min-height: 220px;
 }
 
 .cal-day-cell {
@@ -3161,6 +3165,7 @@ canvas {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    min-height: 385px;
 }
 
 [data-theme="dark"] .home-day-overview {
@@ -3272,6 +3277,7 @@ canvas {
     border-radius: var(--radius-lg);
     padding: 22px 24px 28px;
     box-shadow: var(--shadow-sm);
+    min-height: 320px;
 }
 
 [data-theme="dark"] .home-reports-section {
@@ -3811,10 +3817,12 @@ canvas {
 
     .cal-widget {
         padding: 14px 14px 16px;
+        min-height: 350px;
     }
 
     .home-day-overview {
         padding: 16px 14px;
+        min-height: auto;
     }
 
     .overview-header {

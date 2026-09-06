@@ -212,7 +212,7 @@ const currency = (() => {
         if (!force && !isStale() && rates.USD && rates.EUR) return rates;
         fetching = true;
         try {
-            const res = await fetch(CBU_PROXY_URL, { cache: 'no-store' });
+            const res = await fetch(CBU_PROXY_URL, { cache: 'default' });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
 
@@ -309,15 +309,20 @@ const localDb = {
             const timer = setTimeout(() => {
                 if (!settled) {
                     settled = true;
-                    console.warn('[idb] Open/Upgrade timed out after 3.5s, proceeding with in-memory/fallback');
+                    console.warn('[idb] Open/Upgrade delayed beyond 1.2s, proceeding with in-memory/localStorage cache');
                     resolve(this.db || null);
                 }
-            }, 3500);
+            }, 1200);
 
             try {
                 const req = indexedDB.open(DB_NAME, DB_VERSION);
                 req.onblocked = (e) => {
-                    console.warn('[idb] DB open/upgrade blocked by existing connection:', e);
+                    console.warn('[idb] DB open/upgrade blocked by existing connection, falling back immediately:', e);
+                    if (!settled) {
+                        settled = true;
+                        clearTimeout(timer);
+                        resolve(this.db || null);
+                    }
                 };
                 req.onupgradeneeded = (e) => {
                     const db = e.target.result;
@@ -337,15 +342,21 @@ const localDb = {
                     }
                 };
                 req.onsuccess = (e) => {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    this.db = e.target.result;
+                    const db = e.target.result;
+                    this.db = db;
                     this.db.onversionchange = () => {
                         console.warn('[idb] DB version upgrade requested elsewhere, closing local connection');
                         try { this.db.close(); } catch (err) {}
+                        this.db = null;
                     };
-                    resolve(this.db);
+                    if (!settled) {
+                        settled = true;
+                        clearTimeout(timer);
+                        resolve(this.db);
+                    } else {
+                        console.log('[idb] Late DB connection established successfully, syncing local state');
+                        saveState().catch(err => console.warn('[idb] Late sync error:', err));
+                    }
                 };
                 req.onerror = (e) => {
                     if (settled) return;
@@ -566,23 +577,27 @@ const syncEngine = {
     async _executeSync() {
         if (this.syncing) return;
         clearTimeout(this.retryTimer);
+
+        if (!navigator.onLine) {
+            this.isOnline = false;
+            await this.updateUI();
+            this.scheduleRetry();
+            return;
+        }
+
         this.syncing = true;
         await this.updateUI();
 
         try {
-            const reachable = await this.probeConnectivity();
-            if (!reachable) {
-                this.syncing = false;
-                await this.updateUI();
-                this.scheduleRetry();
-                return;
-            }
-
             await this.pushOutbox();
             await this.pullChanges();
+            this.isOnline = true;
             this.attempts = 0;
         } catch (err) {
             console.warn('[sync] Cycle encountered an issue:', err);
+            if (!navigator.onLine || err.name === 'TypeError' || String(err.message).includes('Failed to fetch')) {
+                this.isOnline = false;
+            }
             this.scheduleRetry();
         } finally {
             this.syncing = false;
@@ -4344,18 +4359,27 @@ async function purgeDemoDataIfPresent() {
 
 // ==================== INIT ====================
 async function init() {
-    // Request persistent storage defensively to prevent browser eviction
+    // 1. Fire-and-forget persistent storage request (non-blocking)
     if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.persist) {
-        try {
-            const isPersisted = await navigator.storage.persist();
+        navigator.storage.persist().then(isPersisted => {
             console.log(`[storage] Persistent storage granted: ${isPersisted}`);
-        } catch (e) {
+        }).catch(e => {
             console.warn('[storage] navigator.storage.persist error:', e);
-        }
+        });
     }
 
-    await localDb.init();
-    await loadState();
+    // 2. Fast Path: Immediately hydrate cached state from localStorage (0ms)
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.categories || parsed.products)) {
+                state = { ...state, ...parsed };
+                if (!Array.isArray(state.sales)) state.sales = [];
+            }
+        }
+    } catch (e) {}
+
     await purgeDemoDataIfPresent();
     currency.load();                  // hydrate cached active code + rates
     homeCalendar.init();
@@ -4363,7 +4387,7 @@ async function init() {
     refreshAll();
     navigateTo('home');
 
-    // Populate category filter
+    // Populate category filter immediately
     const filter = document.getElementById('productCategoryFilter');
     if (filter) {
         filter.innerHTML = '<option value="">All Categories</option>';
@@ -4383,12 +4407,26 @@ async function init() {
     });
     window.addEventListener('focus', () => syncEngine.kick());
 
-    // Kick off background fetch of CBU rates
+    // 3. Start backend network sync and currency fetch IMMEDIATELY (0ms delay!)
     currency.fetchRates();
-
-    // Start background sync engine & schedule periodic cycle
     syncEngine.kick();
     setInterval(() => syncEngine.kick(), 30000);
+
+    // 4. Asynchronously initialize IndexedDB without blocking the UI or sync
+    localDb.init().then(async () => {
+        await loadState();
+        await purgeDemoDataIfPresent();
+        refreshAll();
+        if (filter) {
+            filter.innerHTML = '<option value="">All Categories</option>';
+            state.categories.forEach(c => {
+                filter.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
+            });
+        }
+        syncEngine.kick();
+    }).catch(err => {
+        console.warn('[init] IndexedDB background load notice:', err);
+    });
 }
 
 // Start application when DOM is ready

@@ -13,6 +13,11 @@
       "type": "image/x-icon"
     },
     {
+      "src": "/assets/logo-icon.webp",
+      "sizes": "96x96",
+      "type": "image/webp"
+    },
+    {
       "src": "/assets/logo.webp",
       "sizes": "512x512",
       "type": "image/webp"

@@ -42,13 +42,13 @@
     });
   }
 </script>
-<link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=18">
-<link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="/i18n.js?v=18"></script>
+<link rel="manifest" href="/manifest.json">
+<link rel="stylesheet" href="/style.css?v=20">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<script src="/i18n.js?v=20"></script>
 <script>
   // Robustness guard: ensure all POS keys exist even if an older cached i18n.js was loaded
   (function () {
@@ -1824,12 +1824,12 @@
     font-variant-numeric: tabular-nums;
   }
   .c-diff.up {
-    color: #10B981;
-    background: rgba(16, 185, 129, 0.12);
+    color: #4ADE80;
+    background: rgba(74, 222, 128, 0.18);
   }
   .c-diff.down {
-    color: #EF4444;
-    background: rgba(239, 68, 68, 0.12);
+    color: #F87171;
+    background: rgba(248, 113, 113, 0.18);
   }
 
   .c-sep {
@@ -3804,7 +3804,7 @@
   <!-- HEADER -->
   <header class="pos-header">
     <div class="brand-group">
-      <img src="assets/logo.webp" alt="Bazar" class="brand-logo">
+      <img src="assets/logo-icon.webp" alt="Bazar" class="brand-logo" width="32" height="32">
       <div class="brand-title">
         <span data-i18n="brand.name">Bazar</span>
         <span class="brand-badge" data-i18n="pos.terminalBadge">POS Terminal</span>
@@ -4028,7 +4028,7 @@
           </div>
         </div>
 
-        <button type="button" class="currency-calc-btn" id="btnOpenFxModal" aria-label="Currency Converter" data-i18n-title="pos.currencyCalc" title="Currency Converter">
+        <button type="button" class="currency-calc-btn" id="btnOpenFxModal" aria-label="Kalkulyator — Valyuta konvertori" data-i18n-title="pos.currencyCalc" title="Currency Converter">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="4" y="2" width="16" height="20" rx="2"></rect>
             <line x1="8" y1="6" x2="16" y2="6"></line>
@@ -4623,15 +4623,20 @@ const localDb = {
       const timer = setTimeout(() => {
         if (!settled) {
           settled = true;
-          console.warn('[pos idb] Open/Upgrade timed out after 3.5s, proceeding with in-memory/fallback');
+          console.warn('[pos idb] Open/Upgrade delayed beyond 1.2s, proceeding with in-memory/localStorage cache');
           resolve(this.db || null);
         }
-      }, 3500);
+      }, 1200);
 
       try {
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onblocked = (e) => {
-          console.warn('[pos idb] DB open/upgrade blocked by existing connection:', e);
+          console.warn('[pos idb] DB open/upgrade blocked by existing connection, falling back immediately:', e);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(this.db || null);
+          }
         };
         req.onupgradeneeded = (e) => {
           const db = e.target.result;
@@ -4652,15 +4657,23 @@ const localDb = {
           }
         };
         req.onsuccess = (e) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          this.db = e.target.result;
+          const db = e.target.result;
+          this.db = db;
           this.db.onversionchange = () => {
             console.warn('[pos idb] DB version upgrade requested elsewhere, closing local connection');
             try { this.db.close(); } catch (err) {}
+            this.db = null;
           };
-          resolve(this.db);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            resolve(this.db);
+          } else {
+            console.log('[pos idb] Late DB connection established successfully');
+            if (products.length > 0) {
+              localDb.putAll('products', products).catch(() => {});
+            }
+          }
         };
         req.onerror = (e) => {
           if (settled) return;
@@ -4907,23 +4920,27 @@ const syncEngine = {
   async kick() {
     if (this.syncing) return;
     clearTimeout(this.retryTimer);
+
+    if (!navigator.onLine) {
+      this.isOnline = false;
+      await this.updateUI();
+      this.scheduleRetry();
+      return;
+    }
+
     this.syncing = true;
     await this.updateUI();
 
     try {
-      const isReachable = await this.probeConnectivity();
-      if (!isReachable) {
-        this.syncing = false;
-        await this.updateUI();
-        this.scheduleRetry();
-        return;
-      }
-
       await this.pushOutbox();
       await this.pullChanges();
+      this.isOnline = true;
       this.attempts = 0;
     } catch (err) {
       console.warn('[pos sync] Error:', err);
+      if (!navigator.onLine || err.name === 'TypeError' || String(err.message).includes('Failed to fetch')) {
+        this.isOnline = false;
+      }
       this.scheduleRetry();
     } finally {
       this.syncing = false;
@@ -5182,7 +5199,18 @@ let currentAuditFilter = 'all';
 let activeCashOutReason = 'lunch';
 
 async function loadProductsFromStorage() {
-  const dbProds = await localDb.getAll('products');
+  let dbProds = await localDb.getAll('products');
+  if (!dbProds || dbProds.length === 0) {
+    try {
+      const cached = localStorage.getItem('bazar_pos_products_cache');
+      if (cached) dbProds = JSON.parse(cached);
+    } catch (e) {}
+  } else {
+    try {
+      localStorage.setItem('bazar_pos_products_cache', JSON.stringify(dbProds));
+    } catch (e) {}
+  }
+  if (!Array.isArray(dbProds)) dbProds = [];
   products = dbProds.map(p => ({
     id: p.id,
     name: p.name,
@@ -5336,7 +5364,7 @@ function renderCard(p) {
     new: `<span class="card-badge badge-new">${t('pos.newBadge')}</span>`
   };
 
-  const imgSrc = p.image || 'assets/logo.webp';
+  const imgSrc = p.image || 'assets/logo-icon.webp';
   const localizedTitle = getLocalizedProductName(p, currentLang);
   const showOrig = p.name && localizedTitle !== p.name;
 
@@ -5355,7 +5383,7 @@ function renderCard(p) {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
       </span>
       <div class="pos-card-img-wrap">
-        <img src="${imgSrc}" alt="${escapeHtml(localizedTitle)}" class="pos-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.webp';">
+        <img src="${imgSrc}" alt="${escapeHtml(localizedTitle)}" class="pos-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo-icon.webp';">
         ${badge ? badgeMap[badge] || '' : ''}
       </div>
       <div class="pos-card-body">
@@ -6074,10 +6102,10 @@ function renderCartUI() {
         const prod = products.find(p => p.id === item.productId);
         const locName = prod ? getLocalizedProductName(prod, currentLang) : item.productName;
         const unitMing = item.salePrice >= 1000 ? (item.salePrice / 1000) : item.salePrice;
-        const imgSrc = item.image || (prod && prod.image) || 'assets/logo.webp';
+        const imgSrc = item.image || (prod && prod.image) || 'assets/logo-icon.webp';
         return `
           <div class="cart-item-card" data-idx="${idx}">
-            <img src="${imgSrc}" alt="${escapeHtml(locName)}" class="cart-item-img" onerror="this.onerror=null;this.src='assets/logo.webp';">
+            <img src="${imgSrc}" alt="${escapeHtml(locName)}" class="cart-item-img" onerror="this.onerror=null;this.src='assets/logo-icon.webp';">
             <div class="cart-item-details">
               <div class="cart-item-name" title="${escapeHtml(locName)}">${escapeHtml(locName)}</div>
               <div class="cart-item-pricing">
@@ -7077,10 +7105,10 @@ async function renderAuditView() {
             <span class="audit-optom-badge">${qty}x</span>
           </div>`;
       } else {
-        const imgSrc = (p && p.image) || 'assets/logo.webp';
+        const imgSrc = (p && p.image) || 'assets/logo-icon.webp';
         thumbHtml = `
           <div class="audit-thumb-wrap">
-            <img src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='assets/logo.webp';">
+            <img src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='assets/logo-icon.webp';">
           </div>`;
       }
 
@@ -7479,7 +7507,7 @@ async function fetchCbuRates() {
   try {
     let data = null;
     try {
-      const res = await fetch(`${API_BASE_URL}/rates`, { cache: 'no-store' });
+      const res = await fetch(`${API_BASE_URL}/rates`, { cache: 'default' });
       if (res.ok) data = await res.json();
     } catch (e) {}
 
@@ -7696,19 +7724,60 @@ function setupCurrencyBar() {
 
 // ── INITIALIZATION ────────────────────────────────────────────────────────
 async function init() {
-  await localDb.init();
-  await loadProductsFromStorage();
-  await loadCartFromStorage();
-  renderGrid();
-
+  // 1. Setup UI chrome, currency bar and language immediately
+  loadCachedRates();
   setupLanguageSwitcher();
   setupViewToggle();
   setupBottomNavAndTabs();
   setupProductGridSortable();
-
-  loadCachedRates();
   setupCurrencyBar();
-  fetchCbuRates();
+
+  // Instant render from localStorage cache if available (0ms)
+  try {
+    const cached = localStorage.getItem('bazar_pos_products_cache');
+    if (cached) {
+      const dbProds = JSON.parse(cached);
+      if (Array.isArray(dbProds) && dbProds.length > 0) {
+        products = dbProds.map(p => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku || ('SKU-' + (p.id ? p.id.slice(-6).toUpperCase() : '000000')),
+          price: Number(p.price) || 0,
+          stock: (p.quantity !== undefined && p.quantity !== null && p.quantity !== '') ? Number(p.quantity) : null,
+          image: p.image || p.img || null,
+          sold: Number(p.sold) || 0,
+          notes: p.notes || '',
+          translations: p.translations || {},
+          version: p.version || 1
+        }));
+        applySavedProductOrder();
+        renderGrid();
+      }
+    }
+  } catch (e) {}
+
+  // 2. Initial title setup
+  if (window.i18n && window.i18n.t) {
+    document.title = window.i18n.t('pos.title');
+  }
+
+  // 3. Network and window listeners
+  window.addEventListener('online', () => {
+    syncEngine.isOnline = true;
+    syncEngine.kick();
+    syncActivitiesFromServer().then(() => {
+      if (currentTab === 'audit') renderAuditView();
+    });
+    fetchCbuRates();
+  });
+  window.addEventListener('offline', () => {
+    syncEngine.isOnline = false;
+    syncEngine.updateUI();
+  });
+  window.addEventListener('focus', () => {
+    loadProductsFromStorage().then(renderGrid);
+    syncEngine.kick();
+  });
 
   // Listen to i18n changes
   document.addEventListener('i18n:change', () => {
@@ -7725,39 +7794,8 @@ async function init() {
     if (currentTab === 'settings') renderSettingsView();
   });
 
-  // Initial title setup
-  if (window.i18n && window.i18n.t) {
-    document.title = window.i18n.t('pos.title');
-  }
-
-  // Hydrate session stats from today's activities
-  await refreshSessionStats();
-
-  syncEngine.updateUI();
-
-  // Network and window listeners
-  window.addEventListener('online', () => {
-    syncEngine.isOnline = true;
-    syncEngine.kick();
-    syncActivitiesFromServer().then(() => {
-      if (currentTab === 'audit') renderAuditView();
-    });
-    fetchCbuRates();
-  });
-  window.addEventListener('offline', () => {
-    syncEngine.isOnline = false;
-    syncEngine.updateUI();
-  });
-  window.addEventListener('focus', () => {
-    loadProductsFromStorage().then(renderGrid);
-    syncEngine.kick();
-    syncActivitiesFromServer().then(() => {
-      if (currentTab === 'audit') renderAuditView();
-    });
-    fetchCbuRates();
-  });
-
-  // Start background sync
+  // 4. Start network sync and currency fetch IMMEDIATELY (0ms delay!)
+  fetchCbuRates();
   syncEngine.kick();
   syncActivitiesFromServer().then(() => {
     if (currentTab === 'audit') renderAuditView();
@@ -7771,6 +7809,19 @@ async function init() {
     }
   }, 25000);
   setInterval(fetchCbuRates, 30 * 60 * 1000);
+
+  // 5. Asynchronously initialize IndexedDB without blocking the UI or sync
+  localDb.init().then(async () => {
+    await loadProductsFromStorage();
+    await loadCartFromStorage();
+    renderGrid();
+    await refreshSessionStats();
+    syncEngine.updateUI();
+    syncEngine.kick();
+  }).catch(err => {
+    console.warn('[pos init] Local DB notice:', err);
+    loadCartFromStorage().then(renderCartUI);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', init);
