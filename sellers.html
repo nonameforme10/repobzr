@@ -827,7 +827,7 @@
     position: fixed;
     inset: 0;
     background: rgba(26, 32, 29, 0.45);
-    z-index: 1000;
+    z-index: 3000;
     align-items: center;
     justify-content: center;
     padding: 20px;
@@ -1189,7 +1189,7 @@
     position: fixed;
     top: 80px;
     right: 24px;
-    z-index: 2000;
+    z-index: 4000;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1271,36 +1271,34 @@
     border-color: var(--accent);
   }
 
-  /* ── STICKY BOTTOM CART BAR ── */
+  /* ── STICKY BOTTOM CART BAR (Desktop Only) ── */
   .pos-cart-bar {
+    display: none;
     position: fixed;
-    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-    left: 16px;
-    right: 16px;
-    z-index: 1000;
+    bottom: 24px;
+    right: 28px;
+    left: auto;
+    min-width: 360px;
+    max-width: 440px;
+    z-index: 900;
     background: var(--bg-surface);
     border: 1.5px solid var(--accent);
     border-radius: var(--radius-lg);
     box-shadow: 0 10px 32px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(184, 134, 11, 0.25);
-    display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
     gap: 12px;
     animation: cartSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   }
+  @media (max-width: 1023px) {
+    .pos-cart-bar {
+      display: none !important;
+    }
+  }
   @keyframes cartSlideUp {
     from { opacity: 0; transform: translateY(20px); }
     to   { opacity: 1; transform: translateY(0); }
-  }
-  @media (min-width: 1024px) {
-    .pos-cart-bar {
-      bottom: 24px;
-      right: 28px;
-      left: auto;
-      min-width: 360px;
-      max-width: 440px;
-    }
   }
   .cart-bar-content {
     display: flex;
@@ -5333,6 +5331,9 @@ function openModal(productId) {
   updateSummary();
   validateQty();
 
+  const cartBar = document.getElementById('pos-cart-bar');
+  if (cartBar) cartBar.style.display = 'none';
+
   const overlay = document.getElementById('overlay');
   overlay.classList.add('open');
   setTimeout(() => document.getElementById('price-input').select(), 60);
@@ -5348,6 +5349,7 @@ function closeModal() {
     const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
     btn.textContent = t('pos.confirmSale');
   }
+  renderCartUI();
 }
 
 // ── SUMMARY CALC ──────────────────────────────────────────────────────────
@@ -5622,6 +5624,8 @@ function openCartModal() {
     showToast(t('pos.emptyCartTitle'), 'info');
     return;
   }
+  const cartBar = document.getElementById('pos-cart-bar');
+  if (cartBar) cartBar.style.display = 'none';
   const overlay = document.getElementById('cart-overlay');
   if (overlay) {
     overlay.classList.add('open');
@@ -5632,6 +5636,7 @@ function openCartModal() {
 function closeCartModal() {
   const overlay = document.getElementById('cart-overlay');
   if (overlay) overlay.classList.remove('open');
+  renderCartUI();
 }
 
 function renderCartUI() {
@@ -5639,14 +5644,22 @@ function renderCartUI() {
   const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
   const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
 
-  // 1. Sticky Bottom Cart Bar
+  const isModalOpen = Boolean(
+    document.getElementById('overlay')?.classList.contains('open') || 
+    document.getElementById('cart-overlay')?.classList.contains('open') ||
+    document.getElementById('cashout-modal-overlay')?.classList.contains('open') ||
+    document.getElementById('fx-modal-overlay')?.classList.contains('open')
+  );
+  const isMobile = window.innerWidth < 1024;
+
+  // 1. Sticky Bottom Cart Bar (Only on desktop >= 1024px, and when no modal is open)
   const cartBar = document.getElementById('pos-cart-bar');
   const cartBadgeCount = document.getElementById('cart-badge-count');
   const cartBarTitle = document.getElementById('cart-bar-title');
   const cartBarAmount = document.getElementById('cart-bar-amount');
 
   if (cartBar) {
-    if (totals.itemsCount > 0) {
+    if (totals.itemsCount > 0 && !isMobile && !isModalOpen) {
       cartBar.style.display = 'flex';
       if (cartBadgeCount) cartBadgeCount.textContent = totals.totalUnits;
       if (cartBarTitle) cartBarTitle.textContent = t('pos.cartSummary', { count: totals.itemsCount, units: totals.totalUnits });
@@ -5656,7 +5669,7 @@ function renderCartUI() {
     }
   }
 
-  // 2. Header Cart Button
+  // 2. Header Cart Button (Always visible when items in cart, primary trigger on mobile)
   const hdrCartBtn = document.getElementById('hdr-cart-btn');
   const hdrCartBadge = document.getElementById('hdr-cart-badge');
   if (hdrCartBtn) {
