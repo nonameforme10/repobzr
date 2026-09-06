@@ -42,12 +42,12 @@
   }
 </script>
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=8">
+<link rel="stylesheet" href="/style.css?v=11">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="/i18n.js?v=8"></script>
+<script src="/i18n.js?v=11"></script>
 <style>
   /* ── POS SPECIFIC COMPONENT STYLING (THEME-ALIGNED) ── */
 
@@ -1520,6 +1520,676 @@
       flex-wrap: wrap;
     }
   }
+
+  /* ── MULTI-VIEW CONTAINERS ── */
+  .pos-view {
+    display: none;
+    width: 100%;
+    animation: fadeIn 180ms ease-out;
+  }
+  .pos-view.active {
+    display: block;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .pos-layout {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* ── BOTTOM NAVIGATION BAR ── */
+  .pos-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(62px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-topbar);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 900;
+    box-shadow: 0 -2px 14px rgba(0, 0, 0, 0.05);
+  }
+
+  [data-theme="dark"] .pos-bottom-nav {
+    background: rgba(20, 18, 16, 0.92);
+    border-color: rgba(255, 255, 255, 0.09);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  }
+
+  .bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 100%;
+    border: none;
+    background: none;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    padding: 6px 0;
+  }
+
+  .bottom-nav-item svg {
+    stroke-width: 2;
+    transition: transform 140ms ease, stroke 140ms ease;
+  }
+
+  .bottom-nav-item span {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .bottom-nav-item:active {
+    transform: scale(0.92);
+  }
+
+  .bottom-nav-item.active {
+    color: var(--accent);
+  }
+
+  [data-theme="dark"] .bottom-nav-item.active {
+    color: #5CE1E6;
+  }
+
+  .bottom-nav-item.active svg {
+    transform: scale(1.1);
+  }
+
+  /* Center Elevated Home Button */
+  .bottom-nav-center {
+    position: relative;
+    top: -10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0 10px;
+  }
+
+  .bottom-nav-center-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(184, 134, 11, 0.45);
+    border: 3px solid var(--bg-app);
+    transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 160ms ease;
+  }
+
+  [data-theme="dark"] .bottom-nav-center-btn {
+    background: #B8860B;
+    border-color: #0E0D0B;
+    box-shadow: 0 6px 20px rgba(184, 134, 11, 0.55);
+  }
+
+  .bottom-nav-center:active .bottom-nav-center-btn {
+    transform: scale(0.92);
+  }
+
+  .bottom-nav-center.active .bottom-nav-center-btn {
+    transform: scale(1.08);
+    box-shadow: 0 8px 24px rgba(184, 134, 11, 0.6);
+  }
+
+  .bottom-nav-center-lbl {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── FLOATING ACTION BUTTON (+) FOR CASH OUT / LUNCH ── */
+  .pos-fab {
+    position: fixed;
+    right: 18px;
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.22);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 890;
+    transition: transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1), background 140ms ease, box-shadow 140ms ease;
+  }
+
+  .pos-fab svg {
+    width: 26px;
+    height: 26px;
+    stroke-width: 2.5;
+  }
+
+  .pos-fab:hover {
+    transform: scale(1.08);
+    background: var(--accent-soft);
+  }
+
+  .pos-fab:active {
+    transform: scale(0.92);
+  }
+
+  [data-theme="dark"] .pos-fab {
+    background: #1C1A17;
+    border-color: #5CE1E6;
+    color: #5CE1E6;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(92, 225, 230, 0.25);
+  }
+
+  [data-theme="dark"] .pos-fab:hover {
+    background: rgba(92, 225, 230, 0.12);
+  }
+
+  /* ── CASH OUT MODAL COMPONENTS ── */
+  .quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .quick-chip {
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    padding: 5px 12px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .quick-chip:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  .quick-chip:active {
+    transform: scale(0.94);
+  }
+
+  .reason-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .reason-chip {
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .reason-chip:hover {
+    border-color: var(--border-strong);
+  }
+
+  .reason-chip.active {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  [data-theme="dark"] .reason-chip.active {
+    background: rgba(92, 225, 230, 0.15);
+    border-color: #5CE1E6;
+    color: #5CE1E6;
+  }
+
+  .cashout-live-preview {
+    margin-top: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--danger);
+  }
+
+  /* ── AUDIT VIEW (REPORTS SCREEN) ── */
+  .audit-container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 16px 16px 40px;
+  }
+
+  .audit-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .audit-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.02em;
+  }
+
+  .audit-sub {
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    margin-top: 2px;
+  }
+
+  .audit-refresh-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--ink-muted);
+    transition: var(--transition-fast);
+  }
+
+  .audit-refresh-btn:hover {
+    color: var(--ink-strong);
+    border-color: var(--border-strong);
+  }
+
+  /* 4 KPI Summary Cards */
+  .audit-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  @media (max-width: 640px) {
+    .audit-kpi-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  .audit-kpi-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .audit-kpi-icon {
+    font-size: 1.35rem;
+    flex-shrink: 0;
+  }
+
+  .audit-kpi-body {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .audit-kpi-val {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .audit-kpi-val.val-out {
+    color: var(--danger);
+  }
+
+  .audit-kpi-val.val-net {
+    color: var(--success);
+  }
+
+  .audit-kpi-lbl {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-top: 1px;
+  }
+
+  /* Filter bar */
+  .audit-filter-bar {
+    margin-bottom: 14px;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .audit-filters {
+    display: inline-flex;
+    gap: 6px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    padding: 3px;
+    border-radius: var(--radius-sm);
+  }
+
+  .audit-filter-btn {
+    border: none;
+    background: none;
+    padding: 6px 14px;
+    border-radius: var(--radius-xs);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .audit-filter-btn.active {
+    background: var(--bg-surface);
+    color: var(--ink-strong);
+    box-shadow: var(--shadow-xs);
+  }
+
+  /* Timeline list */
+  .audit-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .audit-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--shadow-xs);
+    transition: var(--transition-fast);
+  }
+
+  .audit-item:hover {
+    border-color: var(--border-strong);
+  }
+
+  .audit-thumb-wrap {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-input-soft);
+    border: 1px solid var(--border-soft);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .audit-thumb-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .audit-icon-cashout {
+    font-size: 1.5rem;
+  }
+
+  .audit-item-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .audit-item-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .audit-item-meta {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .audit-badge {
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
+  .audit-badge-sale {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
+
+  .audit-badge-cashout {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .audit-item-amount {
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .audit-amt-val {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .audit-amt-val.sale-val {
+    color: var(--ink-strong);
+  }
+
+  .audit-amt-val.cashout-val {
+    color: var(--danger);
+  }
+
+  .audit-qty-sub {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    margin-top: 2px;
+  }
+
+  .audit-empty {
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--ink-muted);
+    background: var(--bg-surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+  }
+
+  /* ── SETTINGS VIEW ── */
+  .settings-container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 16px 16px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .settings-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+  }
+
+  .settings-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-xs);
+  }
+
+  .settings-card-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-muted);
+    margin-bottom: 14px;
+  }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+
+  .settings-label {
+    font-size: 0.875rem;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .settings-val {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .settings-divider {
+    height: 1px;
+    background: var(--divider);
+    margin: 8px 0;
+  }
+
+  .settings-highlight .settings-val {
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+
+  .settings-action-btn {
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .settings-action-btn:hover {
+    background: var(--border-soft);
+  }
+
+  .settings-lang-pills {
+    display: flex;
+    gap: 6px;
+  }
+
+  .lang-pill {
+    padding: 5px 12px;
+    border-radius: var(--radius-xs);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: var(--bg-surface-2);
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .lang-pill.active {
+    background: var(--accent);
+    color: #FFF;
+    border-color: var(--accent);
+  }
+
+  .btn-sync-now {
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink-strong);
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+
+  .btn-sync-now:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent-strong);
+  }
+
+  .settings-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-decoration: none;
+    color: var(--ink);
+    padding: 6px 0;
+  }
+
+  .link-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  .link-arrow {
+    font-size: 1.1rem;
+    color: var(--ink-muted);
+  }
 </style>
 </head>
 <body>
@@ -1603,71 +2273,312 @@
     </div>
   </header>
 
-  <!-- MOBILE SESSION STATS STRIP -->
-  <div class="pos-mobile-stats mobile-only">
-    <div class="m-stat-card">
-      <div class="m-stat-val" id="m-hdr-sales">0</div>
-      <div class="m-stat-lbl" data-i18n="pos.salesToday">Sales Today</div>
+  <!-- VIEW: HOME (CATALOG & SELLING) -->
+  <div class="pos-view active" id="view-home">
+    <!-- MOBILE SESSION STATS STRIP -->
+    <div class="pos-mobile-stats mobile-only">
+      <div class="m-stat-card">
+        <div class="m-stat-val" id="m-hdr-sales">0</div>
+        <div class="m-stat-lbl" data-i18n="pos.salesToday">Sales Today</div>
+      </div>
+      <div class="m-stat-card">
+        <div class="m-stat-val" id="m-hdr-revenue">0 soʻm</div>
+        <div class="m-stat-lbl" data-i18n="pos.revenue">Revenue</div>
+      </div>
+      <div class="m-stat-card m-profit">
+        <div class="m-stat-val profit-val" id="m-hdr-profit">+0 soʻm</div>
+        <div class="m-stat-lbl" data-i18n="pos.extraProfit">Extra Profit</div>
+      </div>
     </div>
-    <div class="m-stat-card">
-      <div class="m-stat-val" id="m-hdr-revenue">0 soʻm</div>
-      <div class="m-stat-lbl" data-i18n="pos.revenue">Revenue</div>
+
+    <!-- TOOLBAR -->
+    <div class="pos-toolbar">
+      <div class="pos-search-box">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" class="pos-search-input" id="search" data-i18n-placeholder="pos.searchPlaceholder" placeholder="Search products or SKU...">
+        <button class="pos-search-clear" id="searchClear" aria-label="Clear" type="button">✕</button>
+      </div>
+
+      <div class="pos-toolbar-actions">
+        <div class="pos-filter-group">
+          <button class="pos-filter-btn active" data-filter="all" data-i18n="pos.filterAll">All Items</button>
+          <button class="pos-filter-btn" data-filter="in-stock" data-i18n="pos.filterInStock">In Stock</button>
+          <button class="pos-filter-btn" data-filter="low" data-i18n="pos.filterLowStock">Low Stock</button>
+        </div>
+
+        <div class="toolbar-right">
+          <div class="view-toggle" id="viewToggle" role="group" aria-label="View mode">
+            <button class="view-btn active" id="viewGridBtn" data-view="grid" data-i18n-title="pos.viewGrid" title="Grid view" aria-label="Grid view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
+            </button>
+            <button class="view-btn" id="viewListBtn" data-view="list" data-i18n-title="pos.viewList" title="List view" aria-label="List view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <line x1="3" y1="6" x2="3.01" y2="6"/>
+                <line x1="3" y1="12" x2="3.01" y2="12"/>
+                <line x1="3" y1="18" x2="3.01" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <span class="count-pill" id="product-count">—</span>
+        </div>
+      </div>
     </div>
-    <div class="m-stat-card m-profit">
-      <div class="m-stat-val profit-val" id="m-hdr-profit">+0 soʻm</div>
-      <div class="m-stat-lbl" data-i18n="pos.extraProfit">Extra Profit</div>
+
+    <!-- GRID -->
+    <main class="pos-grid-container">
+      <div class="pos-grid" id="product-grid"></div>
+    </main>
+  </div>
+
+  <!-- VIEW: AUDIT (REPORTS OF WHAT WAS SOLD & CASH MOVES) -->
+  <div class="pos-view" id="view-audit">
+    <div class="audit-container">
+      <div class="audit-header">
+        <div>
+          <h2 class="audit-title" data-i18n="pos.auditTitle">Sales & Cassa Audit</h2>
+          <div class="audit-sub" data-i18n="pos.auditSub">Real-time record of what was sold and cash movements today</div>
+        </div>
+        <button type="button" class="audit-refresh-btn" id="auditRefreshBtn" title="Refresh">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- 4 KPI Summary Cards -->
+      <div class="audit-kpi-grid">
+        <div class="audit-kpi-card">
+          <div class="audit-kpi-icon">🛍️</div>
+          <div class="audit-kpi-body">
+            <div class="audit-kpi-val" id="audit-total-sales">0</div>
+            <div class="audit-kpi-lbl" data-i18n="pos.auditUnitsSold">Units Sold</div>
+          </div>
+        </div>
+        <div class="audit-kpi-card">
+          <div class="audit-kpi-icon">💰</div>
+          <div class="audit-kpi-body">
+            <div class="audit-kpi-val" id="audit-total-revenue">0 soʻm</div>
+            <div class="audit-kpi-lbl" data-i18n="pos.auditRevenue">Revenue</div>
+          </div>
+        </div>
+        <div class="audit-kpi-card">
+          <div class="audit-kpi-icon">🍲</div>
+          <div class="audit-kpi-body">
+            <div class="audit-kpi-val val-out" id="audit-total-cashout">0 soʻm</div>
+            <div class="audit-kpi-lbl" data-i18n="pos.auditCashOut">Cash Taken</div>
+          </div>
+        </div>
+        <div class="audit-kpi-card">
+          <div class="audit-kpi-icon">💵</div>
+          <div class="audit-kpi-body">
+            <div class="audit-kpi-val val-net" id="audit-net-cash">0 soʻm</div>
+            <div class="audit-kpi-lbl" data-i18n="pos.auditNetCash">Cash in Drawer</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter chips for audit -->
+      <div class="audit-filter-bar">
+        <div class="audit-filters">
+          <button class="audit-filter-btn active" data-audit-filter="all" data-i18n="pos.filterAllAudit">All Movements</button>
+          <button class="audit-filter-btn" data-audit-filter="sales" data-i18n="pos.filterSalesOnly">Sales Only</button>
+          <button class="audit-filter-btn" data-audit-filter="cashout" data-i18n="pos.filterCashOnly">Cash Taken Only</button>
+        </div>
+      </div>
+
+      <!-- Audit Timeline -->
+      <div class="audit-timeline" id="audit-timeline">
+        <!-- Dynamically populated -->
+      </div>
     </div>
   </div>
 
-  <!-- TOOLBAR -->
-  <div class="pos-toolbar">
-    <div class="pos-search-box">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-      </svg>
-      <input type="text" class="pos-search-input" id="search" data-i18n-placeholder="pos.searchPlaceholder" placeholder="Search products or SKU...">
-      <button class="pos-search-clear" id="searchClear" aria-label="Clear" type="button">✕</button>
-    </div>
-
-    <div class="pos-toolbar-actions">
-      <div class="pos-filter-group">
-        <button class="pos-filter-btn active" data-filter="all" data-i18n="pos.filterAll">All Items</button>
-        <button class="pos-filter-btn" data-filter="in-stock" data-i18n="pos.filterInStock">In Stock</button>
-        <button class="pos-filter-btn" data-filter="low" data-i18n="pos.filterLowStock">Low Stock</button>
+  <!-- VIEW: SETTINGS -->
+  <div class="pos-view" id="view-settings">
+    <div class="settings-container">
+      <div class="settings-header">
+        <h2 class="settings-title" data-i18n="pos.settingsTitle">Terminal Settings</h2>
       </div>
 
-      <div class="toolbar-right">
-        <div class="view-toggle" id="viewToggle" role="group" aria-label="View mode">
-          <button class="view-btn active" id="viewGridBtn" data-view="grid" data-i18n-title="pos.viewGrid" title="Grid view" aria-label="Grid view">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-            </svg>
-          </button>
-          <button class="view-btn" id="viewListBtn" data-view="list" data-i18n-title="pos.viewList" title="List view" aria-label="List view">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="8" y1="6" x2="21" y2="6"/>
-              <line x1="8" y1="12" x2="21" y2="12"/>
-              <line x1="8" y1="18" x2="21" y2="18"/>
-              <line x1="3" y1="6" x2="3.01" y2="6"/>
-              <line x1="3" y1="12" x2="3.01" y2="12"/>
-              <line x1="3" y1="18" x2="3.01" y2="18"/>
-            </svg>
+      <!-- Terminal Info Card -->
+      <div class="settings-card">
+        <div class="settings-card-title" data-i18n="pos.deviceInfo">Device & Terminal Information</div>
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.deviceId">Device ID</span>
+          <span class="settings-val" id="settings-dev-id">—</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.syncStatusLbl">Sync Status</span>
+          <span class="settings-val" id="settings-sync-status">—</span>
+        </div>
+        <button class="btn-sync-now" id="btnSyncNow" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          <span data-i18n="pos.syncNowBtn">Sync Now</span>
+        </button>
+      </div>
+
+      <!-- Cash Drawer Summary Card -->
+      <div class="settings-card">
+        <div class="settings-card-title" data-i18n="pos.cashSummary">Cash Register Summary</div>
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.auditRevenue">Gross Revenue</span>
+          <span class="settings-val" id="settings-revenue">0 soʻm</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.totalExpenses">Total Cash Taken (Lunch/Etc)</span>
+          <span class="settings-val val-out" id="settings-cashout">0 soʻm</span>
+        </div>
+        <div class="settings-divider"></div>
+        <div class="settings-row settings-highlight">
+          <span class="settings-label" data-i18n="pos.auditNetCash">Net Cash in Drawer</span>
+          <span class="settings-val val-net" id="settings-netcash">0 soʻm</span>
+        </div>
+      </div>
+
+      <!-- Quick Preferences Card -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.themeLbl">Theme Mode</span>
+          <button class="settings-action-btn" id="settingsThemeToggle" type="button">
+            <span id="settingsThemeText">Toggle Theme</span>
           </button>
         </div>
-        <span class="count-pill" id="product-count">—</span>
+        <div class="settings-divider"></div>
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.languageLbl">Interface Language</span>
+          <div class="settings-lang-pills">
+            <button type="button" class="lang-pill" data-set-lang="uz">UZ</button>
+            <button type="button" class="lang-pill" data-set-lang="ru">RU</button>
+            <button type="button" class="lang-pill" data-set-lang="en">EN</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Useful Links -->
+      <div class="settings-card">
+        <a href="https://admin.caretrack.website" target="_blank" rel="noopener" class="settings-link-row">
+          <div class="link-left">
+            <span class="link-icon">⚙️</span>
+            <span class="link-text" data-i18n="pos.adminLink">Open Admin Panel</span>
+          </div>
+          <span class="link-arrow">→</span>
+        </a>
+        <div class="settings-divider"></div>
+        <div class="settings-row">
+          <span class="settings-label" data-i18n="pos.appVersion">Bazar POS Version</span>
+          <span class="settings-val">v2.1 · Offline-First PWA</span>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- GRID -->
-  <main class="pos-grid-container">
-    <div class="pos-grid" id="product-grid"></div>
-  </main>
+  <!-- FLOATING ACTION BUTTON (+) FOR CASH OUT (LUNCH / CASSA) -->
+  <button class="pos-fab" id="fab-cashout" aria-label="Take Cash / Cassa xarajati" data-i18n-title="pos.cashOutBtn" title="Take Cash (Lunch / Expenses)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+  </button>
 
+  <!-- BOTTOM NAVIGATION BAR -->
+  <nav class="pos-bottom-nav">
+    <button class="bottom-nav-item" id="nav-btn-audit" data-tab="audit" type="button">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <line x1="10" y1="9" x2="8" y2="9"></line>
+      </svg>
+      <span data-i18n="pos.navAudit">Audit</span>
+    </button>
+
+    <button class="bottom-nav-center active" id="nav-btn-home" data-tab="home" type="button">
+      <div class="bottom-nav-center-btn">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+      </div>
+      <span class="bottom-nav-center-lbl" data-i18n="pos.navHome">Home</span>
+    </button>
+
+    <button class="bottom-nav-item" id="nav-btn-settings" data-tab="settings" type="button">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+      <span data-i18n="pos.navSettings">Settings</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- CASH OUT MODAL (MONEY TAKEN FROM CASSA) -->
+<div class="pos-overlay" id="cashout-overlay" role="dialog" aria-modal="true" aria-label="Take Cash from Cassa">
+  <div class="pos-modal" id="cashout-modal-card">
+    <div class="pos-modal-header">
+      <div>
+        <div class="pos-modal-title" data-i18n="pos.cashOutTitle">Money Taken from Cassa</div>
+        <div class="pos-modal-sub" data-i18n="pos.cashOutSub">Record lunch money or expenses taken from the cash register</div>
+      </div>
+      <button class="pos-modal-close" id="cashout-modal-close" aria-label="Close" type="button">✕</button>
+    </div>
+    <div class="pos-modal-body">
+      <!-- Amount -->
+      <div class="form-group">
+        <label class="field-label" for="cashout-amount" data-i18n="pos.cashOutAmount">Amount (in ming soʻm)</label>
+        <div class="price-input-wrap">
+          <input class="price-input" type="number" id="cashout-amount" step="any" min="0.1" inputmode="decimal" placeholder="30">
+          <span class="price-symbol" data-i18n="pos.thousandSum">ming soʻm</span>
+        </div>
+        <!-- Quick increment chips -->
+        <div class="quick-chips">
+          <button type="button" class="quick-chip" data-amt="10">+10k</button>
+          <button type="button" class="quick-chip" data-amt="20">+20k</button>
+          <button type="button" class="quick-chip" data-amt="30">+30k</button>
+          <button type="button" class="quick-chip" data-amt="50">+50k</button>
+          <button type="button" class="quick-chip" data-amt="100">+100k</button>
+        </div>
+        <div id="cashout-preview" class="cashout-live-preview" style="display: none;"></div>
+      </div>
+
+      <!-- Reason Category Pills -->
+      <div class="form-group">
+        <label class="field-label" data-i18n="pos.cashOutReason">Reason / Category</label>
+        <div class="reason-chips" id="reasonChips">
+          <button type="button" class="reason-chip active" data-reason="lunch" data-i18n="pos.reasonLunch">Lunch 🍲</button>
+          <button type="button" class="reason-chip" data-reason="taxi" data-i18n="pos.reasonTaxi">Taxi 🚕</button>
+          <button type="button" class="reason-chip" data-reason="supplies" data-i18n="pos.reasonSupplies">Supplies 📦</button>
+          <button type="button" class="reason-chip" data-reason="personal" data-i18n="pos.reasonPersonal">Personal 👤</button>
+          <button type="button" class="reason-chip" data-reason="other" data-i18n="pos.reasonOther">Other 📝</button>
+        </div>
+      </div>
+
+      <!-- Notes input -->
+      <div class="form-group">
+        <label class="field-label" for="cashout-notes" data-i18n="product.notesLabel">Notes</label>
+        <input type="text" class="pos-search-input" id="cashout-notes" data-i18n-placeholder="pos.cashOutNotesPlaceholder" placeholder="Optional details (e.g. Lunch with team)..." style="font-size:0.9375rem;padding:10px 14px;">
+      </div>
+    </div>
+    <div class="pos-modal-footer">
+      <button class="btn-cancel" id="btn-cashout-cancel" type="button" data-i18n="pos.cancel">Cancel</button>
+      <button class="btn-confirm" id="btn-cashout-confirm" type="button" data-i18n="pos.confirmCashOut">Confirm Cash Out</button>
+    </div>
+  </div>
 </div>
 
 <!-- SOLD MODAL -->
@@ -1921,12 +2832,8 @@ if (catalogChannel) {
       sessions.sales = 0;
       sessions.revenue = 0;
       sessions.extraProfit = 0;
-      const elSales = document.getElementById('hdr-sales');
-      const elRev = document.getElementById('hdr-revenue');
-      const elProf = document.getElementById('hdr-profit');
-      if (elSales) elSales.textContent = '0';
-      if (elRev) elRev.textContent = fmt(0);
-      if (elProf) elProf.textContent = `+${fmt(0)}`;
+      sessions.cashOut = 0;
+      updateHeaderStats();
       renderGrid();
       syncEngine.updateUI();
       return;
@@ -1978,6 +2885,11 @@ const syncEngine = {
     } else {
       pill.classList.add('online-synced');
       label.textContent = `🟢 ` + t('pos.synced');
+    }
+
+    const setSyncStatus = document.getElementById('settings-sync-status');
+    if (setSyncStatus) {
+      setSyncStatus.textContent = label.textContent;
     }
   },
 
@@ -2108,12 +3020,8 @@ const syncEngine = {
       sessions.sales = 0;
       sessions.revenue = 0;
       sessions.extraProfit = 0;
-      const elSales = document.getElementById('hdr-sales');
-      const elRev   = document.getElementById('hdr-revenue');
-      const elProf  = document.getElementById('hdr-profit');
-      if (elSales) elSales.textContent = '0';
-      if (elRev)   elRev.textContent   = fmt(0);
-      if (elProf)  elProf.textContent  = `+${fmt(0)}`;
+      sessions.cashOut = 0;
+      updateHeaderStats();
       renderGrid();
 
       // Now fetch the fresh snapshot from the server
@@ -2165,11 +3073,14 @@ const syncEngine = {
 
 // ── STATE ─────────────────────────────────────────────────────────────────
 let products = [];
-let sessions = { sales: 0, revenue: 0, extraProfit: 0 };
+let sessions = { sales: 0, revenue: 0, extraProfit: 0, cashOut: 0 };
 let activeProduct = null;
 let confirmLock = false;
 let searchVal = '';
 let filterVal = 'all';
+let currentTab = 'home';
+let currentAuditFilter = 'all';
+let activeCashOutReason = 'lunch';
 
 async function loadProductsFromStorage() {
   const dbProds = await localDb.getAll('products');
@@ -2627,6 +3538,27 @@ function updateHeaderStats() {
   if (mRevEl) mRevEl.textContent = fmt(sessions.revenue);
   if (profitEl) profitEl.textContent = `+${fmt(sessions.extraProfit)}`;
   if (mProfitEl) mProfitEl.textContent = `+${fmt(sessions.extraProfit)}`;
+
+  // Audit view KPI cards
+  const auditSales = document.getElementById('audit-total-sales');
+  const auditRev = document.getElementById('audit-total-revenue');
+  const auditCashOut = document.getElementById('audit-total-cashout');
+  const auditNet = document.getElementById('audit-net-cash');
+
+  const netCash = (sessions.revenue || 0) - (sessions.cashOut || 0);
+
+  if (auditSales) auditSales.textContent = sessions.sales;
+  if (auditRev) auditRev.textContent = fmt(sessions.revenue);
+  if (auditCashOut) auditCashOut.textContent = fmt(sessions.cashOut || 0);
+  if (auditNet) auditNet.textContent = (netCash < 0 ? '−' : '') + fmt(Math.abs(netCash));
+
+  // Settings view cash summary
+  const setRev = document.getElementById('settings-revenue');
+  const setCashOut = document.getElementById('settings-cashout');
+  const setNet = document.getElementById('settings-netcash');
+  if (setRev) setRev.textContent = fmt(sessions.revenue);
+  if (setCashOut) setCashOut.textContent = fmt(sessions.cashOut || 0);
+  if (setNet) setNet.textContent = (netCash < 0 ? '−' : '') + fmt(Math.abs(netCash));
 }
 
 // ── SYNC INDICATOR ────────────────────────────────────────────────────────
@@ -2677,7 +3609,10 @@ document.getElementById('overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('overlay')) closeModal();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') {
+    closeModal();
+    closeCashOutModal();
+  }
 });
 
 // ── SEARCH & FILTER ───────────────────────────────────────────────────────
@@ -2818,6 +3753,434 @@ if (window.matchMedia) {
   else if (mq.addListener) mq.addListener(listener);
 }
 
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+
+  // View containers
+  const viewHome = document.getElementById('view-home');
+  const viewAudit = document.getElementById('view-audit');
+  const viewSettings = document.getElementById('view-settings');
+
+  if (viewHome) viewHome.classList.toggle('active', tab === 'home');
+  if (viewAudit) viewAudit.classList.toggle('active', tab === 'audit');
+  if (viewSettings) viewSettings.classList.toggle('active', tab === 'settings');
+
+  // Bottom nav items
+  const navHome = document.getElementById('nav-btn-home');
+  const navAudit = document.getElementById('nav-btn-audit');
+  const navSettings = document.getElementById('nav-btn-settings');
+
+  if (navHome) navHome.classList.toggle('active', tab === 'home');
+  if (navAudit) navAudit.classList.toggle('active', tab === 'audit');
+  if (navSettings) navSettings.classList.toggle('active', tab === 'settings');
+
+  // Floating Action Button (+) visibility: visible on home and audit, hidden on settings
+  const fab = document.getElementById('fab-cashout');
+  if (fab) {
+    fab.style.display = (tab === 'settings') ? 'none' : 'flex';
+  }
+
+  if (tab === 'audit') {
+    renderAuditView();
+  } else if (tab === 'settings') {
+    renderSettingsView();
+  }
+
+  window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+// ── CASH OUT MODAL (LUNCH / CASSA) ────────────────────────────────────────
+function openCashOutModal() {
+  const amtInput = document.getElementById('cashout-amount');
+  const notesInput = document.getElementById('cashout-notes');
+  const preview = document.getElementById('cashout-preview');
+
+  if (amtInput) amtInput.value = '';
+  if (notesInput) notesInput.value = '';
+  if (preview) {
+    preview.style.display = 'none';
+    preview.textContent = '';
+  }
+
+  // Reset reason selection to lunch
+  activeCashOutReason = 'lunch';
+  document.querySelectorAll('#reasonChips .reason-chip').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.reason === 'lunch');
+  });
+
+  const overlay = document.getElementById('cashout-overlay');
+  if (overlay) overlay.classList.add('open');
+  if (amtInput) setTimeout(() => amtInput.focus(), 60);
+}
+
+function closeCashOutModal() {
+  const overlay = document.getElementById('cashout-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function updateCashOutPreview() {
+  const amtInput = document.getElementById('cashout-amount');
+  const preview = document.getElementById('cashout-preview');
+  if (!amtInput || !preview) return;
+
+  const rawVal = parseFloat(amtInput.value);
+  if (isNaN(rawVal) || rawVal <= 0) {
+    preview.style.display = 'none';
+    return;
+  }
+
+  const amt = parsePrice(rawVal);
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  const mingLbl = (amt / 1000).toLocaleString('ru-RU') + ' ' + t('pos.thousandSum');
+  preview.style.display = 'block';
+  preview.textContent = `💸 ${mingLbl} = ${fmt(amt)}`;
+}
+
+async function submitCashOut() {
+  const amtInput = document.getElementById('cashout-amount');
+  const rawVal = parseFloat(amtInput ? amtInput.value : '');
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+
+  if (isNaN(rawVal) || rawVal <= 0) {
+    showToast(t('pos.invalidCashOutAmount'), 'warn');
+    if (amtInput) amtInput.focus();
+    return;
+  }
+
+  const amount = parsePrice(rawVal);
+  const notesInput = document.getElementById('cashout-notes');
+  const notes = notesInput ? notesInput.value.trim() : '';
+  const reason = activeCashOutReason || 'lunch';
+
+  const reasonTitles = {
+    lunch: t('pos.reasonLunch'),
+    taxi: t('pos.reasonTaxi'),
+    supplies: t('pos.reasonSupplies'),
+    personal: t('pos.reasonPersonal'),
+    other: t('pos.reasonOther')
+  };
+  const reasonLabel = reasonTitles[reason] || reason;
+
+  const activityId = 'act_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 7);
+  const actRecord = {
+    id: activityId,
+    type: 'cash_out',
+    timestamp: Date.now(),
+    amount: amount,
+    reason: reason,
+    notes: notes ? `${reasonLabel}: ${notes}` : reasonLabel
+  };
+
+  await localDb.put('activities', actRecord);
+
+  // Enqueue operation for sync
+  await enqueueOperation('CASH_OUT', {
+    activityId,
+    amount,
+    reason,
+    notes: notes ? `${reasonLabel}: ${notes}` : reasonLabel,
+    timestamp: Date.now()
+  });
+
+  // Cross-panel broadcast
+  notifyCatalog('CASH_OUT_RECORDED', {
+    activityId,
+    amount,
+    reason,
+    notes
+  });
+
+  sessions.cashOut = (sessions.cashOut || 0) + amount;
+  updateHeaderStats();
+  closeCashOutModal();
+
+  showToast(t('pos.toastCashOutSuccess', { amount: fmt(amount), reason: reasonLabel }), 'warn', reasonLabel);
+
+  if (currentTab === 'audit') {
+    renderAuditView();
+  }
+}
+
+// ── AUDIT VIEW RENDERING ──────────────────────────────────────────────────
+async function renderAuditView() {
+  const timelineEl = document.getElementById('audit-timeline');
+  if (!timelineEl) return;
+
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  const todayStart = new Date().setHours(0, 0, 0, 0);
+
+  let activities = [];
+  try {
+    const all = await localDb.getAll('activities');
+    activities = all.filter(a => (a.timestamp || 0) >= todayStart);
+  } catch (e) {
+    console.warn('[pos audit] Failed to load activities:', e);
+  }
+
+  // Update session stats & KPI cards
+  const sales = activities.filter(a => a.type === 'sale');
+  const cashOuts = activities.filter(a => a.type === 'cash_out');
+
+  const unitsSold = sales.reduce((acc, a) => acc + (Number(a.quantity) || 1), 0);
+  const totalRev = sales.reduce((acc, a) => acc + (Number(a.totalSaleValue) || (Number(a.sellingPrice || 0) * (Number(a.quantity) || 1))), 0);
+  const totalCashTaken = cashOuts.reduce((acc, a) => acc + (Number(a.amount) || Number(a.quantity) || 0), 0);
+
+  sessions.sales = unitsSold;
+  sessions.revenue = totalRev;
+  sessions.cashOut = totalCashTaken;
+  updateHeaderStats();
+
+  // Filter activities
+  let filtered = activities;
+  if (currentAuditFilter === 'sales') {
+    filtered = sales;
+  } else if (currentAuditFilter === 'cashout') {
+    filtered = cashOuts;
+  }
+
+  // Sort by timestamp desc
+  filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  if (!filtered.length) {
+    timelineEl.innerHTML = `
+      <div class="pos-empty" style="padding: 48px 16px;">
+        <div class="pos-empty-icon">🧾</div>
+        <div class="pos-empty-title">${t('pos.noAuditRecords')}</div>
+      </div>`;
+    return;
+  }
+
+  const reasonIcons = {
+    lunch: '🍲',
+    taxi: '🚕',
+    supplies: '📦',
+    personal: '👤',
+    other: '📝'
+  };
+
+  const reasonTitles = {
+    lunch: t('pos.reasonLunch'),
+    taxi: t('pos.reasonTaxi'),
+    supplies: t('pos.reasonSupplies'),
+    personal: t('pos.reasonPersonal'),
+    other: t('pos.reasonOther')
+  };
+
+  timelineEl.innerHTML = filtered.map(item => {
+    const isSale = item.type === 'sale';
+    const date = new Date(item.timestamp || Date.now());
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (isSale) {
+      const p = products.find(prod => prod.id === item.productId);
+      const imgSrc = (p && p.image) || 'assets/logo.webp';
+      const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+      const locTitle = p ? getLocalizedProductName(p, currentLang) : (item.productName || 'Sale');
+      const qty = item.quantity || 1;
+      const unitPrice = item.sellingPrice ? fmt(item.sellingPrice) : '';
+      const totalVal = item.totalSaleValue ? fmt(item.totalSaleValue) : unitPrice;
+      const diff = Number(item.priceDiff) || 0;
+      const profitBadge = diff > 0
+        ? `<span style="color:var(--success);font-weight:600;">+${fmt(diff)}</span>`
+        : diff < 0
+          ? `<span style="color:var(--danger);font-weight:600;">−${fmt(Math.abs(diff))}</span>`
+          : '';
+
+      return `
+        <div class="audit-item">
+          <div class="audit-thumb-wrap">
+            <img src="${imgSrc}" alt="" onerror="this.onerror=null;this.src='assets/logo.webp';">
+          </div>
+          <div class="audit-item-info">
+            <div class="audit-item-title">${escapeHtml(locTitle)}</div>
+            <div class="audit-item-meta">
+              <span class="audit-badge audit-badge-sale">Sale</span>
+              <span>${timeStr}</span>
+              ${profitBadge}
+            </div>
+          </div>
+          <div class="audit-item-amount">
+            <div class="audit-amt-val sale-val">+${totalVal}</div>
+            <div class="audit-qty-sub">${qty} × ${unitPrice}</div>
+          </div>
+        </div>`;
+    } else {
+      // Cash out
+      const reasonKey = item.reason || 'lunch';
+      const icon = reasonIcons[reasonKey] || '💸';
+      const title = reasonTitles[reasonKey] || item.notes || t('pos.cashOutTitle');
+      const amt = Number(item.amount) || Number(item.quantity) || 0;
+      const notesDesc = item.notes && item.notes !== title ? escapeHtml(item.notes) : '';
+
+      return `
+        <div class="audit-item">
+          <div class="audit-thumb-wrap">
+            <span class="audit-icon-cashout">${icon}</span>
+          </div>
+          <div class="audit-item-info">
+            <div class="audit-item-title">${escapeHtml(title)}</div>
+            <div class="audit-item-meta">
+              <span class="audit-badge audit-badge-cashout">${t('pos.auditCashOut')}</span>
+              <span>${timeStr}</span>
+              ${notesDesc ? `<span>· ${notesDesc}</span>` : ''}
+            </div>
+          </div>
+          <div class="audit-item-amount">
+            <div class="audit-amt-val cashout-val">−${fmt(amt)}</div>
+          </div>
+        </div>`;
+    }
+  }).join('');
+}
+
+// ── SETTINGS VIEW RENDERING ───────────────────────────────────────────────
+function renderSettingsView() {
+  const devIdEl = document.getElementById('settings-dev-id');
+  const syncStatusEl = document.getElementById('settings-sync-status');
+  const themeTextEl = document.getElementById('settingsThemeText');
+
+  if (devIdEl) devIdEl.textContent = getDeviceId();
+
+  const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
+  if (syncStatusEl) {
+    if (!navigator.onLine) {
+      syncStatusEl.textContent = '🔴 ' + t('pos.offline');
+    } else if (syncEngine.syncing) {
+      syncStatusEl.textContent = '🟡 ' + t('pos.syncing');
+    } else {
+      syncStatusEl.textContent = '🟢 ' + t('pos.synced');
+    }
+  }
+
+  // Update theme toggle button text
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  if (themeTextEl) {
+    themeTextEl.textContent = currentTheme === 'dark' ? '☀️ Switch to Light Mode' : '🌙 Switch to Dark Mode';
+  }
+
+  // Highlight current language pill
+  const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+  document.querySelectorAll('.lang-pill').forEach(pill => {
+    pill.classList.toggle('active', pill.dataset.setLang === currentLang);
+  });
+
+  updateHeaderStats();
+}
+
+// ── SETUP BOTTOM NAV & ACTIONS ────────────────────────────────────────────
+function setupBottomNavAndTabs() {
+  const btnAudit = document.getElementById('nav-btn-audit');
+  const btnHome = document.getElementById('nav-btn-home');
+  const btnSettings = document.getElementById('nav-btn-settings');
+
+  if (btnAudit) btnAudit.addEventListener('click', () => switchTab('audit'));
+  if (btnHome) btnHome.addEventListener('click', () => switchTab('home'));
+  if (btnSettings) btnSettings.addEventListener('click', () => switchTab('settings'));
+
+  // FAB Cash Out
+  const fab = document.getElementById('fab-cashout');
+  if (fab) fab.addEventListener('click', openCashOutModal);
+
+  // Cash Out modal close / cancel
+  const cashoutClose = document.getElementById('cashout-modal-close');
+  const cashoutCancel = document.getElementById('btn-cashout-cancel');
+  const cashoutConfirm = document.getElementById('btn-cashout-confirm');
+  const cashoutOverlay = document.getElementById('cashout-overlay');
+  const cashoutAmtInput = document.getElementById('cashout-amount');
+
+  if (cashoutClose) cashoutClose.addEventListener('click', closeCashOutModal);
+  if (cashoutCancel) cashoutCancel.addEventListener('click', closeCashOutModal);
+  if (cashoutConfirm) cashoutConfirm.addEventListener('click', submitCashOut);
+
+  if (cashoutOverlay) {
+    cashoutOverlay.addEventListener('click', (e) => {
+      if (e.target === cashoutOverlay) closeCashOutModal();
+    });
+  }
+
+  if (cashoutAmtInput) {
+    cashoutAmtInput.addEventListener('input', updateCashOutPreview);
+  }
+
+  // Quick increment chips (+10k, +20k, etc.)
+  document.querySelectorAll('.quick-chips .quick-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const amt = parseFloat(chip.dataset.amt) || 0;
+      if (!cashoutAmtInput) return;
+      const cur = parseFloat(cashoutAmtInput.value) || 0;
+      cashoutAmtInput.value = (cur + amt);
+      updateCashOutPreview();
+      cashoutAmtInput.focus();
+    });
+  });
+
+  // Reason chips (lunch, taxi, etc.)
+  document.querySelectorAll('#reasonChips .reason-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#reasonChips .reason-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeCashOutReason = chip.dataset.reason || 'lunch';
+    });
+  });
+
+  // Audit filter buttons
+  document.querySelectorAll('.audit-filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.audit-filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentAuditFilter = btn.dataset.auditFilter || 'all';
+      renderAuditView();
+    });
+  });
+
+  // Audit refresh button
+  const auditRefresh = document.getElementById('auditRefreshBtn');
+  if (auditRefresh) {
+    auditRefresh.addEventListener('click', () => {
+      renderAuditView();
+      syncEngine.kick();
+      showToast('✓ Updated', 'info');
+    });
+  }
+
+  // Settings Sync Now button
+  const btnSyncNow = document.getElementById('btnSyncNow');
+  if (btnSyncNow) {
+    btnSyncNow.addEventListener('click', async () => {
+      btnSyncNow.disabled = true;
+      showToast('⟳ Syncing...', 'info');
+      await syncEngine.kick();
+      btnSyncNow.disabled = false;
+      renderSettingsView();
+    });
+  }
+
+  // Settings Theme Toggle
+  const settingsThemeToggle = document.getElementById('settingsThemeToggle');
+  if (settingsThemeToggle) {
+    settingsThemeToggle.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try {
+        localStorage.setItem('salestrack-theme', next);
+      } catch (e) {}
+      renderSettingsView();
+    });
+  }
+
+  // Settings Language Pills
+  document.querySelectorAll('.lang-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const lang = pill.dataset.setLang;
+      if (window.i18n && lang) {
+        window.i18n.setLang(lang);
+      }
+    });
+  });
+}
+
 // ── INITIALIZATION ────────────────────────────────────────────────────────
 async function init() {
   await localDb.init();
@@ -2826,6 +4189,7 @@ async function init() {
 
   setupLanguageSwitcher();
   setupViewToggle();
+  setupBottomNavAndTabs();
 
   // Listen to i18n changes
   document.addEventListener('i18n:change', () => {
@@ -2836,6 +4200,8 @@ async function init() {
     updateHeaderStats();
     syncEngine.updateUI();
     renderGrid();
+    if (currentTab === 'audit') renderAuditView();
+    if (currentTab === 'settings') renderSettingsView();
   });
 
   // Initial title setup
@@ -2848,9 +4214,11 @@ async function init() {
     const todayStart = new Date().setHours(0, 0, 0, 0);
     const acts = await localDb.getAll('activities');
     const todaySales = acts.filter(a => a.type === 'sale' && a.timestamp >= todayStart);
-    sessions.sales = todaySales.length;
+    const todayCashOut = acts.filter(a => a.type === 'cash_out' && a.timestamp >= todayStart);
+    sessions.sales = todaySales.reduce((acc, a) => acc + (Number(a.quantity) || 1), 0);
     sessions.revenue = todaySales.reduce((acc, a) => acc + (Number(a.totalSaleValue) || (Number(a.sellingPrice || 0) * (a.quantity || 1))), 0);
     sessions.extraProfit = todaySales.reduce((acc, a) => acc + (Math.max(0, Number(a.priceDiff) || 0)), 0);
+    sessions.cashOut = todayCashOut.reduce((acc, a) => acc + (Number(a.amount) || Number(a.quantity) || 0), 0);
     updateHeaderStats();
   } catch (e) {
     console.warn('[pos stats] Failed to hydrate session stats:', e);

@@ -314,7 +314,52 @@
             'pos.toastSoldAtBase':        'Sold at catalog price',
             'pos.toastExtraProfit':       'Extra profit: +{amount}',
             'pos.toastDiscount':          'Discount: −{amount}',
-            'pos.toastInsufficientStock': '🚨 Sale rejected: Insufficient stock on server.'
+            'pos.toastInsufficientStock': '🚨 Sale rejected: Insufficient stock on server.',
+
+            // POS Bottom Navigation
+            'pos.navHome':        'Home',
+            'pos.navAudit':       'Audit',
+            'pos.navSettings':    'Settings',
+
+            // POS Audit View
+            'pos.auditTitle':     'Sales & Cassa Audit',
+            'pos.auditSub':       'Real-time record of what was sold and cash movements today',
+            'pos.auditUnitsSold': 'Units Sold',
+            'pos.auditRevenue':   'Revenue',
+            'pos.auditCashOut':   'Cash Taken',
+            'pos.auditNetCash':   'Cash in Drawer',
+            'pos.noAuditRecords': 'No sales or cash movements recorded today.',
+            'pos.filterAllAudit': 'All Movements',
+            'pos.filterSalesOnly':'Sales Only',
+            'pos.filterCashOnly': 'Cash Taken Only',
+
+            // POS Cash Out Floating Action & Modal
+            'pos.cashOutBtn':              'Take Cash (Lunch / Expenses)',
+            'pos.cashOutTitle':            'Money Taken from Cassa',
+            'pos.cashOutSub':              'Record lunch money or expenses taken from the cash register',
+            'pos.cashOutAmount':           'Amount (in ming soʻm)',
+            'pos.cashOutReason':           'Reason / Category',
+            'pos.reasonLunch':             'Lunch 🍲',
+            'pos.reasonTaxi':              'Taxi / Travel 🚕',
+            'pos.reasonSupplies':          'Store Supplies 📦',
+            'pos.reasonPersonal':          'Personal Withdrawal 👤',
+            'pos.reasonOther':             'Other 📝',
+            'pos.cashOutNotesPlaceholder': 'Optional details (e.g. Lunch with team)...',
+            'pos.confirmCashOut':          'Confirm Cash Out',
+            'pos.toastCashOutSuccess':     'Cash taken from register: {amount} ({reason})',
+            'pos.invalidCashOutAmount':    'Please enter a valid cash amount greater than 0.',
+
+            // POS Settings
+            'pos.settingsTitle':  'Terminal Settings',
+            'pos.deviceInfo':     'Device & Terminal Information',
+            'pos.deviceId':       'Device ID',
+            'pos.syncStatusLbl':  'Sync Status',
+            'pos.syncNowBtn':     'Sync Now',
+            'pos.cashSummary':    'Cash Register Summary',
+            'pos.themeLbl':       'Theme Mode',
+            'pos.languageLbl':    'Interface Language',
+            'pos.adminLink':      'Open Admin Panel',
+            'pos.appVersion':     'Bazar POS Version'
         },
 
         /* ============================ RUSSIAN ============================ */
@@ -577,7 +622,52 @@
             'pos.toastSoldAtBase':        'Продано по базовой цене',
             'pos.toastExtraProfit':       'Доп. прибыль: +{amount}',
             'pos.toastDiscount':          'Скидка: −{amount}',
-            'pos.toastInsufficientStock': '🚨 Продажа отклонена: недостаточно товара на сервере.'
+            'pos.toastInsufficientStock': '🚨 Продажа отклонена: недостаточно товара на сервере.',
+
+            // POS Bottom Navigation
+            'pos.navHome':        'Каталог',
+            'pos.navAudit':       'Аудит',
+            'pos.navSettings':    'Настройки',
+
+            // POS Audit View
+            'pos.auditTitle':     'Аудит продаж и кассы',
+            'pos.auditSub':       'Записи того, что продано, и движений наличных за сегодня',
+            'pos.auditUnitsSold': 'Продано шт.',
+            'pos.auditRevenue':   'Выручка',
+            'pos.auditCashOut':   'Взято из кассы',
+            'pos.auditNetCash':   'Остаток в кассе',
+            'pos.noAuditRecords': 'Сегодня продаж и расходов пока нет.',
+            'pos.filterAllAudit': 'Все записи',
+            'pos.filterSalesOnly':'Только продажи',
+            'pos.filterCashOnly': 'Только взятие из кассы',
+
+            // POS Cash Out Floating Action & Modal
+            'pos.cashOutBtn':              'Взять из кассы (на обед / расходы)',
+            'pos.cashOutTitle':            'Взятие денег из кассы',
+            'pos.cashOutSub':              'Запись денег на обед или расходов из кассы',
+            'pos.cashOutAmount':           'Сумма (тыс. сум)',
+            'pos.cashOutReason':           'Причина / Категория',
+            'pos.reasonLunch':             'Обед 🍲',
+            'pos.reasonTaxi':              'Такси / Дорога 🚕',
+            'pos.reasonSupplies':          'Расходные материалы 📦',
+            'pos.reasonPersonal':          'Личные нужды 👤',
+            'pos.reasonOther':             'Другое 📝',
+            'pos.cashOutNotesPlaceholder': 'Дополнительно (например, обед)...',
+            'pos.confirmCashOut':          'Подтвердить взятие',
+            'pos.toastCashOutSuccess':     'Из кассы взято: {amount} ({reason})',
+            'pos.invalidCashOutAmount':    'Укажите корректную сумму больше 0.',
+
+            // POS Settings
+            'pos.settingsTitle':  'Настройки терминала',
+            'pos.deviceInfo':     'Информация об устройстве',
+            'pos.deviceId':       'ID устройства',
+            'pos.syncStatusLbl':  'Статус синхронизации',
+            'pos.syncNowBtn':     'Синхронизировать сейчас',
+            'pos.cashSummary':    'Сводка кассы',
+            'pos.themeLbl':       'Тема оформления',
+            'pos.languageLbl':    'Язык интерфейса',
+            'pos.adminLink':      'Открыть панель администратора',
+            'pos.appVersion':     'Версия Bazar POS'
         },
 
         /* ============================ UZBEK (Latin) ============================ */
@@ -840,7 +930,52 @@
             'pos.toastSoldAtBase':        'Katalog narxida sotildi',
             'pos.toastExtraProfit':       'Qoʻshimcha foyda: +{amount}',
             'pos.toastDiscount':          'Chegirma: −{amount}',
-            'pos.toastInsufficientStock': '🚨 Sotuv rad etildi: serverda yetarli tovar yoʻq.'
+            'pos.toastInsufficientStock': '🚨 Sotuv rad etildi: serverda yetarli tovar yoʻq.',
+
+            // POS Bottom Navigation
+            'pos.navHome':        'Asosiy',
+            'pos.navAudit':       'Audit',
+            'pos.navSettings':    'Sozlamalar',
+
+            // POS Audit View
+            'pos.auditTitle':     'Savdo va kassa auditi',
+            'pos.auditSub':       'Bugungi sotilgan tovarlar va kassa harakatlari',
+            'pos.auditUnitsSold': 'Sotilgan dona',
+            'pos.auditRevenue':   'Jami tushum',
+            'pos.auditCashOut':   'Kassadan olingan',
+            'pos.auditNetCash':   'Kassadagi naqd pul',
+            'pos.noAuditRecords': 'Bugun hali savdolar yoki chiqimlar yoʻq.',
+            'pos.filterAllAudit': 'Barcha harakatlar',
+            'pos.filterSalesOnly':'Faqat savdolar',
+            'pos.filterCashOnly': 'Faqat kassadan olingan',
+
+            // POS Cash Out Floating Action & Modal
+            'pos.cashOutBtn':              'Kassadan olish (tushlik / xarajat)',
+            'pos.cashOutTitle':            'Kassadan pul olish',
+            'pos.cashOutSub':              'Tushlik yoki xarajat uchun olingan pulni qayd etish',
+            'pos.cashOutAmount':           'Miqdor (ming soʻmda)',
+            'pos.cashOutReason':           'Sababi / Toifa',
+            'pos.reasonLunch':             'Tushlik 🍲',
+            'pos.reasonTaxi':              'Yoʻlkira 🚕',
+            'pos.reasonSupplies':          'Doʻkon xarajati 📦',
+            'pos.reasonPersonal':          'Shaxsiy 👤',
+            'pos.reasonOther':             'Boshqa 📝',
+            'pos.cashOutNotesPlaceholder': 'Qoʻshimcha izoh (masalan: jamoa bilan tushlik)...',
+            'pos.confirmCashOut':          'Chiqimni tasdiqlash',
+            'pos.toastCashOutSuccess':     'Kassadan olindi: {amount} ({reason})',
+            'pos.invalidCashOutAmount':    'Iltimos, 0 dan katta toʻgʻri summani kiriting.',
+
+            // POS Settings
+            'pos.settingsTitle':  'Terminal sozlamalari',
+            'pos.deviceInfo':     'Qurilma maʼlumotlari',
+            'pos.deviceId':       'Qurilma ID',
+            'pos.syncStatusLbl':  'Sinxronlash holati',
+            'pos.syncNowBtn':     'Hozir sinxronlash',
+            'pos.cashSummary':    'Kassa hisoboti',
+            'pos.themeLbl':       'Mavzu rejimi',
+            'pos.languageLbl':    'Interfeys tili',
+            'pos.adminLink':      'Admin panelini ochish',
+            'pos.appVersion':     'Bazar POS versiyasi'
         }
     };
 

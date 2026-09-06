@@ -570,6 +570,27 @@ async function processSyncBatch(deviceId, operations = []) {
             ['settings', key, 'UPDATE', { key, value, updatedAt: now }, now]
           );
 
+        } else if (op.type === 'CASH_OUT') {
+          const { amount, reason, notes, timestamp } = payload;
+          const cashAmount = Number(amount);
+          if (!Number.isFinite(cashAmount) || cashAmount <= 0) {
+            throw { code: 'INVALID_PAYLOAD', message: 'Valid cash out amount required' };
+          }
+          const activityId = payload.activityId || `act_${now}_${Math.random().toString(36).substr(2, 7)}`;
+          const reasonStr = typeof reason === 'string' ? reason : 'lunch';
+          const notesStr = notes ? String(notes).trim() : '';
+
+          await client.query(
+            `INSERT INTO activities (id, type, timestamp, product_name, quantity, notes)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [activityId, 'cash_out', timestamp || now, reasonStr, cashAmount, notesStr]
+          );
+
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['activity', activityId, 'CREATE', { id: activityId, type: 'cash_out', timestamp: timestamp || now, amount: cashAmount, reason: reasonStr, notes: notesStr }, now]
+          );
+
         } else {
           throw { code: 'UNSUPPORTED_TYPE', message: `Operation type ${op.type} is not supported` };
         }
