@@ -952,15 +952,72 @@ canvas {
 
 .product-card {
     padding: 18px;
-    transition: var(--transition-fast);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
     position: relative;
     display: flex;
     flex-direction: column;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+}
+
+.product-card:active {
+    cursor: grabbing;
 }
 
 .product-card:hover {
     border-color: var(--border-strong);
     box-shadow: var(--shadow-md);
+}
+
+.product-card.is-dragging {
+    opacity: 0.35 !important;
+    transform: scale(0.96) !important;
+    outline: 2px dashed var(--accent) !important;
+    outline-offset: -2px;
+    cursor: grabbing !important;
+}
+
+.product-card.is-dragging * {
+    cursor: grabbing !important;
+}
+
+.product-card-drag-clone {
+    position: fixed;
+    z-index: 999999;
+    pointer-events: none;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45), 0 0 0 2px var(--accent);
+    border-radius: var(--radius);
+    opacity: 0.95;
+    transform: scale(1.04);
+    background: var(--bg-surface);
+    overflow: hidden;
+}
+
+.product-card-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-muted);
+    opacity: 0.45;
+    cursor: grab;
+    border-radius: 4px;
+    padding: 3px;
+    margin-top: 1px;
+    touch-action: none;
+    transition: opacity 0.15s ease, color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.product-card:hover .product-card-drag-handle,
+.product-card.is-dragging .product-card-drag-handle {
+    opacity: 0.9;
+    color: var(--accent);
+}
+
+.product-card-drag-handle:active {
+    cursor: grabbing;
 }
 
 .product-header {

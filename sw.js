@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bazar-pos-v16';
+const CACHE_NAME = 'bazar-pos-v17';
 const ASSETS_TO_CACHE = [
   '/',
   '/admin',

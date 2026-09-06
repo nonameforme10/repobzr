@@ -798,6 +798,7 @@ async function loadState() {
         if (cats.length > 0 || prods.length > 0) {
             state.categories = cats;
             state.products = prods;
+            applySavedAdminProductOrder();
             state.activities = acts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             if (sets.length > 0) {
                 const settingsObj = {};
@@ -2017,17 +2018,19 @@ function renderProducts() {
         });
     }
 
-    prods.sort((a, b) => {
-        if (sortMode === 'name') return getProductDisplayName(a).localeCompare(getProductDisplayName(b));
-        if (sortMode === 'sold') return (b.sold || 0) - (a.sold || 0);
-        if (sortMode === 'stock') {
-            const aQty = (a.quantity !== null && a.quantity !== undefined) ? a.quantity : -1;
-            const bQty = (b.quantity !== null && b.quantity !== undefined) ? b.quantity : -1;
-            return bQty - aQty;
-        }
-        if (sortMode === 'price') return (b.price || 0) - (a.price || 0);
-        return 0;
-    });
+    if (sortMode !== 'custom') {
+        prods.sort((a, b) => {
+            if (sortMode === 'name') return getProductDisplayName(a).localeCompare(getProductDisplayName(b));
+            if (sortMode === 'sold') return (b.sold || 0) - (a.sold || 0);
+            if (sortMode === 'stock') {
+                const aQty = (a.quantity !== null && a.quantity !== undefined) ? a.quantity : -1;
+                const bQty = (b.quantity !== null && b.quantity !== undefined) ? b.quantity : -1;
+                return bQty - aQty;
+            }
+            if (sortMode === 'price') return (b.price || 0) - (a.price || 0);
+            return 0;
+        });
+    }
 
     if (!prods.length) {
         grid.innerHTML = `<div class="empty-state">${tr('product.empty')}</div>`;
@@ -2070,12 +2073,21 @@ function renderProducts() {
             : '';
 
         return `
-            <div class="product-card glass">
+            <div class="product-card glass" id="admin-card-${p.id}" data-product-id="${p.id}" draggable="true">
                 ${imgHtml}
                 <div class="product-header">
-                    <div>
-                        <div class="product-title">${escapeHtml(dispTitle)}</div>
-                        ${transSubtitle}
+                    <div style="display: flex; align-items: flex-start; gap: 8px; flex: 1; min-width: 0;">
+                        <span class="product-card-drag-handle" title="${tr('product.dragSort') || 'Drag to reorder'}" aria-label="Reorder">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/>
+                                <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                                <circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/>
+                            </svg>
+                        </span>
+                        <div style="min-width: 0;">
+                            <div class="product-title">${escapeHtml(dispTitle)}</div>
+                            ${transSubtitle}
+                        </div>
                     </div>
                     <div class="product-actions-top">
                         <button class="btn btn-icon btn-sm btn-secondary" onclick="openEditProduct('${p.id}')" title="${editLbl}">
@@ -2118,6 +2130,239 @@ function renderProducts() {
             </div>
         `;
     }).join('');
+}
+
+// ==================== ADMIN PRODUCT DRAG AND DROP ====================
+let lastAdminCardDragEndTime = 0;
+
+function applySavedAdminProductOrder() {
+    try {
+        const raw = localStorage.getItem('bazar_admin_product_order');
+        if (!raw) return;
+        const order = JSON.parse(raw);
+        if (!Array.isArray(order) || !order.length) return;
+
+        const orderMap = new Map();
+        order.forEach((id, idx) => orderMap.set(id, idx));
+
+        state.products.sort((a, b) => {
+            const idxA = orderMap.has(a.id) ? orderMap.get(a.id) : 999999;
+            const idxB = orderMap.has(b.id) ? orderMap.get(b.id) : 999999;
+            return idxA - idxB;
+        });
+
+        const sortSelect = document.getElementById('productSort');
+        if (sortSelect) sortSelect.value = 'custom';
+    } catch (e) {
+        console.warn('[admin] Failed to apply product order:', e);
+    }
+}
+
+function saveAdminProductOrderFromDOM() {
+    const grid = document.getElementById('productsGrid');
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.product-card');
+    const visibleIds = Array.from(cards).map(c => c.dataset.productId).filter(Boolean);
+    if (!visibleIds.length) return;
+
+    const allIds = state.products.map(p => p.id);
+    const remainingIds = allIds.filter(id => !visibleIds.includes(id));
+    const newOrder = [...visibleIds, ...remainingIds];
+
+    const orderMap = new Map();
+    newOrder.forEach((id, idx) => orderMap.set(id, idx));
+    state.products.sort((a, b) => (orderMap.get(a.id) ?? 99999) - (orderMap.get(b.id) ?? 99999));
+
+    try {
+        localStorage.setItem('bazar_admin_product_order', JSON.stringify(newOrder));
+    } catch (e) {
+        console.warn('[admin] Failed to save product order:', e);
+    }
+
+    const sortSelect = document.getElementById('productSort');
+    if (sortSelect) sortSelect.value = 'custom';
+}
+
+function setupAdminProductGridSortable() {
+    const grid = document.getElementById('productsGrid');
+    if (!grid || grid.__sortableInitialized) return;
+    grid.__sortableInitialized = true;
+
+    let draggedCard = null;
+
+    grid.addEventListener('dragstart', (e) => {
+        if (e.target.closest('button') || e.target.closest('.product-actions') || e.target.closest('.product-actions-top')) {
+            e.preventDefault();
+            return;
+        }
+        const card = e.target.closest('.product-card');
+        if (!card) return;
+
+        draggedCard = card;
+        lastAdminCardDragEndTime = Date.now();
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', card.dataset.productId || '');
+
+        setTimeout(() => {
+            if (draggedCard === card) {
+                card.classList.add('is-dragging');
+            }
+        }, 0);
+    });
+
+    grid.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (!draggedCard) return;
+
+        const target = e.target.closest('.product-card');
+        if (target && target !== draggedCard && target.parentElement === grid) {
+            const rect = target.getBoundingClientRect();
+            const midX = rect.left + rect.width / 2;
+            const midY = rect.top + rect.height / 2;
+            const isBelow = e.clientY > midY;
+            const isRightOfMid = Math.abs(e.clientY - midY) < rect.height * 0.35 && e.clientX > midX;
+            const next = isBelow || isRightOfMid;
+            const sibling = next ? target.nextSibling : target;
+            if (sibling !== draggedCard && draggedCard.nextSibling !== sibling) {
+                grid.insertBefore(draggedCard, sibling);
+            }
+        }
+    });
+
+    const cleanupDrag = () => {
+        if (draggedCard) {
+            draggedCard.classList.remove('is-dragging');
+            draggedCard = null;
+            lastAdminCardDragEndTime = Date.now();
+            saveAdminProductOrderFromDOM();
+        }
+    };
+
+    grid.addEventListener('dragend', cleanupDrag);
+    grid.addEventListener('drop', (e) => {
+        e.preventDefault();
+        cleanupDrag();
+    });
+
+    // Touch support with hold and vibration
+    let touchCard = null;
+    let touchClone = null;
+    let touchOffsetX = 0;
+    let touchOffsetY = 0;
+    let touchMoved = false;
+    let holdTimer = null;
+    let startX = 0;
+    let startY = 0;
+    let isDragging = false;
+
+    function startAdminCardTouchDrag(card, touch) {
+        touchCard = card;
+        touchMoved = false;
+        isDragging = true;
+        const rect = card.getBoundingClientRect();
+        touchOffsetX = touch.clientX - rect.left;
+        touchOffsetY = touch.clientY - rect.top;
+
+        touchClone = card.cloneNode(true);
+        touchClone.className = card.className + ' product-card-drag-clone';
+        touchClone.style.width = rect.width + 'px';
+        touchClone.style.height = rect.height + 'px';
+        touchClone.style.top = rect.top + 'px';
+        touchClone.style.left = rect.left + 'px';
+        document.body.appendChild(touchClone);
+
+        card.classList.add('is-dragging');
+        if (navigator.vibrate) {
+            try { navigator.vibrate(60); } catch (e) {}
+        }
+    }
+
+    grid.addEventListener('touchstart', (e) => {
+        clearTimeout(holdTimer);
+        if (e.target.closest('button') || e.target.closest('.product-actions') || e.target.closest('.product-actions-top')) return;
+
+        const card = e.target.closest('.product-card');
+        if (!card) return;
+
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
+
+        if (e.target.closest('.product-card-drag-handle')) {
+            startAdminCardTouchDrag(card, touch);
+            e.preventDefault();
+            return;
+        }
+
+        holdTimer = setTimeout(() => {
+            startAdminCardTouchDrag(card, touch);
+        }, 450);
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+
+        if (!isDragging) {
+            if (holdTimer) {
+                const dist = Math.hypot(touch.clientX - startX, touch.clientY - startY);
+                if (dist > 10) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
+                }
+            }
+            return;
+        }
+
+        touchMoved = true;
+        if (touchClone) {
+            touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+            touchClone.style.left = (touch.clientX - touchOffsetX) + 'px';
+
+            touchClone.style.display = 'none';
+            const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+            touchClone.style.display = 'flex';
+
+            const target = elem ? elem.closest('#productsGrid .product-card') : null;
+            if (target && target !== touchCard && target.parentElement === grid) {
+                const rect = target.getBoundingClientRect();
+                const midX = rect.left + rect.width / 2;
+                const midY = rect.top + rect.height / 2;
+                const isBelow = touch.clientY > midY;
+                const isRightOfMid = Math.abs(touch.clientY - midY) < rect.height * 0.35 && touch.clientX > midX;
+                const next = isBelow || isRightOfMid;
+                const sibling = next ? target.nextSibling : target;
+                if (sibling !== touchCard && touchCard.nextSibling !== sibling) {
+                    grid.insertBefore(touchCard, sibling);
+                }
+            }
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    const endTouch = () => {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+        if (touchClone) {
+            touchClone.remove();
+            touchClone = null;
+        }
+        if (touchCard) {
+            touchCard.classList.remove('is-dragging');
+            touchCard = null;
+            if (touchMoved || isDragging) {
+                lastAdminCardDragEndTime = Date.now();
+                if (navigator.vibrate) {
+                    try { navigator.vibrate(30); } catch (e) {}
+                }
+            }
+            isDragging = false;
+            saveAdminProductOrderFromDOM();
+        }
+    };
+
+    document.addEventListener('touchend', endTouch);
+    document.addEventListener('touchcancel', endTouch);
 }
 
 // ---------- Activity ----------
@@ -3606,8 +3851,9 @@ function setupEventListeners() {
         });
     });
 
-    // Setup drag-and-drop sortable sidebar
+    // Setup drag-and-drop sortable sidebar and products
     setupSidebarSortable();
+    setupAdminProductGridSortable();
 
     // Sidebar toggle and overlay
     const sidebar = document.getElementById('sidebar');

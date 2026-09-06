@@ -420,15 +420,81 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    transition: var(--transition);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
     box-shadow: var(--shadow-xs);
     position: relative;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+  }
+
+  .pos-card:active {
+    cursor: grabbing;
   }
 
   .pos-card:hover {
     border-color: var(--border-strong);
     box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
+  }
+
+  .pos-card-drag-handle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0;
+    cursor: grab;
+    transition: opacity 0.15s ease, background 0.15s ease;
+    z-index: 6;
+  }
+
+  .pos-card:hover .pos-card-drag-handle,
+  .pos-card.is-dragging .pos-card-drag-handle {
+    opacity: 0.85;
+  }
+
+  .pos-card-drag-handle:hover {
+    background: rgba(0, 0, 0, 0.75);
+    opacity: 1 !important;
+  }
+
+  .pos-card-drag-handle svg {
+    stroke: none !important;
+    fill: currentColor !important;
+  }
+
+  .pos-card.is-dragging {
+    opacity: 0.35 !important;
+    transform: scale(0.96) !important;
+    outline: 2px dashed var(--accent) !important;
+    outline-offset: -2px;
+    cursor: grabbing !important;
+  }
+
+  .pos-card.is-dragging * {
+    cursor: grabbing !important;
+  }
+
+  .pos-card-drag-clone {
+    position: fixed;
+    z-index: 999999;
+    pointer-events: none;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 0 2px var(--accent);
+    border-radius: var(--radius-lg);
+    opacity: 0.95;
+    transform: scale(1.04);
+    background: var(--bg-surface);
+    overflow: hidden;
   }
 
   .pos-card.out-of-stock {
@@ -4267,6 +4333,49 @@ async function loadProductsFromStorage() {
     translations: p.translations || {},
     version: p.version || 1
   }));
+  applySavedProductOrder();
+}
+
+function applySavedProductOrder() {
+  try {
+    const raw = localStorage.getItem('bazar_pos_product_order');
+    if (!raw) return;
+    const order = JSON.parse(raw);
+    if (!Array.isArray(order) || !order.length) return;
+
+    const orderMap = new Map();
+    order.forEach((id, idx) => orderMap.set(id, idx));
+
+    products.sort((a, b) => {
+      const idxA = orderMap.has(a.id) ? orderMap.get(a.id) : 999999;
+      const idxB = orderMap.has(b.id) ? orderMap.get(b.id) : 999999;
+      return idxA - idxB;
+    });
+  } catch(e) {
+    console.warn('[pos] Failed to apply product order:', e);
+  }
+}
+
+function saveProductOrderFromDOM() {
+  const grid = document.getElementById('product-grid');
+  if (!grid) return;
+  const cards = grid.querySelectorAll('.pos-card');
+  const visibleIds = Array.from(cards).map(c => c.dataset.productId || c.id.replace('card-', '')).filter(Boolean);
+  if (!visibleIds.length) return;
+
+  const currentIds = products.map(p => p.id);
+  const remainingIds = currentIds.filter(id => !visibleIds.includes(id));
+  const newOrder = [...visibleIds, ...remainingIds];
+
+  const orderMap = new Map();
+  newOrder.forEach((id, idx) => orderMap.set(id, idx));
+  products.sort((a, b) => (orderMap.get(a.id) ?? 99999) - (orderMap.get(b.id) ?? 99999));
+
+  try {
+    localStorage.setItem('bazar_pos_product_order', JSON.stringify(newOrder));
+  } catch(e) {
+    console.warn('[pos] Failed to save product order:', e);
+  }
 }
 
 async function refreshSessionStats() {
@@ -4375,8 +4484,11 @@ function renderCard(p) {
         : `<span class="stock-pill stock-in" id="stock-${p.id}"><span class="stock-num">${p.stock}</span> ${t('pos.inStock')}</span>`;
 
   return `
-    <div class="pos-card ${isOut ? 'out-of-stock' : ''}" id="card-${p.id}">
+    <div class="pos-card ${isOut ? 'out-of-stock' : ''}" id="card-${p.id}" data-product-id="${p.id}" draggable="true">
       <div class="sync-indicator" id="sync-${p.id}"></div>
+      <span class="pos-card-drag-handle" title="Tartiblash uchun suring" aria-label="Reorder">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+      </span>
       <div class="pos-card-img-wrap">
         <img src="${imgSrc}" alt="${escapeHtml(localizedTitle)}" class="pos-card-img" loading="lazy" onerror="this.onerror=null;this.src='assets/logo.webp';">
         ${badge ? badgeMap[badge] || '' : ''}
@@ -4495,8 +4607,196 @@ function updateCardStock(productId) {
   }
 }
 
+// ── PRODUCT GRID DRAG AND DROP SORTING ────────────────────────────────────
+let lastCardDragEndTime = 0;
+
+function setupProductGridSortable() {
+  const grid = document.getElementById('product-grid');
+  if (!grid || grid.__sortableInitialized) return;
+  grid.__sortableInitialized = true;
+
+  let draggedCard = null;
+
+  // --- Desktop Drag and Drop ---
+  grid.addEventListener('dragstart', (e) => {
+    if (e.target.closest('.sold-btn')) {
+      e.preventDefault();
+      return;
+    }
+    const card = e.target.closest('.pos-card');
+    if (!card) return;
+
+    draggedCard = card;
+    lastCardDragEndTime = Date.now();
+    e.dataTransfer.effectAllowed = 'move';
+    const prodId = card.dataset.productId || card.id.replace('card-', '');
+    e.dataTransfer.setData('text/plain', prodId);
+
+    setTimeout(() => {
+      if (draggedCard === card) {
+        card.classList.add('is-dragging');
+      }
+    }, 0);
+  });
+
+  grid.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (!draggedCard) return;
+
+    const target = e.target.closest('.pos-card');
+    if (target && target !== draggedCard && target.parentElement === grid) {
+      const rect = target.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      const midY = rect.top + rect.height / 2;
+      const isBelow = e.clientY > midY;
+      const isRightOfMid = Math.abs(e.clientY - midY) < rect.height * 0.35 && e.clientX > midX;
+      const next = isBelow || isRightOfMid;
+      const sibling = next ? target.nextSibling : target;
+      if (sibling !== draggedCard && draggedCard.nextSibling !== sibling) {
+        grid.insertBefore(draggedCard, sibling);
+      }
+    }
+  });
+
+  const cleanupCardDrag = () => {
+    if (draggedCard) {
+      draggedCard.classList.remove('is-dragging');
+      draggedCard = null;
+      lastCardDragEndTime = Date.now();
+      saveProductOrderFromDOM();
+    }
+  };
+
+  grid.addEventListener('dragend', cleanupCardDrag);
+  grid.addEventListener('drop', (e) => {
+    e.preventDefault();
+    cleanupCardDrag();
+  });
+
+  // --- Mobile Touch Drag & Drop with Hold & Haptic Feedback ---
+  let touchCard = null;
+  let touchCardClone = null;
+  let touchCardOffsetX = 0;
+  let touchCardOffsetY = 0;
+  let touchCardMoved = false;
+  let cardHoldTimer = null;
+  let startCardTouchX = 0;
+  let startCardTouchY = 0;
+  let isCardTouchDragging = false;
+
+  function startCardTouchDrag(card, touch) {
+    touchCard = card;
+    touchCardMoved = false;
+    isCardTouchDragging = true;
+    const rect = card.getBoundingClientRect();
+    touchCardOffsetX = touch.clientX - rect.left;
+    touchCardOffsetY = touch.clientY - rect.top;
+
+    touchCardClone = card.cloneNode(true);
+    touchCardClone.className = card.className + ' pos-card-drag-clone';
+    touchCardClone.style.width = rect.width + 'px';
+    touchCardClone.style.height = rect.height + 'px';
+    touchCardClone.style.top = rect.top + 'px';
+    touchCardClone.style.left = rect.left + 'px';
+    document.body.appendChild(touchCardClone);
+
+    card.classList.add('is-dragging');
+    if (navigator.vibrate) {
+      try { navigator.vibrate(60); } catch(e) {}
+    }
+  }
+
+  grid.addEventListener('touchstart', (e) => {
+    clearTimeout(cardHoldTimer);
+    if (e.target.closest('.sold-btn')) return;
+
+    const card = e.target.closest('.pos-card');
+    if (!card) return;
+
+    const touch = e.touches[0];
+    startCardTouchX = touch.clientX;
+    startCardTouchY = touch.clientY;
+
+    if (e.target.closest('.pos-card-drag-handle')) {
+      startCardTouchDrag(card, touch);
+      e.preventDefault();
+      return;
+    }
+
+    cardHoldTimer = setTimeout(() => {
+      startCardTouchDrag(card, touch);
+    }, 450);
+  }, { passive: false });
+
+  document.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+
+    if (!isCardTouchDragging) {
+      if (cardHoldTimer) {
+        const dist = Math.hypot(touch.clientX - startCardTouchX, touch.clientY - startCardTouchY);
+        if (dist > 10) {
+          clearTimeout(cardHoldTimer);
+          cardHoldTimer = null;
+        }
+      }
+      return;
+    }
+
+    touchCardMoved = true;
+    if (touchCardClone) {
+      touchCardClone.style.top = (touch.clientY - touchCardOffsetY) + 'px';
+      touchCardClone.style.left = (touch.clientX - touchCardOffsetX) + 'px';
+
+      touchCardClone.style.display = 'none';
+      const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+      touchCardClone.style.display = 'flex';
+
+      const target = elem ? elem.closest('#product-grid .pos-card') : null;
+      if (target && target !== touchCard && target.parentElement === grid) {
+        const rect = target.getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        const midY = rect.top + rect.height / 2;
+        const isBelow = touch.clientY > midY;
+        const isRightOfMid = Math.abs(touch.clientY - midY) < rect.height * 0.35 && touch.clientX > midX;
+        const next = isBelow || isRightOfMid;
+        const sibling = next ? target.nextSibling : target;
+        if (sibling !== touchCard && touchCard.nextSibling !== sibling) {
+          grid.insertBefore(touchCard, sibling);
+        }
+      }
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  const endCardTouch = () => {
+    clearTimeout(cardHoldTimer);
+    cardHoldTimer = null;
+    if (touchCardClone) {
+      touchCardClone.remove();
+      touchCardClone = null;
+    }
+    if (touchCard) {
+      touchCard.classList.remove('is-dragging');
+      touchCard = null;
+      if (touchCardMoved || isCardTouchDragging) {
+        lastCardDragEndTime = Date.now();
+        if (navigator.vibrate) {
+          try { navigator.vibrate(30); } catch(e) {}
+        }
+      }
+      isCardTouchDragging = false;
+      saveProductOrderFromDOM();
+    }
+  };
+
+  document.addEventListener('touchend', endCardTouch);
+  document.addEventListener('touchcancel', endCardTouch);
+}
+
 // ── MODAL ─────────────────────────────────────────────────────────────────
 function openModal(productId) {
+  if (Date.now() - lastCardDragEndTime < 250) return;
   activeProduct = products.find(p => p.id === productId);
   const isUntracked = activeProduct && (activeProduct.stock === null || activeProduct.stock === undefined);
   if (!activeProduct || (!isUntracked && activeProduct.stock === 0)) return;
@@ -5714,6 +6014,7 @@ async function init() {
   setupLanguageSwitcher();
   setupViewToggle();
   setupBottomNavAndTabs();
+  setupProductGridSortable();
 
   loadCachedRates();
   setupCurrencyBar();
