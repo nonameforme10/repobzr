@@ -43,12 +43,12 @@
   }
 </script>
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=13">
+<link rel="stylesheet" href="/style.css?v=14">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="/i18n.js?v=13"></script>
+<script src="/i18n.js?v=14"></script>
 <script>
   // Robustness guard: ensure all POS keys exist even if an older cached i18n.js was loaded
   (function () {
@@ -1668,107 +1668,278 @@
       min-height: 40px;
     }
 
-    /* Grid: single column on phones, two on wider mobiles */
+    /* Grid container on mobile */
     .pos-grid-container {
       padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 32px);
       display: block; /* revert flex so grid fills naturally */
     }
-    .pos-grid {
-      grid-template-columns: 1fr;
-      gap: 12px;
+
+    /* View toggle tap targets on mobile */
+    .view-btn {
+      min-width: 34px;
+      min-height: 34px;
+      padding: 6px 8px;
     }
 
-    /* Product cards: horizontal compact layout on mobile */
-    .pos-card {
-      flex-direction: row;
+    /* ── CARD / GRID VIEW ON MOBILE (Default when not list view) ── */
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card {
+      display: flex;
+      flex-direction: column;
       align-items: stretch;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-xs);
     }
-    .pos-card-img-wrap {
-      width: 96px;
-      min-width: 96px;
-      aspect-ratio: unset;
+
+    .pos-grid:not(.pos-list-view) .pos-card-img-wrap {
+      width: 100%;
+      min-width: unset;
       height: auto;
+      aspect-ratio: 4/3;
       border-radius: 0;
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-surface-2);
     }
-    .pos-card-body {
-      padding: 12px 12px 0;
+
+    .pos-grid:not(.pos-list-view) .pos-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .pos-grid:not(.pos-list-view) .card-badge {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      font-size: 0.625rem;
+      padding: 2px 6px;
+      border-radius: var(--radius-pill);
+      z-index: 2;
+    }
+
+    .pos-grid:not(.pos-list-view) .sync-indicator {
+      top: 6px;
+      right: 6px;
+      font-size: 0.625rem;
+      padding: 2px 6px;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card-body {
+      padding: 10px 10px 0;
       flex: 1;
       min-width: 0;
+      display: flex;
+      flex-direction: column;
     }
-    .pos-card-name {
-      font-size: 0.9375rem;
+
+    .pos-grid:not(.pos-list-view) .pos-card-name {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1.3;
+      color: var(--ink-strong);
+      margin-bottom: 2px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      white-space: normal;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card-orig {
+      display: none;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card-sku {
+      font-size: 0.625rem;
+      color: var(--ink-muted);
+      margin-bottom: 6px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-    .pos-card-orig {
-      display: none; /* hide secondary name on mobile to reduce noise */
-    }
-    .pos-card-meta {
-      margin-bottom: 10px;
-    }
-    .pos-card-price-row {
-      border-bottom: none;
-      padding-bottom: 0;
-      margin-top: 4px;
-      gap: 8px;
-      flex-wrap: nowrap;
-    }
-    .pos-card-price {
-      font-size: 1.0625rem;
-    }
-    .pos-card-footer {
-      padding: 12px 12px 12px 0;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      flex-shrink: 0;
-    }
-    /* Sold button: tall thumb-friendly square on mobile */
-    .sold-btn {
-      width: auto;
-      min-width: 64px;
-      height: 100%;
-      min-height: 56px;
-      padding: 10px 14px;
-      font-size: 0.8125rem;
-      flex-direction: column;
-      gap: 4px;
-      border-radius: var(--radius);
+      font-variant-numeric: tabular-nums;
     }
 
-    /* Restore list-view on mobile — override the card row layout */
+    .pos-grid:not(.pos-list-view) .pos-card-meta {
+      display: none;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card-price-row {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      margin-top: auto;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--divider);
+      flex-wrap: wrap;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card-price {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--ink-strong);
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pos-grid:not(.pos-list-view) .stock-pill {
+      font-size: 0.625rem;
+      padding: 2px 6px;
+      border-radius: var(--radius-pill);
+      white-space: nowrap;
+    }
+
+    .pos-grid:not(.pos-list-view) .pos-card-footer {
+      padding: 8px 10px 10px;
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .pos-grid:not(.pos-list-view) .sold-btn {
+      width: 100%;
+      min-width: unset;
+      height: auto;
+      min-height: 38px;
+      padding: 8px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+    }
+
+    /* ── LIST / TABLE VIEW ON MOBILE ── */
     .pos-grid.pos-list-view {
       display: flex;
       flex-direction: column;
       gap: 8px;
+      width: 100%;
     }
+
     .pos-grid.pos-list-view .pos-card {
+      display: flex;
       flex-direction: row;
       align-items: center;
       padding: 10px 12px;
       gap: 12px;
+      border-radius: var(--radius);
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-xs);
     }
+
     .pos-grid.pos-list-view .pos-card-img-wrap {
       width: 56px;
       min-width: 56px;
       height: 56px;
       aspect-ratio: 1/1;
       border-radius: var(--radius-sm);
+      overflow: hidden;
+      flex-shrink: 0;
     }
+
+    .pos-grid.pos-list-view .pos-card-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .pos-grid.pos-list-view .card-badge {
+      display: none;
+    }
+
     .pos-grid.pos-list-view .pos-card-body {
       padding: 0;
       flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
+
+    .pos-grid.pos-list-view .pos-card-name {
+      font-size: 0.875rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+      display: block;
+      -webkit-line-clamp: unset;
+    }
+
+    .pos-grid.pos-list-view .pos-card-orig {
+      display: none;
+    }
+
+    .pos-grid.pos-list-view .pos-card-sku {
+      font-size: 0.6875rem;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pos-grid.pos-list-view .pos-card-meta {
+      display: none;
+    }
+
+    .pos-grid.pos-list-view .pos-card-price-row {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-top: 2px;
+      gap: 8px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .pos-grid.pos-list-view .pos-card-price {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .pos-grid.pos-list-view .stock-pill {
+      font-size: 0.625rem;
+      padding: 2px 6px;
+    }
+
     .pos-grid.pos-list-view .pos-card-footer {
       padding: 0;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      width: auto;
     }
+
     .pos-grid.pos-list-view .sold-btn {
-      min-height: 44px;
+      width: auto;
+      min-width: unset;
+      min-height: 38px;
       height: auto;
       flex-direction: row;
-      padding: 9px 14px;
+      padding: 8px 14px;
+      font-size: 0.8125rem;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
     }
 
     /* Modal: sheet from bottom with safe area */
@@ -1850,53 +2021,58 @@
     }
     .pos-grid-container {
       padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 28px);
-      display: block;
-    }
-    .pos-card-img-wrap {
-      width: 80px;
-      min-width: 80px;
     }
   }
 
-  /* ── TWO COLUMNS on wider phones (≥480px) ── */
-  @media (min-width: 480px) and (max-width: 768px) {
-    /* Revert back to grid (not the mobile card row) for wider phones */
-    .pos-grid {
-      grid-template-columns: repeat(2, 1fr);
+  /* ── EXTRA NARROW PHONES (≤360px) ── */
+  @media (max-width: 360px) {
+    .pos-grid:not(.pos-list-view) {
+      gap: 6px;
     }
-    /* Revert card to normal vertical layout for 2-col grid */
-    .pos-card {
-      flex-direction: column;
+    .pos-grid:not(.pos-list-view) .pos-card-body {
+      padding: 8px 8px 0;
     }
-    .pos-card-img-wrap {
-      width: 100%;
-      min-width: unset;
-      aspect-ratio: 16/10;
-      height: auto;
+    .pos-grid:not(.pos-list-view) .pos-card-name {
+      font-size: 0.75rem;
     }
-    .pos-card-body {
-      padding: 12px 14px 0;
+    .pos-grid:not(.pos-list-view) .pos-card-footer {
+      padding: 6px 8px 8px;
     }
-    .pos-card-orig {
-      display: block;
+    .pos-grid:not(.pos-list-view) .sold-btn {
+      padding: 7px 4px;
+      font-size: 0.6875rem;
+      gap: 3px;
     }
-    .pos-card-footer {
-      padding: 10px 14px 14px;
+    .pos-grid:not(.pos-list-view) .sold-btn svg {
+      width: 12px;
+      height: 12px;
     }
-    .sold-btn {
-      width: 100%;
-      min-width: unset;
-      height: auto;
-      min-height: unset;
-      flex-direction: row;
-      gap: 7px;
-      padding: 11px 16px;
+    .pos-grid:not(.pos-list-view) .pos-card-price {
       font-size: 0.875rem;
     }
-    .pos-card-price-row {
-      border-bottom: 1px solid var(--divider);
-      padding-bottom: 12px;
-      flex-wrap: wrap;
+    .pos-grid.pos-list-view .pos-card {
+      padding: 8px 10px;
+      gap: 8px;
+    }
+    .pos-grid.pos-list-view .pos-card-img-wrap {
+      width: 48px;
+      min-width: 48px;
+      height: 48px;
+    }
+    .pos-grid.pos-list-view .pos-card-name {
+      font-size: 0.8125rem;
+    }
+    .pos-grid.pos-list-view .sold-btn {
+      padding: 7px 10px;
+      font-size: 0.75rem;
+    }
+  }
+
+  /* ── WIDER PHONES / PHABLETS (540px–768px) ── */
+  @media (min-width: 540px) and (max-width: 768px) {
+    .pos-grid:not(.pos-list-view) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
     }
   }
 
