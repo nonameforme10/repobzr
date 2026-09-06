@@ -1,7 +1,9 @@
-const CACHE_NAME = 'bazar-pos-v1';
+const CACHE_NAME = 'bazar-pos-v2';
 const ASSETS_TO_CACHE = [
   '/',
+  '/admin',
   '/admin.html',
+  '/sellers',
   '/sellers.html',
   '/404.html',
   '/style.css',
@@ -14,13 +16,17 @@ const ASSETS_TO_CACHE = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        // We use addAll but handle potential errors nicely
-        // (if any file doesn't exist, the whole addAll might fail, so we might want to ensure they exist)
-        return cache.addAll(ASSETS_TO_CACHE);
+      .then(async cache => {
+        // Cache assets individually so one failure doesn't block the entire SW installation
+        for (const asset of ASSETS_TO_CACHE) {
+          try {
+            await cache.add(asset);
+          } catch (err) {
+            console.warn(`[SW] Failed to cache ${asset}:`, err);
+          }
+        }
       })
       .then(() => self.skipWaiting())
-      .catch(err => console.warn('Service worker install error:', err))
   );
 });
 
@@ -47,7 +53,7 @@ self.addEventListener('fetch', event => {
   }
 
   // Handle HTML (Network first, fallback to cache)
-  if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
+  if (event.request.mode === 'navigate' || (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
     event.respondWith(
       fetch(event.request).then(response => {
         const responseClone = response.clone();
@@ -55,28 +61,47 @@ self.addEventListener('fetch', event => {
         return response;
       }).catch(() => {
         return caches.match(event.request).then(response => {
-          return response || caches.match('/404.html');
+          if (response) return response;
+          
+          // Smart offline routing based on hostname
+          if (url.hostname.startsWith('admin')) {
+            return caches.match('/admin.html') || caches.match('/admin');
+          } else if (url.hostname.startsWith('sellers')) {
+            return caches.match('/sellers.html') || caches.match('/sellers');
+          }
+          
+          return caches.match('/404.html');
         });
       })
     );
     return;
   }
 
-  // Handle other static assets (Stale-While-Revalidate)
+  // Handle other static assets (Cache First, then Network)
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
-      const fetchPromise = fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+      if (cachedResponse) {
+        // Return from cache, but update it in background (Stale-While-Revalidate)
+        fetch(event.request).then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
+          }
+        }).catch(() => {});
+        return cachedResponse;
+      }
+      
+      return fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200) {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then(cache => {
             cache.put(event.request, responseToCache);
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // If fetch fails and no cache, let it fail natively
+      }).catch(err => {
+        console.warn('[SW] Network fetch failed for', event.request.url);
+        throw err;
       });
-      return cachedResponse || fetchPromise;
     })
   );
 });
