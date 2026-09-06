@@ -169,20 +169,28 @@
     max-width: 1440px;
     width: 100%;
     margin: 0 auto;
-    padding: 24px 28px 0;
+    padding: 20px 28px 0;
     display: flex;
     align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
+    gap: 12px;
+    flex-wrap: nowrap;
   }
 
   .pos-search-box {
     position: relative;
     display: flex;
     align-items: center;
+    flex: 0 0 auto;
+    width: clamp(220px, 25%, 360px);
+  }
+
+  /* Actions row stretches to fill remaining space */
+  .pos-toolbar-actions {
     flex: 1;
-    min-width: 240px;
-    max-width: 380px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
   }
 
   .pos-search-box svg {
@@ -244,6 +252,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1;
+    min-width: 0;
   }
 
   .pos-filter-btn {
@@ -332,12 +342,15 @@
     margin: 0 auto;
     padding: 20px 28px 48px;
     flex: 1;
+    display: flex;
+    flex-direction: column;
   }
 
   .pos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 20px;
+    flex: 1;
   }
 
   /* ── PRODUCT CARD ── */
@@ -730,6 +743,7 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
+    position: relative;
   }
 
   .pos-modal-title {
@@ -1111,12 +1125,14 @@
   /* ── EMPTY STATE ── */
   .pos-empty {
     grid-column: 1 / -1;
-    padding: 64px 24px;
+    padding: 0 24px;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    flex: 1;
+    min-height: 340px;
   }
 
   .pos-empty-icon {
@@ -1153,13 +1169,22 @@
     display: none;
   }
 
+  /* ── TABLET (769–1024px) ── */
+  @media (max-width: 1024px) {
+    .pos-grid {
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+  }
+
+  /* ── MOBILE (≤768px) ── */
   @media (max-width: 768px) {
     .desktop-only { display: none !important; }
     .mobile-only { display: grid !important; }
 
+    /* Header: taller tap targets, more breathing room */
     .pos-header {
       padding: 0 16px;
-      height: 58px;
+      height: 60px;
     }
     .brand-title span:first-child {
       font-size: 1rem;
@@ -1169,93 +1194,205 @@
       padding: 1px 6px;
     }
     .header-actions {
-      gap: 8px;
+      gap: 10px;
     }
 
-    /* Mobile 3-card stats strip */
+    /* Theme & lang buttons: bigger tap area */
+    .theme-toggle,
+    .lang-toggle {
+      min-width: 40px;
+      min-height: 40px;
+      padding: 0 10px;
+    }
+
+    /* Mobile 3-card stats strip — auto-sized columns, no truncation */
     .pos-mobile-stats {
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      padding: 10px 16px 0;
+      padding: 10px 12px 0;
       max-width: 1440px;
       margin: 0 auto;
       width: 100%;
+      box-sizing: border-box;
     }
     .m-stat-card {
       background: var(--bg-surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      padding: 7px 6px;
+      padding: 8px 6px;
       text-align: center;
       box-shadow: var(--shadow-xs);
       display: flex;
       flex-direction: column;
       justify-content: center;
       min-width: 0;
+      overflow: hidden;
     }
     .m-stat-val {
-      font-size: 0.8125rem;
+      font-size: clamp(0.7rem, 2.8vw, 0.9rem);
       font-weight: 700;
       color: var(--ink-strong);
       line-height: 1.2;
       font-variant-numeric: tabular-nums;
-      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .m-stat-val.profit-val {
       color: var(--success);
     }
     .m-stat-lbl {
-      font-size: 0.625rem;
+      font-size: clamp(0.55rem, 2vw, 0.65rem);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.02em;
       color: var(--ink-muted);
       margin-top: 2px;
-      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
+    /* Toolbar: wrap to two rows on mobile */
     .pos-toolbar {
-      padding: 12px 16px 0;
+      padding: 12px 12px 0;
       gap: 10px;
+      flex-wrap: wrap;
     }
     .pos-search-box {
-      max-width: 100%;
-      min-width: 100%;
+      width: 100%;
+      flex: 1 1 100%;
+    }
+    .pos-search-input {
+      font-size: 1rem; /* prevent iOS zoom on focus */
+      padding: 11px 14px 11px 40px;
     }
     .pos-toolbar-actions {
       width: 100%;
-      display: flex;
-      align-items: center;
+      flex: 1 1 100%;
       justify-content: space-between;
-      gap: 8px;
     }
     .pos-filter-group {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       padding-bottom: 2px;
       scrollbar-width: none;
+      flex: 1 1 auto;
     }
     .pos-filter-group::-webkit-scrollbar {
       display: none;
     }
-    .pos-grid-container {
-      padding: 14px 16px 40px;
-    }
-    .pos-grid {
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 14px;
-    }
-    .pos-card-body {
-      padding: 12px 14px 0;
-    }
-    .pos-card-footer {
-      padding: 10px 14px 14px;
+    /* Larger filter tap targets on mobile */
+    .pos-filter-btn {
+      padding: 9px 14px;
+      font-size: 0.875rem;
+      min-height: 40px;
     }
 
+    /* Grid: single column on phones, two on wider mobiles */
+    .pos-grid-container {
+      padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 32px);
+      display: block; /* revert flex so grid fills naturally */
+    }
+    .pos-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    /* Product cards: horizontal compact layout on mobile */
+    .pos-card {
+      flex-direction: row;
+      align-items: stretch;
+    }
+    .pos-card-img-wrap {
+      width: 96px;
+      min-width: 96px;
+      aspect-ratio: unset;
+      height: auto;
+      border-radius: 0;
+    }
+    .pos-card-body {
+      padding: 12px 12px 0;
+      flex: 1;
+      min-width: 0;
+    }
+    .pos-card-name {
+      font-size: 0.9375rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pos-card-orig {
+      display: none; /* hide secondary name on mobile to reduce noise */
+    }
+    .pos-card-meta {
+      margin-bottom: 10px;
+    }
+    .pos-card-price-row {
+      border-bottom: none;
+      padding-bottom: 0;
+      margin-top: 4px;
+      gap: 8px;
+      flex-wrap: nowrap;
+    }
+    .pos-card-price {
+      font-size: 1.0625rem;
+    }
+    .pos-card-footer {
+      padding: 12px 12px 12px 0;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+    /* Sold button: tall thumb-friendly square on mobile */
+    .sold-btn {
+      width: auto;
+      min-width: 64px;
+      height: 100%;
+      min-height: 56px;
+      padding: 10px 14px;
+      font-size: 0.8125rem;
+      flex-direction: column;
+      gap: 4px;
+      border-radius: var(--radius);
+    }
+
+    /* Restore list-view on mobile — override the card row layout */
+    .pos-grid.pos-list-view {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .pos-grid.pos-list-view .pos-card {
+      flex-direction: row;
+      align-items: center;
+      padding: 10px 12px;
+      gap: 12px;
+    }
+    .pos-grid.pos-list-view .pos-card-img-wrap {
+      width: 56px;
+      min-width: 56px;
+      height: 56px;
+      aspect-ratio: 1/1;
+      border-radius: var(--radius-sm);
+    }
+    .pos-grid.pos-list-view .pos-card-body {
+      padding: 0;
+      flex: 1;
+    }
+    .pos-grid.pos-list-view .pos-card-footer {
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .pos-grid.pos-list-view .sold-btn {
+      min-height: 44px;
+      height: auto;
+      flex-direction: row;
+      padding: 9px 14px;
+    }
+
+    /* Modal: sheet from bottom with safe area */
     .pos-overlay {
       padding: 0;
       align-items: flex-end;
@@ -1267,21 +1404,120 @@
       max-height: 92dvh;
       overflow-y: auto;
     }
+    /* Drag handle hint */
+    .pos-modal-header::before {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 36px;
+      height: 4px;
+      background: var(--border-strong);
+      border-radius: 2px;
+    }
+    .pos-modal-header {
+      position: relative;
+      padding-top: 24px;
+    }
+    /* Bigger input targets in modal */
+    .qty-btn {
+      width: 52px;
+      height: 52px;
+      font-size: 22px;
+    }
+    .qty-input {
+      font-size: 1.25rem;
+    }
+    .price-input {
+      padding: 13px 95px 13px 14px;
+      font-size: 1.25rem;
+    }
+    /* Modal footer: taller confirm button, safe area bottom */
+    .pos-modal-footer {
+      padding: 14px 18px calc(env(safe-area-inset-bottom, 0px) + 16px);
+    }
+    .btn-cancel,
+    .btn-confirm {
+      padding: 14px 16px;
+      font-size: 0.9375rem;
+      min-height: 50px;
+    }
+
     @keyframes modal-up {
       from { transform: translateY(100%); }
       to   { transform: translateY(0); }
     }
+
+    /* Toast: above any system nav bar */
     .pos-toast-container {
-      bottom: 16px;
-      right: 16px;
-      left: 16px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+      right: 12px;
+      left: 12px;
       max-width: 100%;
     }
   }
 
+  /* ── NARROW PHONES (≤400px) ── */
+  @media (max-width: 400px) {
+    .pos-header {
+      padding: 0 12px;
+    }
+    .brand-badge {
+      display: none; /* hide POS badge to save space on tiny screens */
+    }
+    .pos-toolbar {
+      padding: 10px 10px 0;
+    }
+    .pos-grid-container {
+      padding: 10px 10px calc(env(safe-area-inset-bottom, 0px) + 28px);
+      display: block;
+    }
+    .pos-card-img-wrap {
+      width: 80px;
+      min-width: 80px;
+    }
+  }
+
+  /* ── TWO COLUMNS on wider phones (≥480px) ── */
   @media (min-width: 480px) and (max-width: 768px) {
+    /* Revert back to grid (not the mobile card row) for wider phones */
     .pos-grid {
       grid-template-columns: repeat(2, 1fr);
+    }
+    /* Revert card to normal vertical layout for 2-col grid */
+    .pos-card {
+      flex-direction: column;
+    }
+    .pos-card-img-wrap {
+      width: 100%;
+      min-width: unset;
+      aspect-ratio: 16/10;
+      height: auto;
+    }
+    .pos-card-body {
+      padding: 12px 14px 0;
+    }
+    .pos-card-orig {
+      display: block;
+    }
+    .pos-card-footer {
+      padding: 10px 14px 14px;
+    }
+    .sold-btn {
+      width: 100%;
+      min-width: unset;
+      height: auto;
+      min-height: unset;
+      flex-direction: row;
+      gap: 7px;
+      padding: 11px 16px;
+      font-size: 0.875rem;
+    }
+    .pos-card-price-row {
+      border-bottom: 1px solid var(--divider);
+      padding-bottom: 12px;
+      flex-wrap: wrap;
     }
   }
 </style>

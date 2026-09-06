@@ -45,6 +45,7 @@
             'brand.tagline': 'Merchant Dashboard',
 
             // Navigation / sidebar actions
+            'nav.home':            'Home',
             'nav.dashboard':       'Dashboard',
             'nav.categories':      'Categories',
             'nav.products':        'Products',
@@ -306,6 +307,7 @@
             'brand.name':    'Bazar',
             'brand.tagline': 'Панель торговца',
 
+            'nav.home':          'Главная',
             'nav.dashboard':     'Панель',
             'nav.categories':    'Категории',
             'nav.products':      'Товары',
@@ -553,6 +555,7 @@
             'brand.name':    'Bazar',
             'brand.tagline': 'Savdogar paneli',
 
+            'nav.home':          'Asosiy',
             'nav.dashboard':     'Boshqaruv paneli',
             'nav.categories':    'Kategoriyalar',
             'nav.products':      'Mahsulotlar',

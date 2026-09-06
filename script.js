@@ -28,7 +28,7 @@ let state = {
 };
 
 let chartInstances = {};
-let currentPage = 'dashboard';
+let currentPage = 'home';
 
 // ==================== IMAGE STORAGE ABSTRACTION ====================
 /**
@@ -1512,12 +1512,58 @@ async function clearAllData() {
 
 // ==================== RENDERERS ====================
 function refreshAll() {
+    renderHome();
     renderDashboard();
     renderCategories();
     renderProducts();
     renderAnalytics();
     renderActivity();
     updateCharts();
+}
+
+// ---------- Home ----------
+function renderHome() {
+    const datePicker = document.getElementById('homeDatePicker');
+    const tbody = document.getElementById('homeReportsTableBody');
+    if (!datePicker || !tbody) return;
+    
+    // Set default date to today if empty
+    if (!datePicker.value) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        datePicker.value = `${yyyy}-${mm}-${dd}`;
+    }
+
+    const selectedDate = new Date(datePicker.value);
+    const startOfDay = new Date(selectedDate.setHours(0,0,0,0)).getTime();
+    const endOfDay = new Date(selectedDate.setHours(23,59,59,999)).getTime();
+
+    const sales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
+    
+    if (sales.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-cell">No sales on this date</td></tr>';
+        return;
+    }
+
+    let html = '';
+    sales.forEach(sale => {
+        const prod = getProduct(sale.productId);
+        const pic = (prod && prod.image) ? `<img src="${escapeHtml(prod.image)}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;">` : `<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#999;font-size:10px;">No pic</div>`;
+        const name = sale.productName || 'Unknown';
+        const qty = sale.quantity || 1;
+        const sum = prod ? formatCurrency((prod.price || 0) * qty) : '-';
+        html += `
+            <tr>
+                <td>${pic}</td>
+                <td>${escapeHtml(name)}</td>
+                <td>${qty}</td>
+                <td style="font-weight:bold;">${sum}</td>
+            </tr>
+        `;
+    });
+    tbody.innerHTML = html;
 }
 
 // ---------- Dashboard ----------
@@ -3025,13 +3071,14 @@ function navigateTo(page) {
     document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
 
     const titleKeys = {
+        home:       'nav.home',
         dashboard:  'nav.dashboard',
         categories: 'category.title',
         products:   'product.title',
         analytics:  'analytics.title',
         activity:   'activity.title'
     };
-    const key = titleKeys[page] || 'nav.dashboard';
+    const key = titleKeys[page] || 'nav.home';
     const titleEl = document.getElementById('pageTitle');
     titleEl.setAttribute('data-i18n', key);
     titleEl.textContent = tr(key);
@@ -3092,6 +3139,7 @@ function setupEventListeners() {
     document.getElementById('addProductBtn')?.addEventListener('click', openAddProduct);
 
     // Filters
+    document.getElementById('homeDatePicker')?.addEventListener('change', renderHome);
     document.getElementById('productCategoryFilter')?.addEventListener('change', renderProducts);
     document.getElementById('productSort')?.addEventListener('change', renderProducts);
     document.getElementById('activityFilter')?.addEventListener('change', renderActivity);
@@ -3227,7 +3275,7 @@ async function init() {
     currency.load();                  // hydrate cached active code + rates
     setupEventListeners();
     refreshAll();
-    navigateTo('dashboard');
+    navigateTo('home');
 
     // Populate category filter
     const filter = document.getElementById('productCategoryFilter');
