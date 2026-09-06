@@ -56,7 +56,34 @@ async function getSnapshot() {
     const [categoriesRes, productsRes, activitiesRes, settingsRes, seqRes] = await Promise.all([
       client.query('SELECT id, name, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM categories WHERE is_deleted = FALSE ORDER BY created_at ASC'),
       client.query('SELECT id, category_id AS "categoryId", name, quantity::float, sold::float, price::float, notes, image, translations, version, created_at AS "createdAt", updated_at AS "updatedAt" FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC'),
-      client.query('SELECT id, type, timestamp, product_id AS "productId", product_name AS "productName", category_id AS "categoryId", category_name AS "categoryName", quantity::float, notes, previous_quantity::float AS "previousQuantity", previous_sold::float AS "previousSold" FROM activities ORDER BY timestamp DESC LIMIT 500'),
+      client.query(`
+        SELECT 
+          a.id, 
+          a.type, 
+          a.timestamp::bigint AS timestamp, 
+          a.product_id AS "productId", 
+          a.product_name AS "productName", 
+          a.category_id AS "categoryId", 
+          a.category_name AS "categoryName", 
+          a.quantity::float, 
+          a.notes, 
+          a.previous_quantity::float AS "previousQuantity", 
+          a.previous_sold::float AS "previousSold",
+          CASE 
+            WHEN a.type = 'cash_out' THEN a.quantity::float 
+            ELSE 0 
+          END AS "amount",
+          CASE 
+            WHEN a.type = 'cash_out' THEN a.product_name 
+            ELSE NULL 
+          END AS "reason",
+          COALESCE(p.price::float, 0) AS "sellingPrice",
+          (COALESCE(p.price::float, 0) * COALESCE(a.quantity::float, 1)) AS "totalSaleValue"
+        FROM activities a
+        LEFT JOIN products p ON a.product_id = p.id
+        ORDER BY a.timestamp DESC 
+        LIMIT 500
+      `),
       client.query('SELECT key, value FROM settings'),
       client.query('SELECT COALESCE(MAX(seq), 0)::bigint AS max_seq FROM changes')
     ]);
@@ -69,7 +96,7 @@ async function getSnapshot() {
     return {
       categories: categoriesRes.rows,
       products: productsRes.rows,
-      activities: activitiesRes.rows,
+      activities: activitiesRes.rows.map(r => ({ ...r, timestamp: Number(r.timestamp) })),
       settings,
       currentSeq: Number(seqRes.rows[0]?.max_seq || 0),
       serverTime: Date.now()
@@ -272,9 +299,23 @@ async function processSyncBatch(deviceId, operations = []) {
             ['product', product.id, 'UPDATE', { id: product.id, quantity: newQty, sold: newSold, version: newVersion, isDeleted: false, updatedAt: now }, now]
           );
 
+          const unitPrice = Number(payload.sellingPrice) || Number(product.price) || 0;
+          const totalValue = unitPrice * saleQty;
           await client.query(
             'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-            ['activity', activityId, 'CREATE', { id: activityId, type: 'sale', timestamp: timestamp || now, productId: product.id, productName: product.name, quantity: saleQty, notes: notes ? notes.trim() : '' }, now]
+            ['activity', activityId, 'CREATE', {
+              id: activityId,
+              type: 'sale',
+              timestamp: Number(timestamp || now),
+              productId: product.id,
+              productName: product.name,
+              categoryId: product.category_id,
+              categoryName: categoryName,
+              quantity: saleQty,
+              sellingPrice: unitPrice,
+              totalSaleValue: totalValue,
+              notes: notes ? notes.trim() : `POS sale (${saleQty}x @ ${unitPrice})`
+            }, now]
           );
 
         } else if (op.type === 'RESTOCK') {
@@ -588,7 +629,7 @@ async function processSyncBatch(deviceId, operations = []) {
 
           await client.query(
             'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-            ['activity', activityId, 'CREATE', { id: activityId, type: 'cash_out', timestamp: timestamp || now, amount: cashAmount, reason: reasonStr, notes: notesStr }, now]
+            ['activity', activityId, 'CREATE', { id: activityId, type: 'cash_out', timestamp: Number(timestamp || now), amount: cashAmount, quantity: cashAmount, reason: reasonStr, notes: notesStr }, now]
           );
 
         } else {

@@ -3160,24 +3160,37 @@ canvas {
 }
 
 .home-reports-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     margin-bottom: 18px;
     padding-bottom: 14px;
     border-bottom: 1px solid var(--border-soft);
 }
 
-.home-reports-header h3 {
+.home-reports-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.home-reports-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.home-reports-title-row h3 {
     font-size: 1.125rem;
     font-weight: 700;
     color: var(--ink-strong);
-    margin-bottom: 2px;
+    margin: 0;
 }
 
 .reports-caption {
     font-size: 0.8125rem;
     color: var(--ink-muted);
+    line-height: 1.4;
 }
 
 .reports-summary-badge {
@@ -3188,6 +3201,10 @@ canvas {
     border: 1px solid var(--border);
     padding: 4px 12px;
     border-radius: var(--radius-pill);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 [data-theme="dark"] .reports-summary-badge {
@@ -3201,35 +3218,40 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
 }
 
-/* Blueprint Head */
+/* Blueprint Head (Desktop & Tablet) */
 .blueprint-reports-head {
     display: grid;
-    grid-template-columns: 80px 1fr 120px 160px;
-    padding: 10px 16px;
+    grid-template-columns: 52px minmax(180px, 1fr) 90px 140px;
+    align-items: center;
+    padding: 8px 16px;
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--ink-muted);
     border-bottom: 1px solid var(--border-soft);
+    gap: 12px;
 }
 
-@media (max-width: 600px) {
-    .blueprint-reports-head {
-        grid-template-columns: 60px 1fr 70px 100px;
-        padding: 8px 10px;
-        font-size: 0.6875rem;
-    }
+.bp-col-pic {
+    text-align: left;
 }
 
-.bp-col-sum {
-    text-align: right;
+.bp-col-sold {
+    text-align: left;
+    min-width: 0;
 }
 
 .bp-col-qty {
     text-align: center;
+}
+
+.bp-col-sum {
+    text-align: right;
 }
 
 /* Blueprint Rows */
@@ -3237,25 +3259,21 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
 }
 
 .bp-row {
     display: grid;
-    grid-template-columns: 80px 1fr 120px 160px;
+    grid-template-columns: 52px minmax(180px, 1fr) 90px 140px;
     align-items: center;
     padding: 10px 16px;
     background: var(--bg-surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    gap: 12px;
     transition: var(--transition-fast);
-}
-
-@media (max-width: 600px) {
-    .bp-row {
-        grid-template-columns: 60px 1fr 70px 100px;
-        padding: 8px 10px;
-        gap: 6px;
-    }
+    min-width: 0;
 }
 
 [data-theme="dark"] .bp-row {
@@ -3275,8 +3293,8 @@ canvas {
 
 /* Picture Cell */
 .bp-img-wrap {
-    width: 52px;
-    height: 52px;
+    width: 48px;
+    height: 48px;
     border-radius: var(--radius-sm);
     background: var(--bg-input-soft);
     border: 1px solid var(--border-soft);
@@ -3285,13 +3303,6 @@ canvas {
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-}
-
-@media (max-width: 600px) {
-    .bp-img-wrap {
-        width: 44px;
-        height: 44px;
-    }
 }
 
 .bp-img-wrap img {
@@ -3309,8 +3320,12 @@ canvas {
 
 /* What Was Sold Cell */
 .bp-info {
-    padding: 0 12px;
+    padding: 0;
     min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .bp-name {
@@ -3320,15 +3335,75 @@ canvas {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.35;
 }
 
 .bp-meta {
     font-size: 0.75rem;
     color: var(--ink-muted);
-    margin-top: 3px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.bp-meta-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ink-muted);
+    white-space: nowrap;
+}
+
+.bp-meta-cat {
+    color: var(--ink-muted);
+    white-space: nowrap;
+}
+
+.bp-source-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    letter-spacing: 0.03em;
+    line-height: 1.3;
+    text-transform: uppercase;
+}
+
+.bp-source-badge.pos {
+    background: rgba(99, 102, 241, 0.12);
+    color: #6366f1;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+[data-theme="dark"] .bp-source-badge.pos {
+    background: rgba(129, 140, 248, 0.15);
+    color: #a5b4fc;
+    border-color: rgba(129, 140, 248, 0.3);
+}
+
+.bp-unit-rate {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.bp-note-text {
+    font-size: 0.6875rem;
+    color: var(--ink-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-soft);
+    padding: 1px 6px;
+    border-radius: var(--radius-xs);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* Quantity Cell */
@@ -3340,7 +3415,7 @@ canvas {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 4px 12px;
+    padding: 3px 10px;
     background: var(--accent-soft);
     color: var(--accent-strong);
     border-radius: var(--radius-pill);
@@ -3360,14 +3435,167 @@ canvas {
 }
 
 .bp-sum-val {
-    font-size: 1rem;
+    font-size: 0.9375rem;
     font-weight: 700;
     color: var(--ink-strong);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 [data-theme="dark"] .bp-sum-val {
     color: #F4F1EA;
+}
+
+/* Mobile Responsive for Reports and Home */
+@media (max-width: 640px) {
+    .home-container {
+        gap: 14px;
+        padding-bottom: 36px;
+    }
+
+    .home-top-section {
+        gap: 14px;
+    }
+
+    .cal-widget {
+        padding: 14px 14px 16px;
+    }
+
+    .home-day-overview {
+        padding: 16px 14px;
+    }
+
+    .overview-header {
+        margin-bottom: 12px;
+    }
+
+    .overview-stats-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .ov-card {
+        padding: 10px 12px;
+        gap: 10px;
+    }
+
+    .ov-icon {
+        width: 38px;
+        height: 38px;
+    }
+
+    .ov-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .ov-val {
+        font-size: 1.125rem;
+    }
+
+    .ov-lbl {
+        font-size: 0.6875rem;
+    }
+
+    .home-reports-section {
+        padding: 16px 14px;
+    }
+
+    .home-reports-header {
+        margin-bottom: 14px;
+        padding-bottom: 12px;
+    }
+
+    .home-reports-title-row h3 {
+        font-size: 1rem;
+    }
+
+    .reports-summary-badge {
+        font-size: 0.75rem;
+        padding: 3px 9px;
+    }
+
+    /* Hide rigid desktop table headers on mobile */
+    .blueprint-reports-head {
+        display: none;
+    }
+
+    .blueprint-reports-body {
+        gap: 10px;
+    }
+
+    /* Mobile Row: High quality 3-column / 2-row card grid */
+    .bp-row {
+        display: grid;
+        grid-template-columns: 46px 1fr auto;
+        grid-template-rows: auto auto;
+        align-items: start;
+        padding: 12px 12px;
+        gap: 2px 10px;
+    }
+
+    .bp-img-wrap {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        width: 46px;
+        height: 46px;
+        align-self: center;
+    }
+
+    .bp-info {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        padding: 0;
+        min-width: 0;
+    }
+
+    .bp-name {
+        font-size: 0.875rem;
+        font-weight: 600;
+        line-height: 1.35;
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        word-break: break-word;
+        color: var(--ink-strong);
+    }
+
+    .bp-meta {
+        margin-top: 4px;
+        gap: 3px 6px;
+        font-size: 0.6875rem;
+    }
+
+    .bp-sum-cell {
+        grid-column: 3;
+        grid-row: 1;
+        text-align: right;
+    }
+
+    .bp-sum-val {
+        font-size: 0.9375rem;
+        font-weight: 700;
+        color: var(--ink-strong);
+        white-space: nowrap;
+    }
+
+    .bp-qty-cell {
+        grid-column: 3;
+        grid-row: 2;
+        text-align: right;
+        margin-top: 2px;
+    }
+
+    .bp-qty-pill {
+        padding: 2px 7px;
+        font-size: 0.6875rem;
+    }
+
+    .bp-note-text {
+        max-width: 120px;
+    }
 }
 
 /* Empty State */

@@ -1801,12 +1801,32 @@ function renderHomeReports() {
     let rowsHtml = '';
     daySales.forEach(sale => {
         const prod = getProduct(sale.productId);
-        const name = sale.productName || (prod ? getProductDisplayName(prod) : 'Unknown Product');
+        const name = (prod ? getProductDisplayName(prod) : null) || sale.productName || 'Unknown Product';
         const qty = sale.quantity || 1;
         const price = (prod && prod.price) ? prod.price : (sale.unitPrice || 0);
         const lineTotal = price * qty;
         const timeStr = formatTime(sale.timestamp);
         const catName = getCategoryName(sale.categoryId || (prod ? prod.categoryId : null));
+
+        const isPos = Boolean(sale.notes && /pos\s*sale/i.test(sale.notes));
+        let customNote = '';
+        if (sale.notes) {
+            const rawNote = sale.notes.trim();
+            if (/^pos\s*sale[:\s(]/i.test(rawNote)) {
+                let stripped = rawNote
+                    .replace(/^pos\s*sale\s*\([^)]*\)/i, '')
+                    .replace(/^pos\s*sale[:\s]*[\d\s.,x@*a-zA-Zʻʼ']+/i, '')
+                    .trim();
+                stripped = stripped.replace(/^[·\-:,]\s*/, '').trim();
+                if (stripped) {
+                    customNote = stripped;
+                }
+            } else if (/^sold\s+\d+\s+unit/i.test(rawNote)) {
+                // generic default sale note
+            } else {
+                customNote = rawNote;
+            }
+        }
 
         const imgHtml = (prod && prod.image)
             ? `<img src="${escapeHtml(prod.image)}" alt="${escapeHtml(name)}" loading="lazy">`
@@ -1820,9 +1840,14 @@ function renderHomeReports() {
                 <div class="bp-info">
                     <div class="bp-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
                     <div class="bp-meta">
-                        <span>🕒 ${timeStr}</span>
-                        ${catName && catName !== 'Unknown' ? `<span>· ${escapeHtml(catName)}</span>` : ''}
-                        ${sale.notes ? `<span>· ${escapeHtml(sale.notes)}</span>` : ''}
+                        <span class="bp-meta-time">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                            ${timeStr}
+                        </span>
+                        ${catName && catName !== 'Unknown' ? `<span class="bp-meta-cat">· ${escapeHtml(catName)}</span>` : ''}
+                        ${isPos ? `<span class="bp-source-badge pos">POS</span>` : ''}
+                        ${qty > 1 ? `<span class="bp-unit-rate">· @ ${formatCurrency(price)}</span>` : ''}
+                        ${customNote ? `<span class="bp-note-text" title="${escapeHtml(customNote)}">${escapeHtml(customNote)}</span>` : ''}
                     </div>
                 </div>
                 <div class="bp-qty-cell">

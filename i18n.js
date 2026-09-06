@@ -72,6 +72,9 @@
             'home.quantity':            'Quantity',
             'home.salesSum':            'Sales sum',
             'home.noSales':             'No sales recorded for this date',
+            'home.unitsSold':           'units sold',
+            'home.unitPcs':             'pcs',
+            'home.atRate':              'each',
             'home.today':               'Today',
 
             // Topbar
@@ -406,6 +409,9 @@
             'home.quantity':            'Количество',
             'home.salesSum':            'Сумма продаж',
             'home.noSales':             'На эту дату продаж нет',
+            'home.unitsSold':           'шт. продано',
+            'home.unitPcs':             'шт.',
+            'home.atRate':              'за шт.',
             'home.today':               'Сегодня',
 
             'topbar.searchPlaceholder': 'Поиск товаров...',
@@ -726,6 +732,9 @@
             'home.quantity':            'Miqdor',
             'home.salesSum':            'Savdo summasi',
             'home.noSales':             'Ushbu sanada savdolar yoʻq',
+            'home.unitsSold':           'dona sotildi',
+            'home.unitPcs':             'dona',
+            'home.atRate':              'dona narxi',
             'home.today':               'Bugun',
 
             'topbar.searchPlaceholder': 'Mahsulot qidirish...',

@@ -43,12 +43,12 @@
   }
 </script>
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=14">
+<link rel="stylesheet" href="/style.css?v=15">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="/i18n.js?v=14"></script>
+<script src="/i18n.js?v=15"></script>
 <script>
   // Robustness guard: ensure all POS keys exist even if an older cached i18n.js was loaded
   (function () {
@@ -3013,9 +3013,12 @@
     }
 
     /* ── VIEWS: fill height ── */
-    #view-home {
+    #view-home.active {
       display: flex;
       flex-direction: column;
+    }
+    #view-home:not(.active) {
+      display: none !important;
     }
     .pos-grid-container {
       flex: 1;
@@ -3905,9 +3908,20 @@ if (catalogChannel) {
       syncEngine.updateUI();
       return;
     }
+    if (type === 'SALE_RECORDED' || type === 'CASH_OUT_RECORDED') {
+      await loadProductsFromStorage();
+      renderGrid();
+      if (typeof syncActivitiesFromServer === 'function') await syncActivitiesFromServer();
+      if (typeof refreshSessionStats === 'function') await refreshSessionStats();
+      if (currentTab === 'audit') renderAuditView();
+      return;
+    }
     if (type === 'PRODUCT_CREATED' || type === 'PRODUCT_UPDATED' || type === 'PRODUCT_DELETED' || type === 'CATALOG_CHANGED') {
       await loadProductsFromStorage();
       renderGrid();
+      if (typeof syncActivitiesFromServer === 'function') await syncActivitiesFromServer();
+      if (typeof refreshSessionStats === 'function') await refreshSessionStats();
+      if (currentTab === 'audit') renderAuditView();
       const t = (window.i18n && window.i18n.t) ? window.i18n.t : (k => k);
       if (type === 'PRODUCT_CREATED' && product?.name) {
         showToast(t('pos.toastNewProduct', { name: product.name }), 'info');
@@ -4101,12 +4115,18 @@ const syncEngine = {
           await loadProductsFromStorage();
           renderGrid();
         }
+        if (Array.isArray(snap.activities) && snap.activities.length > 0) {
+          await localDb.putAll('activities', snap.activities);
+        }
+        await refreshSessionStats();
+        if (currentTab === 'audit') renderAuditView();
       }
       return;
     }
 
     if (Array.isArray(data.changes) && data.changes.length > 0) {
       let modified = false;
+      let activitiesModified = false;
       for (const ch of data.changes) {
         if (ch.entityType === 'product') {
           if (ch.action === 'DELETE' || ch.data?.isDeleted) {
@@ -4119,12 +4139,37 @@ const syncEngine = {
             await localDb.put('products', merged);
             modified = true;
           }
+        } else if (ch.entityType === 'activity') {
+          if (ch.data) {
+            const act = {
+              id: ch.data.id || ch.entityId,
+              type: ch.data.type,
+              productId: ch.data.productId,
+              productName: ch.data.productName,
+              categoryId: ch.data.categoryId,
+              categoryName: ch.data.categoryName,
+              quantity: Number(ch.data.quantity || 1),
+              sellingPrice: ch.data.sellingPrice != null ? Number(ch.data.sellingPrice) : undefined,
+              totalSaleValue: ch.data.totalSaleValue != null ? Number(ch.data.totalSaleValue) : undefined,
+              amount: ch.data.amount != null ? Number(ch.data.amount) : undefined,
+              reason: ch.data.reason,
+              notes: ch.data.notes,
+              timestamp: Number(ch.data.timestamp) || Date.now(),
+              batchId: ch.data.batchId
+            };
+            await localDb.put('activities', act);
+            activitiesModified = true;
+          }
         }
       }
       await localDb.setMeta('lastSyncSeq', data.currentSeq || 0);
       if (modified) {
         await loadProductsFromStorage();
         renderGrid();
+      }
+      if (activitiesModified) {
+        await refreshSessionStats();
+        if (currentTab === 'audit') renderAuditView();
       }
     }
   },
@@ -4163,6 +4208,50 @@ async function loadProductsFromStorage() {
     translations: p.translations || {},
     version: p.version || 1
   }));
+}
+
+async function refreshSessionStats() {
+  try {
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const acts = await localDb.getAll('activities');
+    const todaySales = acts.filter(a => a.type === 'sale' && Number(a.timestamp || 0) >= todayStart);
+    const todayCashOut = acts.filter(a => a.type === 'cash_out' && Number(a.timestamp || 0) >= todayStart);
+
+    sessions.sales = todaySales.reduce((acc, a) => acc + (Number(a.quantity) || 1), 0);
+    sessions.revenue = todaySales.reduce((acc, a) => {
+      const p = products.find(prod => prod.id === a.productId);
+      const unitP = a.sellingPrice != null ? Number(a.sellingPrice) : (p ? Number(p.price) : 0);
+      return acc + (a.totalSaleValue != null ? Number(a.totalSaleValue) : (unitP * (Number(a.quantity) || 1)));
+    }, 0);
+    sessions.extraProfit = todaySales.reduce((acc, a) => acc + Math.max(0, Number(a.priceDiff) || 0), 0);
+    sessions.cashOut = todayCashOut.reduce((acc, a) => acc + (Number(a.amount) || Number(a.quantity) || 0), 0);
+    updateHeaderStats();
+  } catch (e) {
+    console.warn('[pos stats] Failed to refresh session stats:', e);
+  }
+}
+
+async function syncActivitiesFromServer() {
+  if (!navigator.onLine) return;
+  try {
+    const res = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const snap = await res.json();
+    if (Array.isArray(snap.activities) && snap.activities.length > 0) {
+      await localDb.putAll('activities', snap.activities);
+    }
+    if (Array.isArray(snap.products) && snap.products.length > 0) {
+      await localDb.putAll('products', snap.products);
+      await loadProductsFromStorage();
+    }
+    const curSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
+    if (snap.currentSeq && Number(snap.currentSeq) > Number(curSeq)) {
+      await localDb.setMeta('lastSyncSeq', Number(snap.currentSeq));
+    }
+    await refreshSessionStats();
+  } catch (err) {
+    console.warn('[pos] Failed to sync activities from server:', err);
+  }
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────
@@ -4864,6 +4953,9 @@ function switchTab(tab) {
 
   if (tab === 'audit') {
     renderAuditView();
+    syncActivitiesFromServer().then(() => {
+      if (currentTab === 'audit') renderAuditView();
+    });
   } else if (tab === 'settings') {
     renderSettingsView();
   }
@@ -4994,7 +5086,7 @@ async function renderAuditView() {
   let activities = [];
   try {
     const all = await localDb.getAll('activities');
-    activities = all.filter(a => (a.timestamp || 0) >= todayStart);
+    activities = all.filter(a => Number(a.timestamp || 0) >= todayStart);
   } catch (e) {
     console.warn('[pos audit] Failed to load activities:', e);
   }
@@ -5004,11 +5096,17 @@ async function renderAuditView() {
   const cashOuts = activities.filter(a => a.type === 'cash_out');
 
   const unitsSold = sales.reduce((acc, a) => acc + (Number(a.quantity) || 1), 0);
-  const totalRev = sales.reduce((acc, a) => acc + (Number(a.totalSaleValue) || (Number(a.sellingPrice || 0) * (Number(a.quantity) || 1))), 0);
+  const totalRev = sales.reduce((acc, a) => {
+    const p = products.find(prod => prod.id === a.productId);
+    const unitP = a.sellingPrice != null ? Number(a.sellingPrice) : (p ? Number(p.price) : 0);
+    return acc + (a.totalSaleValue != null ? Number(a.totalSaleValue) : (unitP * (Number(a.quantity) || 1)));
+  }, 0);
+  const extraProfit = sales.reduce((acc, a) => acc + Math.max(0, Number(a.priceDiff) || 0), 0);
   const totalCashTaken = cashOuts.reduce((acc, a) => acc + (Number(a.amount) || Number(a.quantity) || 0), 0);
 
   sessions.sales = unitsSold;
   sessions.revenue = totalRev;
+  sessions.extraProfit = extraProfit;
   sessions.cashOut = totalCashTaken;
   updateHeaderStats();
 
@@ -5021,7 +5119,7 @@ async function renderAuditView() {
   }
 
   // Sort by timestamp desc
-  filtered.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  filtered.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
 
   if (!filtered.length) {
     timelineEl.innerHTML = `
@@ -5050,7 +5148,7 @@ async function renderAuditView() {
 
   timelineEl.innerHTML = filtered.map(item => {
     const isSale = item.type === 'sale';
-    const date = new Date(item.timestamp || Date.now());
+    const date = new Date(Number(item.timestamp) || Date.now());
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     if (isSale) {
@@ -5058,9 +5156,10 @@ async function renderAuditView() {
       const imgSrc = (p && p.image) || 'assets/logo.webp';
       const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
       const locTitle = p ? getLocalizedProductName(p, currentLang) : (item.productName || 'Sale');
-      const qty = item.quantity || 1;
-      const unitPrice = item.sellingPrice ? fmt(item.sellingPrice) : '';
-      const totalVal = item.totalSaleValue ? fmt(item.totalSaleValue) : unitPrice;
+      const qty = Number(item.quantity) || 1;
+      const effectiveUnitPrice = item.sellingPrice != null ? Number(item.sellingPrice) : (p ? Number(p.price) : 0);
+      const unitPrice = effectiveUnitPrice ? fmt(effectiveUnitPrice) : '';
+      const totalVal = item.totalSaleValue != null ? fmt(item.totalSaleValue) : (effectiveUnitPrice ? fmt(effectiveUnitPrice * qty) : unitPrice);
       const diff = Number(item.priceDiff) || 0;
       const profitBadge = diff > 0
         ? `<span style="color:var(--success);font-weight:600;">+${fmt(diff)}</span>`
@@ -5218,9 +5317,12 @@ function setupBottomNavAndTabs() {
   // Audit refresh button
   const auditRefresh = document.getElementById('auditRefreshBtn');
   if (auditRefresh) {
-    auditRefresh.addEventListener('click', () => {
-      renderAuditView();
-      syncEngine.kick();
+    auditRefresh.addEventListener('click', async () => {
+      auditRefresh.classList.add('spinning');
+      await syncActivitiesFromServer();
+      await syncEngine.kick();
+      await renderAuditView();
+      setTimeout(() => auditRefresh.classList.remove('spinning'), 500);
       showToast('✓ Updated', 'info');
     });
   }
@@ -5231,6 +5333,7 @@ function setupBottomNavAndTabs() {
     btnSyncNow.addEventListener('click', async () => {
       btnSyncNow.disabled = true;
       showToast('⟳ Syncing...', 'info');
+      await syncActivitiesFromServer();
       await syncEngine.kick();
       btnSyncNow.disabled = false;
       renderSettingsView();
@@ -5577,19 +5680,7 @@ async function init() {
   }
 
   // Hydrate session stats from today's activities
-  try {
-    const todayStart = new Date().setHours(0, 0, 0, 0);
-    const acts = await localDb.getAll('activities');
-    const todaySales = acts.filter(a => a.type === 'sale' && a.timestamp >= todayStart);
-    const todayCashOut = acts.filter(a => a.type === 'cash_out' && a.timestamp >= todayStart);
-    sessions.sales = todaySales.reduce((acc, a) => acc + (Number(a.quantity) || 1), 0);
-    sessions.revenue = todaySales.reduce((acc, a) => acc + (Number(a.totalSaleValue) || (Number(a.sellingPrice || 0) * (a.quantity || 1))), 0);
-    sessions.extraProfit = todaySales.reduce((acc, a) => acc + (Math.max(0, Number(a.priceDiff) || 0)), 0);
-    sessions.cashOut = todayCashOut.reduce((acc, a) => acc + (Number(a.amount) || Number(a.quantity) || 0), 0);
-    updateHeaderStats();
-  } catch (e) {
-    console.warn('[pos stats] Failed to hydrate session stats:', e);
-  }
+  await refreshSessionStats();
 
   syncEngine.updateUI();
 
@@ -5597,6 +5688,9 @@ async function init() {
   window.addEventListener('online', () => {
     syncEngine.isOnline = true;
     syncEngine.kick();
+    syncActivitiesFromServer().then(() => {
+      if (currentTab === 'audit') renderAuditView();
+    });
     fetchCbuRates();
   });
   window.addEventListener('offline', () => {
@@ -5606,12 +5700,25 @@ async function init() {
   window.addEventListener('focus', () => {
     loadProductsFromStorage().then(renderGrid);
     syncEngine.kick();
+    syncActivitiesFromServer().then(() => {
+      if (currentTab === 'audit') renderAuditView();
+    });
     fetchCbuRates();
   });
 
   // Start background sync
   syncEngine.kick();
-  setInterval(() => syncEngine.kick(), 25000);
+  syncActivitiesFromServer().then(() => {
+    if (currentTab === 'audit') renderAuditView();
+  });
+  setInterval(() => {
+    syncEngine.kick();
+    if (currentTab === 'audit') {
+      syncActivitiesFromServer().then(() => {
+        if (currentTab === 'audit') renderAuditView();
+      });
+    }
+  }, 25000);
   setInterval(fetchCbuRates, 30 * 60 * 1000);
 }
 

@@ -43,13 +43,13 @@
         }
     </script>
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/style.css?v=10">
+    <link rel="stylesheet" href="/style.css?v=11">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-    <script src="/i18n.js?v=13" defer></script>
+    <script src="/i18n.js?v=14" defer></script>
 </head>
 <body>
     <div id="app">
@@ -272,11 +272,13 @@
                         <!-- Reports Section (Strictly Blueprint-compliant) -->
                         <div class="home-reports-section glass">
                             <div class="home-reports-header">
-                                <div>
-                                    <h3 data-i18n="home.reports">Reports</h3>
+                                <div class="home-reports-title-group">
+                                    <div class="home-reports-title-row">
+                                        <h3 data-i18n="home.reports">Reports</h3>
+                                        <div class="reports-summary-badge" id="homeReportsSummaryBadge">0 items</div>
+                                    </div>
                                     <span class="reports-caption" id="homeReportsCaption" data-i18n="home.reportsCaption">Showing reports and sales for the selected date</span>
                                 </div>
-                                <div class="reports-summary-badge" id="homeReportsSummaryBadge">0 items</div>
                             </div>
 
                             <div class="blueprint-reports-table">
@@ -567,6 +569,6 @@
         </div>
     </div>
 
-    <script src="/script.js?v=10" defer></script>
+    <script src="/script.js?v=11" defer></script>
 </body>
 </html>

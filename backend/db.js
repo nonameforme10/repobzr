@@ -3,7 +3,8 @@
  * Resilient connection pooling with automated versioned migration execution.
  */
 
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+types.setTypeParser(20, (val) => val === null ? null : parseInt(val, 10));
 const fs = require('fs');
 const path = require('path');
 
