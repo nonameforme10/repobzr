@@ -334,6 +334,7 @@
             'pos.filterCashOnly': 'Cash Taken Only',
 
             // POS Cash Out Floating Action & Modal
+            'pos.cashOut':                 'Take Cash Out',
             'pos.cashOutBtn':              'Take Cash (Lunch / Expenses)',
             'pos.cashOutTitle':            'Money Taken from Cassa',
             'pos.cashOutSub':              'Record lunch money or expenses taken from the cash register',
@@ -348,6 +349,7 @@
             'pos.confirmCashOut':          'Confirm Cash Out',
             'pos.toastCashOutSuccess':     'Cash taken from register: {amount} ({reason})',
             'pos.invalidCashOutAmount':    'Please enter a valid cash amount greater than 0.',
+            'pos.totalExpenses':           'Total Cash Taken (Lunch/Etc)',
 
             // POS Settings
             'pos.settingsTitle':  'Terminal Settings',
@@ -652,20 +654,22 @@
             'pos.filterCashOnly': 'Только взятие из кассы',
 
             // POS Cash Out Floating Action & Modal
+            'pos.cashOut':                 'Взять из кассы',
             'pos.cashOutBtn':              'Взять из кассы (на обед / расходы)',
             'pos.cashOutTitle':            'Взятие денег из кассы',
             'pos.cashOutSub':              'Запись денег на обед или расходов из кассы',
             'pos.cashOutAmount':           'Сумма (тыс. сум)',
             'pos.cashOutReason':           'Причина / Категория',
             'pos.reasonLunch':             'Обед 🍲',
-            'pos.reasonTaxi':              'Такси / Дорога 🚕',
-            'pos.reasonSupplies':          'Расходные материалы 📦',
+            'pos.reasonTaxi':              'Такси / Проезд 🚕',
+            'pos.reasonSupplies':          'Хозтовары / Упаковка 📦',
             'pos.reasonPersonal':          'Личные нужды 👤',
             'pos.reasonOther':             'Другое 📝',
             'pos.cashOutNotesPlaceholder': 'Дополнительно (например, обед)...',
-            'pos.confirmCashOut':          'Подтвердить взятие',
-            'pos.toastCashOutSuccess':     'Из кассы взято: {amount} ({reason})',
-            'pos.invalidCashOutAmount':    'Укажите корректную сумму больше 0.',
+            'pos.confirmCashOut':          'Подтвердить выдачу',
+            'pos.toastCashOutSuccess':     'Взято из кассы: {amount} ({reason})',
+            'pos.invalidCashOutAmount':    'Пожалуйста, введите корректную сумму больше 0.',
+            'pos.totalExpenses':           'Всего взято из кассы (обед/расходы)',
 
             // POS Settings
             'pos.settingsTitle':  'Настройки терминала',
@@ -970,6 +974,7 @@
             'pos.filterCashOnly': 'Faqat kassadan olingan',
 
             // POS Cash Out Floating Action & Modal
+            'pos.cashOut':                 'Kassadan pul olish',
             'pos.cashOutBtn':              'Kassadan olish (tushlik / xarajat)',
             'pos.cashOutTitle':            'Kassadan pul olish',
             'pos.cashOutSub':              'Tushlik yoki xarajat uchun olingan pulni qayd etish',
@@ -984,6 +989,7 @@
             'pos.confirmCashOut':          'Chiqimni tasdiqlash',
             'pos.toastCashOutSuccess':     'Kassadan olindi: {amount} ({reason})',
             'pos.invalidCashOutAmount':    'Iltimos, 0 dan katta toʻgʻri summani kiriting.',
+            'pos.totalExpenses':           'Jami olingan pul (tushlik/xarajat)',
 
             // POS Settings
             'pos.settingsTitle':  'Terminal sozlamalari',
@@ -1077,12 +1083,36 @@
             var nodes = root.querySelectorAll(selector);
             for (var i = 0; i < nodes.length; i++) fn(nodes[i]);
         };
-        apply('[data-i18n]',             function (el) { el.textContent = t(el.getAttribute('data-i18n')); });
-        apply('[data-i18n-html]',        function (el) { el.innerHTML   = t(el.getAttribute('data-i18n-html')); });
-        apply('[data-i18n-placeholder]', function (el) { el.setAttribute('placeholder', t(el.getAttribute('data-i18n-placeholder'))); });
-        apply('[data-i18n-title]',       function (el) { el.setAttribute('title',       t(el.getAttribute('data-i18n-title'))); });
-        apply('[data-i18n-aria-label]',  function (el) { el.setAttribute('aria-label',  t(el.getAttribute('data-i18n-aria-label'))); });
-        apply('[data-i18n-value]',       function (el) { el.setAttribute('value',       t(el.getAttribute('data-i18n-value'))); });
+        apply('[data-i18n]', function (el) {
+            var k = el.getAttribute('data-i18n');
+            var v = t(k);
+            if (v && v !== k) el.textContent = v;
+        });
+        apply('[data-i18n-html]', function (el) {
+            var k = el.getAttribute('data-i18n-html');
+            var v = t(k);
+            if (v && v !== k) el.innerHTML = v;
+        });
+        apply('[data-i18n-placeholder]', function (el) {
+            var k = el.getAttribute('data-i18n-placeholder');
+            var v = t(k);
+            if (v && v !== k) el.setAttribute('placeholder', v);
+        });
+        apply('[data-i18n-title]', function (el) {
+            var k = el.getAttribute('data-i18n-title');
+            var v = t(k);
+            if (v && v !== k) el.setAttribute('title', v);
+        });
+        apply('[data-i18n-aria-label]', function (el) {
+            var k = el.getAttribute('data-i18n-aria-label');
+            var v = t(k);
+            if (v && v !== k) el.setAttribute('aria-label', v);
+        });
+        apply('[data-i18n-value]', function (el) {
+            var k = el.getAttribute('data-i18n-value');
+            var v = t(k);
+            if (v && v !== k) el.setAttribute('value', v);
+        });
     }
 
     // Apply initial <html lang="..."> right away

@@ -34,6 +34,7 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
       navigator.serviceWorker.register('/sw.js').then(function(registration) {
+        if (registration.update) registration.update();
         console.log('ServiceWorker registration successful with scope: ', registration.scope);
       }, function(err) {
         console.log('ServiceWorker registration failed: ', err);
@@ -42,12 +43,70 @@
   }
 </script>
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=12">
+<link rel="stylesheet" href="/style.css?v=13">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="/i18n.js?v=12"></script>
+<script src="/i18n.js?v=13"></script>
+<script>
+  // Robustness guard: ensure all POS keys exist even if an older cached i18n.js was loaded
+  (function () {
+    if (!window.i18n || !window.i18n.dict) return;
+    var d = window.i18n.dict;
+    var patches = {
+      en: {
+        'pos.navHome': 'Home',
+        'pos.navAudit': 'Audit',
+        'pos.navSettings': 'Settings',
+        'pos.calc': 'Calculator',
+        'pos.cashOut': 'Take Cash Out',
+        'pos.totalExpenses': 'Total Cash Taken (Lunch/Etc)',
+        'pos.currencyRates': 'CBU Exchange Rates',
+        'pos.currencyCalc': 'Currency Converter',
+        'pos.cbuSource': 'cbu.uz official rate',
+        'pos.convertTitle': 'Currency Converter (CBU.UZ)',
+        'pos.convertSubtitle': 'Official exchange rates from Central Bank of Uzbekistan',
+        'pos.officialRateFrom': 'From cbu.uz',
+        'pos.equals': 'equals'
+      },
+      ru: {
+        'pos.navHome': 'Каталог',
+        'pos.navAudit': 'Аудит',
+        'pos.navSettings': 'Настройки',
+        'pos.calc': 'Калькулятор',
+        'pos.cashOut': 'Взять из кассы',
+        'pos.totalExpenses': 'Всего взято из кассы (обед/расходы)',
+        'pos.currencyRates': 'Курсы валют ЦБ РУз',
+        'pos.currencyCalc': 'Конвертер валют',
+        'pos.cbuSource': 'Официальный курс cbu.uz',
+        'pos.convertTitle': 'Конвертер валют (CBU.UZ)',
+        'pos.convertSubtitle': 'Официальные курсы Центрального Банка Узбекистана',
+        'pos.officialRateFrom': 'По данным cbu.uz',
+        'pos.equals': 'равен'
+      },
+      uz: {
+        'pos.navHome': 'Asosiy',
+        'pos.navAudit': 'Audit',
+        'pos.navSettings': 'Sozlamalar',
+        'pos.calc': 'Kalkulyator',
+        'pos.cashOut': 'Kassadan pul olish',
+        'pos.totalExpenses': 'Jami olingan pul (tushlik/xarajat)',
+        'pos.currencyRates': 'MB valyuta kurslari',
+        'pos.currencyCalc': 'Valyuta hisoblagich',
+        'pos.cbuSource': 'cbu.uz rasmiy kursi',
+        'pos.convertTitle': 'Valyuta konvertori (CBU.UZ)',
+        'pos.convertSubtitle': 'Oʻzbekiston Respublikasi Markaziy Banki rasmiy kurslari',
+        'pos.officialRateFrom': 'cbu.uz rasmiy kursi boʻyicha',
+        'pos.equals': 'teng'
+      }
+    };
+    ['en', 'ru', 'uz'].forEach(function (lang) {
+      if (!d[lang]) d[lang] = {};
+      Object.assign(d[lang], patches[lang]);
+    });
+  })();
+</script>
 <style>
   /* ── POS SPECIFIC COMPONENT STYLING (THEME-ALIGNED) ── */
 
@@ -1262,9 +1321,32 @@
     border-color: var(--border-soft);
   }
 
-  .c-flag {
-    font-size: 0.9375rem;
+  .c-symbol {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
     line-height: 1;
+    flex-shrink: 0;
+  }
+  .c-symbol.usd {
+    background: rgba(16, 185, 129, 0.14);
+    color: #10B981;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+  }
+  .c-symbol.eur {
+    background: rgba(59, 130, 246, 0.14);
+    color: #3B82F6;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+  }
+  .c-symbol.rub {
+    background: rgba(168, 85, 247, 0.14);
+    color: #A855F7;
+    border: 1px solid rgba(168, 85, 247, 0.35);
   }
 
   .c-label {
@@ -2487,6 +2569,326 @@
     font-size: 1.1rem;
     color: var(--ink-muted);
   }
+
+  /* ═══════════════════════════════════════════════════════════
+     DESKTOP LAYOUT OVERRIDES  (≥ 1024px)
+     ═══════════════════════════════════════════════════════════ */
+  @media (min-width: 1024px) {
+
+    /* ── HIDE MOBILE-ONLY ELEMENTS ── */
+    .pos-bottom-nav { display: none !important; }
+    .pos-fab { display: none !important; }
+    .pos-layout { padding-bottom: 0 !important; }
+
+    /* ── ROOT SHELL: header + body side-by-side ── */
+    .pos-layout {
+      display: grid;
+      grid-template-rows: 60px 1fr;
+      grid-template-columns: 240px 1fr;
+      min-height: 100vh;
+    }
+
+    /* Header spans full width */
+    .pos-header {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      height: 60px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-topbar);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+
+    /* ── DESKTOP LEFT SIDEBAR ── */
+    .pos-desktop-sidebar {
+      display: flex !important;
+      grid-column: 1;
+      grid-row: 2;
+      flex-direction: column;
+      width: 240px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      position: sticky;
+      top: 60px;
+      height: calc(100vh - 60px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px 12px 24px;
+      gap: 0;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+
+    /* ── MAIN CONTENT AREA ── */
+    .pos-main-content {
+      grid-column: 2;
+      grid-row: 2;
+      min-width: 0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── SIDEBAR NAV ── */
+    .sidebar-nav-section {
+      margin-bottom: 4px;
+    }
+    .sidebar-nav-label {
+      font-size: 0.625rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--ink-faint);
+      padding: 6px 10px 4px;
+      display: block;
+    }
+    .sidebar-nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 10px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink-subtle);
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      text-align: left;
+      transition: background 120ms ease, color 120ms ease;
+      margin-bottom: 2px;
+    }
+    .sidebar-nav-btn svg {
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+    .sidebar-nav-btn:hover {
+      background: var(--bg-surface-2);
+      color: var(--ink-strong);
+    }
+    .sidebar-nav-btn:hover svg {
+      opacity: 1;
+    }
+    .sidebar-nav-btn.active {
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 600;
+    }
+    .sidebar-nav-btn.active svg {
+      opacity: 1;
+    }
+    [data-theme="dark"] .sidebar-nav-btn.active {
+      background: rgba(92, 225, 230, 0.12);
+      color: #5CE1E6;
+    }
+
+    /* ── SIDEBAR STATS BLOCK ── */
+    .sidebar-stats {
+      margin-top: 8px;
+      padding: 14px 12px;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-soft);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .sidebar-stats-title {
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--ink-faint);
+    }
+    .sidebar-stat-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .sidebar-stat-lbl {
+      font-size: 0.75rem;
+      color: var(--ink-muted);
+      font-weight: 500;
+    }
+    .sidebar-stat-val {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--ink-strong);
+      font-variant-numeric: tabular-nums;
+    }
+    .sidebar-stat-val.profit {
+      color: var(--success);
+    }
+    .sidebar-divider {
+      height: 1px;
+      background: var(--border-soft);
+    }
+
+    /* ── SIDEBAR CASH-OUT BUTTON ── */
+    .sidebar-cashout-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 12px;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-surface);
+      color: var(--ink);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 120ms, border-color 120ms, color 120ms;
+    }
+    .sidebar-cashout-btn:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: var(--danger-soft);
+    }
+
+    /* ── SIDEBAR BOTTOM SPACER / SYNC PILL ── */
+    .sidebar-bottom {
+      margin-top: auto;
+      padding-top: 16px;
+    }
+
+    /* ── HIDE HEADER STATS CLUSTER (moved to sidebar) ── */
+    .header-stats-cluster {
+      display: none !important;
+    }
+
+    /* ── HEADER: compact right side ── */
+    .header-actions {
+      gap: 12px;
+    }
+
+    /* ── CURRENCY BAR: full width in main area ── */
+    .pos-currency-bar {
+      max-width: none;
+      padding: 0;
+      margin: 0;
+    }
+    .currency-bar-inner {
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      border-top: none;
+      box-shadow: none;
+      height: 40px;
+    }
+
+    /* ── TOOLBAR ── */
+    .pos-toolbar {
+      max-width: none;
+      padding: 16px 24px 0;
+      gap: 10px;
+    }
+    .pos-search-box {
+      width: clamp(200px, 22%, 320px);
+    }
+
+    /* ── GRID CONTAINER ── */
+    .pos-grid-container {
+      max-width: none;
+      padding: 16px 24px 40px;
+    }
+
+    /* ── PRODUCT GRID: adaptive columns ── */
+    .pos-grid {
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 18px;
+    }
+
+    /* ── CARD IMPROVEMENTS ── */
+    .pos-card {
+      border-radius: 12px;
+    }
+    .pos-card-img-wrap {
+      aspect-ratio: 4/3;
+    }
+
+    /* ── LIST VIEW ON DESKTOP ── */
+    .pos-grid.pos-list-view .pos-card-img-wrap {
+      width: 80px;
+      height: 80px;
+    }
+
+    /* ── AUDIT & SETTINGS: full-width within main ── */
+    .audit-container,
+    .settings-container {
+      padding: 24px;
+      max-width: none;
+    }
+    .audit-kpi-grid {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    .audit-kpi-card {
+      padding: 16px 18px;
+    }
+    .audit-kpi-val {
+      font-size: 1.25rem;
+    }
+
+    /* ── VIEWS: fill height ── */
+    #view-home {
+      display: flex;
+      flex-direction: column;
+    }
+    .pos-grid-container {
+      flex: 1;
+    }
+
+    /* ── MODALS: centered, not sheet ── */
+    .pos-overlay {
+      align-items: center;
+      padding: 24px;
+    }
+    .pos-modal {
+      border-radius: 14px;
+    }
+    .pos-modal-header::before {
+      display: none;
+    }
+
+    /* ── TOAST: above fold, not bottom-nav ── */
+    .pos-toast-container {
+      bottom: 28px;
+      right: 28px;
+    }
+  }
+
+  /* ── 1280px+: wider cards ── */
+  @media (min-width: 1280px) {
+    .pos-layout {
+      grid-template-columns: 260px 1fr;
+    }
+    .pos-desktop-sidebar {
+      width: 260px;
+    }
+    .pos-grid {
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+  }
+
+  /* ── 1600px+: very wide screens ── */
+  @media (min-width: 1600px) {
+    .pos-layout {
+      grid-template-columns: 280px 1fr;
+    }
+    .pos-desktop-sidebar {
+      width: 280px;
+    }
+    .pos-grid {
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    }
+  }
 </style>
 </head>
 <body>
@@ -2570,6 +2972,74 @@
     </div>
   </header>
 
+  <!-- DESKTOP SIDEBAR (hidden on mobile via CSS) -->
+  <aside class="pos-desktop-sidebar" id="desktopSidebar" style="display:none;">
+    <!-- Navigation -->
+    <nav class="sidebar-nav-section">
+      <span class="sidebar-nav-label">NAVIGATION</span>
+      <button class="sidebar-nav-btn active" id="sidebar-btn-home" data-tab="home" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span data-i18n="pos.navHome">Home</span>
+      </button>
+      <button class="sidebar-nav-btn" id="sidebar-btn-audit" data-tab="audit" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <span data-i18n="pos.navAudit">Audit</span>
+      </button>
+      <button class="sidebar-nav-btn" id="sidebar-btn-settings" data-tab="settings" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span data-i18n="pos.navSettings">Settings</span>
+      </button>
+    </nav>
+
+    <!-- Today's Stats -->
+    <div class="sidebar-stats" style="margin-top:16px;">
+      <div class="sidebar-stats-title">TODAY'S SESSION</div>
+      <div class="sidebar-stat-row">
+        <span class="sidebar-stat-lbl" data-i18n="pos.salesToday">Sales</span>
+        <span class="sidebar-stat-val" id="sidebar-sales">0</span>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-stat-row">
+        <span class="sidebar-stat-lbl" data-i18n="pos.revenue">Revenue</span>
+        <span class="sidebar-stat-val" id="sidebar-revenue">0 soʻm</span>
+      </div>
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-stat-row">
+        <span class="sidebar-stat-lbl" data-i18n="pos.extraProfit">Extra profit</span>
+        <span class="sidebar-stat-val profit" id="sidebar-profit">+0 soʻm</span>
+      </div>
+    </div>
+
+    <!-- Cash Out Button -->
+    <button class="sidebar-cashout-btn" id="sidebar-cashout-btn" type="button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      <span data-i18n="pos.cashOut">Take Cash Out</span>
+    </button>
+
+    <!-- Bottom: sync status -->
+    <div class="sidebar-bottom">
+      <div style="font-size:0.6875rem;color:var(--ink-faint);padding:4px 10px;" id="sidebar-sync-label">Synced</div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT WRAPPER (desktop: col 2) -->
+  <div class="pos-main-content" id="posMainContent">
+
   <!-- VIEW: HOME (CATALOG & SELLING) -->
   <div class="pos-view active" id="view-home">
     <!-- CURRENCY RATES STATS BAR (ONE LINE) -->
@@ -2584,7 +3054,7 @@
           <div class="currency-rates-ticker" id="currencyRatesTicker">
             <!-- USD -->
             <button type="button" class="currency-chip" id="chipUsd" data-ccy="USD" title="1 USD to UZS">
-              <span class="c-flag">🇺🇸</span>
+              <span class="c-symbol usd">$</span>
               <span class="c-label">1 USD</span>
               <span class="c-eq">=</span>
               <span class="c-val" id="rateValUsd">11 795</span>
@@ -2596,7 +3066,7 @@
 
             <!-- EUR -->
             <button type="button" class="currency-chip" id="chipEur" data-ccy="EUR" title="1 EUR to UZS">
-              <span class="c-flag">🇪🇺</span>
+              <span class="c-symbol eur">€</span>
               <span class="c-label">1 EUR</span>
               <span class="c-eq">=</span>
               <span class="c-val" id="rateValEur">13 699</span>
@@ -2608,7 +3078,7 @@
 
             <!-- RUB -->
             <button type="button" class="currency-chip" id="chipRub" data-ccy="RUB" title="1 RUB to UZS">
-              <span class="c-flag">🇷🇺</span>
+              <span class="c-symbol rub">₽</span>
               <span class="c-label">1 RUB</span>
               <span class="c-eq">=</span>
               <span class="c-val" id="rateValRub">136</span>
@@ -2617,7 +3087,7 @@
           </div>
         </div>
 
-        <button type="button" class="currency-calc-btn" id="btnOpenFxModal" aria-label="Valyuta hisoblagich" data-i18n-title="pos.currencyCalc" title="Currency Converter">
+        <button type="button" class="currency-calc-btn" id="btnOpenFxModal" aria-label="Currency Converter" data-i18n-title="pos.currencyCalc" title="Currency Converter">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="4" y="2" width="16" height="20" rx="2"></rect>
             <line x1="8" y1="6" x2="16" y2="6"></line>
@@ -2630,7 +3100,7 @@
             <path d="M12 18h.01"></path>
             <path d="M8 18h.01"></path>
           </svg>
-          <span class="calc-label" data-i18n="pos.calc">Kalkulyator</span>
+          <span class="calc-label" data-i18n="pos.calc">Calculator</span>
         </button>
       </div>
     </div>
@@ -2828,6 +3298,8 @@
       </div>
     </div>
   </div>
+
+  </div><!-- /pos-main-content -->
 
   <!-- FLOATING ACTION BUTTON (+) FOR CASH OUT (LUNCH / CASSA) -->
   <button class="pos-fab" id="fab-cashout" aria-label="Take Cash / Cassa xarajati" data-i18n-title="pos.cashOutBtn" title="Take Cash (Lunch / Expenses)">
@@ -3958,6 +4430,14 @@ function updateHeaderStats() {
   if (profitEl) profitEl.textContent = `+${fmt(sessions.extraProfit)}`;
   if (mProfitEl) mProfitEl.textContent = `+${fmt(sessions.extraProfit)}`;
 
+  // Desktop sidebar session stats
+  const sSalesEl = document.getElementById('sidebar-sales');
+  const sRevEl = document.getElementById('sidebar-revenue');
+  const sProfitEl = document.getElementById('sidebar-profit');
+  if (sSalesEl) sSalesEl.textContent = sessions.sales;
+  if (sRevEl) sRevEl.textContent = fmt(sessions.revenue);
+  if (sProfitEl) sProfitEl.textContent = `+${fmt(sessions.extraProfit)}`;
+
   // Audit view KPI cards
   const auditSales = document.getElementById('audit-total-sales');
   const auditRev = document.getElementById('audit-total-revenue');
@@ -4194,6 +4674,11 @@ function switchTab(tab) {
   if (navHome) navHome.classList.toggle('active', tab === 'home');
   if (navAudit) navAudit.classList.toggle('active', tab === 'audit');
   if (navSettings) navSettings.classList.toggle('active', tab === 'settings');
+
+  // Desktop sidebar nav items
+  document.querySelectorAll('.sidebar-nav-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
 
   // Floating Action Button (+) visibility: visible on home and audit, hidden on settings
   const fab = document.getElementById('fab-cashout');
@@ -4955,6 +5440,54 @@ async function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ── DESKTOP SIDEBAR WIRING ────────────────────────────────────────────────
+function setupDesktopSidebar() {
+  const isDesktop = () => window.innerWidth >= 1024;
+  const sidebar = document.getElementById('desktopSidebar');
+
+  // Show/hide sidebar based on viewport
+  function toggleSidebarVisibility() {
+    if (sidebar) sidebar.style.display = isDesktop() ? 'flex' : 'none';
+  }
+  toggleSidebarVisibility();
+  window.addEventListener('resize', toggleSidebarVisibility);
+
+  // Wire sidebar nav buttons directly to switchTab
+  ['home', 'audit', 'settings'].forEach(tab => {
+    const btn = document.getElementById(`sidebar-btn-${tab}`);
+    if (!btn) return;
+    btn.addEventListener('click', () => switchTab(tab));
+  });
+
+  // Wire sidebar cash-out button
+  const sidebarCashOut = document.getElementById('sidebar-cashout-btn');
+  if (sidebarCashOut) {
+    sidebarCashOut.addEventListener('click', () => {
+      const fab = document.getElementById('fab-cashout');
+      if (fab) fab.click();
+    });
+  }
+
+  // Mirror session stats and sync status to sidebar
+  function syncSidebarStats() {
+    const sSales = document.getElementById('sidebar-sales');
+    const sRev = document.getElementById('sidebar-revenue');
+    const sProfit = document.getElementById('sidebar-profit');
+    if (typeof sessions !== 'undefined') {
+      if (sSales) sSales.textContent = sessions.sales;
+      if (sRev) sRev.textContent = fmt(sessions.revenue);
+      if (sProfit) sProfit.textContent = `+${fmt(sessions.extraProfit)}`;
+    }
+    const syncLbl = document.getElementById('posSyncLabel');
+    const sidebarSyncLbl = document.getElementById('sidebar-sync-label');
+    if (syncLbl && sidebarSyncLbl) sidebarSyncLbl.textContent = syncLbl.textContent;
+  }
+
+  setInterval(syncSidebarStats, 2000);
+  syncSidebarStats();
+}
+setupDesktopSidebar();
 </script>
 </body>
 </html>

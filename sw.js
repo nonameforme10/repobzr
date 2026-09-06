@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bazar-pos-v12';
+const CACHE_NAME = 'bazar-pos-v13';
 const ASSETS_TO_CACHE = [
   '/',
   '/admin',
@@ -90,7 +90,7 @@ self.addEventListener('fetch', event => {
       }
       return networkResponse;
     }).catch(() => {
-      return caches.match(event.request);
+      return caches.match(event.request, { ignoreSearch: true });
     })
   );
 });
