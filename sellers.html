@@ -70,11 +70,14 @@
         'pos.officialRateFrom': 'From cbu.uz',
         'pos.equals': 'equals',
         'pos.optomSale': 'Optom sale',
+        'pos.saleBadge': 'Sale',
+        'pos.optomBadge': 'Optom',
         'pos.whatWasSold': 'What was sold',
         'pos.price': 'Price',
         'pos.subtotal': 'Subtotal',
         'pos.discount': 'Discount',
-        'pos.itemsUnits': '{count} items · {units} pcs'
+        'pos.itemsUnits': '{count} items · {units} pcs',
+        'pos.productFallback': 'Item'
       },
       ru: {
         'pos.navHome': 'Каталог',
@@ -91,11 +94,14 @@
         'pos.officialRateFrom': 'По данным cbu.uz',
         'pos.equals': 'равен',
         'pos.optomSale': 'Оптовая продажа (Optom sale)',
+        'pos.saleBadge': 'Продажа',
+        'pos.optomBadge': 'Оптом',
         'pos.whatWasSold': 'Что продано',
         'pos.price': 'Цена',
         'pos.subtotal': 'Подытог',
         'pos.discount': 'Скидка',
-        'pos.itemsUnits': '{count} тов. · {units} шт.'
+        'pos.itemsUnits': '{count} тов. · {units} шт.',
+        'pos.productFallback': 'Товар'
       },
       uz: {
         'pos.navHome': 'Asosiy',
@@ -111,12 +117,15 @@
         'pos.convertSubtitle': 'Oʻzbekiston Respublikasi Markaziy Banki rasmiy kurslari',
         'pos.officialRateFrom': 'cbu.uz rasmiy kursi boʻyicha',
         'pos.equals': 'teng',
-        'pos.optomSale': 'Optom sotuv',
+        'pos.optomSale': 'Optom savdo',
+        'pos.saleBadge': 'Sotuv',
+        'pos.optomBadge': 'Optom',
         'pos.whatWasSold': 'Nima sotildi',
         'pos.price': 'Narx',
         'pos.subtotal': 'Oraliq jami',
         'pos.discount': 'Chegirma',
-        'pos.itemsUnits': '{count} xil · {units} dona'
+        'pos.itemsUnits': '{count} xil · {units} dona',
+        'pos.productFallback': 'Mahsulot'
       }
     };
     ['en', 'ru', 'uz'].forEach(function (lang) {
@@ -7011,14 +7020,14 @@ async function renderAuditView() {
       const isMulti = saleItems.length > 1 || (item.itemsCount && item.itemsCount > 1) || item.isOptom || Boolean(item.productName && item.productName.includes('+')) || Boolean(item.notes && item.notes.includes('multi-item'));
       const isOptom = isMulti || discount > 0;
 
-      // 4. Title resolution
+      // 4. Title resolution (fully localized)
       let locTitle = '';
       if (isOptom) {
-        locTitle = 'Optom sale';
+        locTitle = t('pos.optomSale') || (currentLang === 'ru' ? 'Оптовая продажа' : currentLang === 'uz' ? 'Optom savdo' : 'Optom sale');
       } else if (p) {
         locTitle = getLocalizedProductName(p, currentLang);
       } else {
-        locTitle = item.productName || 'Sale';
+        locTitle = item.productName || (t('pos.saleBadge') || (currentLang === 'uz' ? 'Sotuv' : currentLang === 'ru' ? 'Продажа' : 'Sale'));
       }
 
       const qty = Number(item.quantity) || (saleItems.length ? saleItems.reduce((s, i) => s + (Number(i.quantity) || 1), 0) : 1);
@@ -7053,32 +7062,34 @@ async function renderAuditView() {
           : `<span class="audit-status-badge audit-status-synced">🟢 ${t('pos.statusSynced')}</span>`;
 
       const optomBadge = isOptom
-        ? `<span class="audit-badge audit-badge-optom">Optom</span>`
+        ? `<span class="audit-badge audit-badge-optom">${t('pos.optomBadge') || (currentLang === 'ru' ? 'Оптом' : 'Optom')}</span>`
         : '';
 
       const discountTag = discount > 0
-        ? `<span style="color:var(--danger);font-size:0.75rem;font-weight:600;">Chegirma: −${fmt(discount)}</span>`
+        ? `<span style="color:var(--danger);font-size:0.75rem;font-weight:600;">${t('pos.discount')}: −${fmt(discount)}</span>`
         : '';
 
       const diff = Number(item.priceDiff) || 0;
-      const profitBadge = diff > 0
-        ? `<span style="color:var(--success);font-weight:600;">+${fmt(diff)}</span>`
-        : diff < 0
-          ? `<span style="color:var(--danger);font-weight:600;">−${fmt(Math.abs(diff))}</span>`
+      // Prevent duplicate red badge: if discount exists, priceDiff already accounts for it
+      const netExtraDiff = discount > 0 ? (diff + discount) : diff;
+      const profitBadge = netExtraDiff > 0
+        ? `<span style="color:var(--success);font-weight:600;">+${fmt(netExtraDiff)}</span>`
+        : (netExtraDiff < 0 && discount === 0)
+          ? `<span style="color:var(--danger);font-weight:600;">−${fmt(Math.abs(netExtraDiff))}</span>`
           : '';
 
-      const itemsDesc = (isMulti && saleItems.length > 1)
-        ? `${saleItems.length} xil · ${qty} dona`
-        : (isMulti && item.itemsCount > 1)
-          ? `${item.itemsCount} xil · ${qty} dona`
-          : `${qty} × ${unitPrice}`;
+      const countPcs = (isMulti && saleItems.length > 1) ? saleItems.length : (item.itemsCount || 1);
+      const itemsDesc = isMulti
+        ? (t('pos.itemsUnits', { count: countPcs, units: qty }) || (currentLang === 'uz' ? `${countPcs} xil · ${qty} dona` : currentLang === 'ru' ? `${countPcs} тов. · ${qty} шт.` : `${countPcs} items · ${qty} pcs`))
+        : `${qty} × ${unitPrice}`;
 
       // 6. Dropdown Breakdown Items
       let dropdownItemsHtml = '';
       if (saleItems.length > 0) {
         dropdownItemsHtml = saleItems.map(si => {
           const sip = products.find(prod => prod.id === si.productId);
-          const siName = sip ? getLocalizedProductName(sip, currentLang) : (si.productName || 'Item');
+          const fallbackName = t('pos.productFallback') || (currentLang === 'uz' ? 'Mahsulot' : currentLang === 'ru' ? 'Товар' : 'Item');
+          const siName = sip ? getLocalizedProductName(sip, currentLang) : (si.productName || fallbackName);
           const siQty = Number(si.quantity) || 1;
           const siPrice = Number(si.salePrice || si.basePrice || 0);
           const siSub = Number(si.subtotal || (siQty * siPrice));
@@ -7095,12 +7106,13 @@ async function renderAuditView() {
             </div>`;
         }).join('');
       } else {
+        const singleFallback = p ? getLocalizedProductName(p, currentLang) : (item.productName || (t('pos.productFallback') || 'Mahsulot'));
         dropdownItemsHtml = `
           <div class="audit-drop-row">
             <div class="audit-drop-left">
               <span class="audit-drop-bullet">•</span>
               <div class="audit-drop-details">
-                <span class="audit-drop-name">${escapeHtml(p ? getLocalizedProductName(p, currentLang) : (item.productName || 'Sale'))}</span>
+                <span class="audit-drop-name">${escapeHtml(singleFallback)}</span>
                 <span class="audit-drop-qty">${qty} × ${unitPrice}</span>
               </div>
             </div>
@@ -7110,13 +7122,19 @@ async function renderAuditView() {
 
       let dropdownDiscountHtml = '';
       if (discount > 0) {
+        // Never show internal debug strings like 'POS multi-item sale...' to users
+        const hasUserCustomNote = item.notes && !item.notes.startsWith('POS ') && !item.notes.startsWith('POS multi');
+        const discSubNote = hasUserCustomNote
+          ? escapeHtml(item.notes)
+          : (t('pos.orderDiscount') || (currentLang === 'uz' ? 'Umumiy chegirma' : currentLang === 'ru' ? 'Скидка на заказ' : 'Order discount'));
+
         dropdownDiscountHtml = `
           <div class="audit-drop-row discount-row">
             <div class="audit-drop-left">
               <span class="audit-drop-bullet">🏷️</span>
               <div class="audit-drop-details">
-                <span class="audit-drop-name">${t('pos.discount') || 'Chegirma (Discount)'}</span>
-                <span class="audit-drop-qty">${item.notes && item.notes.includes('discount') ? escapeHtml(item.notes) : 'Order Discount'}</span>
+                <span class="audit-drop-name">${t('pos.discount')}</span>
+                <span class="audit-drop-qty">${discSubNote}</span>
               </div>
             </div>
             <div class="audit-drop-right">−${fmt(discount)}</div>
@@ -7125,6 +7143,7 @@ async function renderAuditView() {
 
       const cardId = item.id || `audit_${index}`;
       const isOpen = expandedAuditIds.has(cardId);
+      const saleBadgeText = t('pos.saleBadge') || (currentLang === 'uz' ? 'Sotuv' : currentLang === 'ru' ? 'Продажа' : 'Sale');
 
       return `
         <div class="audit-card is-expandable ${isOpen ? 'is-open' : ''}" id="audit-card-${cardId}">
@@ -7133,7 +7152,7 @@ async function renderAuditView() {
             <div class="audit-item-info">
               <div class="audit-item-title">${escapeHtml(locTitle)}</div>
               <div class="audit-item-meta">
-                <span class="audit-badge audit-badge-sale">Sale</span>
+                <span class="audit-badge audit-badge-sale">${saleBadgeText}</span>
                 ${optomBadge}
                 <span>${timeStr}</span>
                 ${statusBadge}
@@ -7153,8 +7172,8 @@ async function renderAuditView() {
           </div>
           <div class="audit-dropdown" id="audit-details-${cardId}">
             <div class="audit-drop-head">
-              <span>${t('pos.whatWasSold') || 'Nima sotildi'}</span>
-              <span>${t('pos.price') || 'Narx'}</span>
+              <span>${t('pos.whatWasSold') || (currentLang === 'ru' ? 'Что продано' : currentLang === 'en' ? 'What was sold' : 'Nima sotildi')}</span>
+              <span>${t('pos.price') || (currentLang === 'ru' ? 'Цена' : currentLang === 'en' ? 'Price' : 'Narx')}</span>
             </div>
             <div class="audit-drop-list">
               ${dropdownItemsHtml}
@@ -7162,16 +7181,16 @@ async function renderAuditView() {
             </div>
             <div class="audit-drop-summary">
               <div class="audit-summary-line">
-                <span>${t('pos.subtotal') || 'Oraliq jami'}</span>
+                <span>${t('pos.subtotal') || (currentLang === 'uz' ? 'Oraliq jami' : currentLang === 'ru' ? 'Подытог' : 'Subtotal')}</span>
                 <span>${fmt(subtotalNum || (totalValNum + discount))}</span>
               </div>
               ${discount > 0 ? `
               <div class="audit-summary-line" style="color:var(--danger);">
-                <span>${t('pos.discount') || 'Chegirma'}</span>
+                <span>${t('pos.discount') || (currentLang === 'uz' ? 'Chegirma' : currentLang === 'ru' ? 'Скидка' : 'Discount')}</span>
                 <span style="font-weight:700;">−${fmt(discount)}</span>
               </div>` : ''}
               <div class="audit-summary-line total-line">
-                <span>${t('pos.finalTotal') || 'JAMI TOʻLOV'}</span>
+                <span>${t('pos.finalTotal') || (currentLang === 'uz' ? 'JAMI TOʻLOV' : currentLang === 'ru' ? 'ИТОГО' : 'TOTAL')}</span>
                 <span class="val">+${totalVal}</span>
               </div>
             </div>
