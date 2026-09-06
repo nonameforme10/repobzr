@@ -21,6 +21,7 @@ let state = {
     categories: [],
     products: [],
     activities: [],
+    sales: [],
     settings: {
         lastResetDate: null,
         currency: BASE_CURRENCY
@@ -269,7 +270,7 @@ const currency = (() => {
 
 // ==================== LOCAL-FIRST INDEXEDDB & SYNC ENGINE ====================
 const DB_NAME = 'SalesTrackDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // ==================== CROSS-TAB / CROSS-PANEL BROADCAST CHANNEL ====================
 const catalogChannel = (typeof window !== 'undefined' && 'BroadcastChannel' in window)
@@ -293,7 +294,7 @@ if (catalogChannel) {
             await loadState();
             refreshAll();
             if (type === 'SALE_RECORDED' && productName) {
-                showToast(`🛍️ POS Sale: ${productName} × ${quantity || 1} ($${Number(total || 0).toFixed(2)})`, 'success', 4500);
+                showToast(`🛍️ POS Sale: ${productName} × ${quantity || 1} (${formatCurrency(Number(total || 0))})`, 'success', 4500);
             }
         }
     };
@@ -316,6 +317,11 @@ const localDb = {
                     outboxStore.createIndex('status', 'status', { unique: false });
                 }
                 if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('sales')) {
+                    const salesStore = db.createObjectStore('sales', { keyPath: 'id' });
+                    salesStore.createIndex('status', 'status', { unique: false });
+                    salesStore.createIndex('createdAt', 'createdAt', { unique: false });
+                }
             };
             req.onsuccess = (e) => {
                 this.db = e.target.result;
@@ -699,9 +705,29 @@ const syncEngine = {
                 }
             } else if (ch.entityType === 'activity') {
                 const act = ch.data;
-                if (!state.activities.some(a => a.id === act.id)) {
+                const actId = act.id || ch.entityId;
+                const idx = state.activities.findIndex(a => a.id === actId);
+                if (idx !== -1) {
+                    state.activities[idx] = { ...state.activities[idx], ...act };
+                    await localDb.put('activities', state.activities[idx]);
+                    modified = true;
+                } else {
                     state.activities.unshift(act);
                     await localDb.put('activities', act);
+                    modified = true;
+                }
+            } else if (ch.entityType === 'sale') {
+                const sale = ch.data;
+                const saleId = sale.id || ch.entityId;
+                if (!Array.isArray(state.sales)) state.sales = [];
+                const idx = state.sales.findIndex(s => s.id === saleId);
+                if (idx !== -1) {
+                    state.sales[idx] = { ...state.sales[idx], ...sale };
+                    await localDb.put('sales', state.sales[idx]);
+                    modified = true;
+                } else {
+                    state.sales.unshift(sale);
+                    await localDb.put('sales', sale);
                     modified = true;
                 }
             }
@@ -724,7 +750,8 @@ const syncEngine = {
         await Promise.all([
             localDb.clear('categories'),
             localDb.clear('products'),
-            localDb.clear('activities')
+            localDb.clear('activities'),
+            localDb.clear('sales')
         ]);
 
         if (Array.isArray(snapshot.categories)) {
@@ -766,6 +793,13 @@ const syncEngine = {
             state.activities = [];
         }
 
+        if (Array.isArray(snapshot.sales)) {
+            state.sales = snapshot.sales;
+            if (state.sales.length > 0) await localDb.putAll('sales', state.sales);
+        } else {
+            state.sales = [];
+        }
+
         // If the server snapshot is completely empty, clean local outbox and localStorage
         if (state.categories.length === 0 && state.products.length === 0) {
             await localDb.clear('outbox');
@@ -788,11 +822,12 @@ const syncEngine = {
 // ==================== STORAGE ====================
 async function loadState() {
     try {
-        const [cats, prods, acts, sets] = await Promise.all([
+        const [cats, prods, acts, sets, sales] = await Promise.all([
             localDb.getAll('categories'),
             localDb.getAll('products'),
             localDb.getAll('activities'),
-            localDb.getAll('settings')
+            localDb.getAll('settings'),
+            localDb.getAll('sales')
         ]);
 
         if (cats.length > 0 || prods.length > 0) {
@@ -800,6 +835,7 @@ async function loadState() {
             state.products = prods;
             applySavedAdminProductOrder();
             state.activities = acts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            state.sales = sales || [];
             if (sets.length > 0) {
                 const settingsObj = {};
                 sets.forEach(s => settingsObj[s.key] = s.value);
@@ -812,6 +848,7 @@ async function loadState() {
                 const parsed = JSON.parse(raw);
                 if (parsed.categories || parsed.products) {
                     state = { ...state, ...parsed };
+                    if (!Array.isArray(state.sales)) state.sales = [];
                     await saveState();
                 }
             }
@@ -830,7 +867,8 @@ async function saveState() {
         await Promise.all([
             localDb.putAll('categories', state.categories),
             localDb.putAll('products', state.products),
-            localDb.putAll('activities', state.activities.slice(0, 500))
+            localDb.putAll('activities', state.activities.slice(0, 500)),
+            localDb.putAll('sales', (state.sales || []).slice(0, 200))
         ]);
     } catch (e) {
         console.error('Failed to save state to IndexedDB:', e);
@@ -1038,10 +1076,8 @@ function getTodayRevenue() {
     return state.activities
         .filter(a => a.type === 'sale' && !a.undone && a.timestamp >= resetTime)
         .reduce((sum, a) => {
-            if (a.totalSaleValue != null) return sum + Number(a.totalSaleValue);
-            if (a.sellingPrice != null) return sum + (Number(a.sellingPrice) * (a.quantity || 1));
-            const p = getProduct(a.productId);
-            return sum + ((p && p.price ? p.price * a.quantity : 0));
+            const d = resolveActivitySaleDetails(a);
+            return sum + d.totalSaleValue;
         }, 0);
 }
 
@@ -1057,6 +1093,156 @@ function getCategoryStats() {
 // ==================== I18N HELPER ====================
 function tr(key, params) {
     return (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t(key, params) : key;
+}
+
+// ==================== SALE DETAILS & NOTES RESOLUTION ====================
+function resolveActivitySaleDetails(act) {
+    if (!act || act.type !== 'sale') {
+        return {
+            isOptom: false,
+            totalSaleValue: 0,
+            totalUnits: Number(act?.quantity) || 0,
+            subtotal: 0,
+            discount: 0,
+            items: [],
+            displayName: act?.productName || ''
+        };
+    }
+
+    // 1. Find linked sale in state.sales
+    let linkedSale = null;
+    if (Array.isArray(state.sales) && state.sales.length > 0) {
+        linkedSale = state.sales.find(s => {
+            if (act.saleId && s.id === act.saleId) return true;
+            const actVal = act.totalSaleValue != null ? Number(act.totalSaleValue) : 0;
+            const actTs = Number(act.timestamp || 0);
+            const valMatch = actVal > 0 && Math.abs(Number(s.total || 0) - actVal) < 100;
+            const timeMatch = actTs > 0 && Math.abs(Number(s.createdAt || s.timestamp || 0) - actTs) < 300000;
+            return valMatch && timeMatch;
+        });
+    }
+
+    // 2. Resolve items
+    let items = [];
+    if (Array.isArray(act.items) && act.items.length > 0) {
+        items = act.items;
+    } else if (typeof act.items === 'string' && act.items.startsWith('[')) {
+        try { items = JSON.parse(act.items); } catch (e) {}
+    } else if (linkedSale && Array.isArray(linkedSale.items) && linkedSale.items.length > 0) {
+        items = linkedSale.items;
+    }
+
+    // 3. Resolve discount & subtotal
+    let discount = Number(act.discount || 0);
+    if (!discount && linkedSale && linkedSale.discount) {
+        discount = Number(linkedSale.discount);
+    }
+    if (!discount && act.notes) {
+        const discMatch = act.notes.match(/(?:discount|chegirma):\s*-?([0-9\s]+)/i);
+        if (discMatch) {
+            discount = parseInt(discMatch[1].replace(/\s+/g, ''), 10) || 0;
+        }
+    }
+
+    let subtotal = Number(act.subtotal || 0);
+    if (!subtotal && linkedSale && linkedSale.subtotal) {
+        subtotal = Number(linkedSale.subtotal);
+    }
+
+    // 4. Resolve isOptom
+    const prod = getProduct(act.productId);
+    const isMulti = items.length > 1 || (act.itemsCount && act.itemsCount > 1) || act.isOptom ||
+        Boolean(act.productName && /optom/i.test(act.productName)) ||
+        Boolean(act.notes && /(?:multi-item|optom)/i.test(act.notes));
+    const isOptom = isMulti || discount > 0;
+
+    // 5. Total Units
+    let totalUnits = Number(act.quantity) || 0;
+    if (!totalUnits && items.length > 0) {
+        totalUnits = items.reduce((sum, i) => sum + (Number(i.quantity) || 1), 0);
+    }
+    if (!totalUnits) totalUnits = 1;
+
+    // 6. Total Sale Value
+    let totalSaleValue = 0;
+    if (linkedSale && linkedSale.total != null && Number(linkedSale.total) > 0) {
+        totalSaleValue = Number(linkedSale.total);
+    } else if (subtotal > 0) {
+        totalSaleValue = subtotal - discount;
+    } else if (act.totalSaleValue != null && Number(act.totalSaleValue) > 0) {
+        totalSaleValue = Number(act.totalSaleValue);
+    } else if (act.sellingPrice != null && Number(act.sellingPrice) > 0) {
+        totalSaleValue = Number(act.sellingPrice) * totalUnits;
+    } else {
+        const price = (prod && prod.price) ? Number(prod.price) : 0;
+        totalSaleValue = price * totalUnits;
+    }
+
+    if (!subtotal) {
+        subtotal = totalSaleValue + discount;
+    }
+
+    // 7. Display Name
+    let displayName = '';
+    const currentLang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+    if (isOptom) {
+        displayName = tr('pos.optomSale') || (currentLang === 'ru' ? 'Оптовая продажа' : (currentLang === 'en' ? 'Optom sale' : 'Optom savdo'));
+    } else if (prod) {
+        displayName = getProductDisplayName(prod);
+    } else {
+        displayName = act.productName || tr('pos.productFallback') || 'Mahsulot';
+    }
+
+    return {
+        isOptom,
+        totalSaleValue,
+        totalUnits,
+        subtotal,
+        discount,
+        items,
+        displayName,
+        product: prod,
+        linkedSale
+    };
+}
+
+function formatActivityNote(note, act = null) {
+    if (!note) return '';
+    const text = String(note).trim();
+
+    // Handle POS multi-item sale note
+    const multiMatch = text.match(/POS multi-item sale \((\d+) items, (\d+) units, total: ([\d\s]+)(?: UZS)?, discount: -?([\d\s]+)(?: UZS)?\)/i)
+        || text.match(/POS multi-item sale \((\d+) items, (\d+) units, total: ([\d\s]+)(?: UZS)?\)/i);
+    if (multiMatch) {
+        const itemsCount = multiMatch[1];
+        const units = multiMatch[2];
+        const total = formatCurrency(parseInt(multiMatch[3].replace(/\s+/g, ''), 10) || 0);
+        const discNum = multiMatch[4] ? parseInt(multiMatch[4].replace(/\s+/g, ''), 10) : 0;
+        const discPart = discNum > 0 ? `, ${tr('pos.discount')}: -${formatCurrency(discNum)}` : '';
+        return tr('activity.posOptomNote', {
+            items: itemsCount,
+            units: units,
+            total: total,
+            discount: discPart
+        }) || `POS optom: ${itemsCount} xil, ${units} dona, ${total}${discPart}`;
+    }
+
+    // Handle single POS sale note: POS sale (1x @ 170 000 so'm)
+    const singleMatch = text.match(/POS sale \((\d+)x @ ([\d\s]+)(?: so['ʻ’]?m)?\)/i);
+    if (singleMatch) {
+        const qty = singleMatch[1];
+        const price = formatCurrency(parseInt(singleMatch[2].replace(/\s+/g, ''), 10) || 0);
+        return tr('activity.posSaleNote', { qty, price }) || `POS savdosi (${qty} dona @ ${price})`;
+    }
+
+    if (/^Product created$/i.test(text)) return tr('activity.productCreated');
+    if (/^Product deleted$/i.test(text)) return tr('activity.productDeleted');
+    if (/^Product updated$/i.test(text)) return tr('activity.productUpdated');
+    if (/^Category created$/i.test(text)) return tr('activity.categoryCreated');
+    if (/^Category deleted$/i.test(text)) return tr('activity.categoryDeleted');
+    if (/^Category updated$/i.test(text)) return tr('activity.categoryUpdated');
+
+    return text;
 }
 
 // ==================== TOASTS & CONFIRM ====================
@@ -1373,38 +1559,59 @@ function undoSale(activityId) {
     const act = state.activities.find(a => a.id === activityId);
     if (!act || act.type !== 'sale') return showToast(tr('sale.cannotUndo'), 'error');
 
-    const prod = getProduct(act.productId);
-    if (!prod) return showToast(tr('sale.productGone'), 'error');
-
-    // Restore previous state
-    if (act.previousQuantity !== undefined) prod.quantity = act.previousQuantity;
-    if (act.previousSold !== undefined) prod.sold = act.previousSold;
+    const details = resolveActivitySaleDetails(act);
 
     // Mark activity as undone instead of deleting
     act.undone = true;
     act.undoneAt = Date.now();
-    saveState();
 
-    enqueueOperation('RESTOCK', {
-        productId: prod.id,
-        quantity: act.quantity,
-        notes: `Undo sale: ${act.notes || 'Sale reversed'}`,
-        timestamp: Date.now()
-    });
+    if (details.items && details.items.length > 0) {
+        for (const item of details.items) {
+            const p = getProduct(item.productId);
+            if (p) {
+                const itemQty = Number(item.quantity || 1);
+                if (p.quantity !== null && p.quantity !== undefined) p.quantity += itemQty;
+                p.sold = Math.max(0, (p.sold || 0) - itemQty);
+                enqueueOperation('RESTOCK', {
+                    productId: p.id,
+                    quantity: itemQty,
+                    notes: `Undo sale: ${item.productName || p.name}`,
+                    timestamp: Date.now()
+                });
+            }
+        }
+    } else {
+        const prod = getProduct(act.productId);
+        if (prod) {
+            if (act.previousQuantity !== undefined) prod.quantity = act.previousQuantity;
+            else if (prod.quantity !== null && prod.quantity !== undefined) prod.quantity += (act.quantity || 1);
+            if (act.previousSold !== undefined) prod.sold = act.previousSold;
+            else prod.sold = Math.max(0, (prod.sold || 0) - (act.quantity || 1));
+
+            enqueueOperation('RESTOCK', {
+                productId: prod.id,
+                quantity: act.quantity || 1,
+                notes: `Undo sale: ${act.notes || 'Sale reversed'}`,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    saveState();
 
     addActivity({
         type: 'return',
-        productId: prod.id,
-        productName: prod.name,
-        categoryId: prod.categoryId,
-        categoryName: getCategoryName(prod.categoryId),
-        quantity: act.quantity,
+        productId: act.productId || null,
+        productName: details.displayName,
+        categoryId: act.categoryId || null,
+        categoryName: act.categoryName || '',
+        quantity: details.totalUnits,
         notes: `Undo: ${act.notes || 'Sale reversed'}`
     });
 
     showToast(tr('sale.undone'), 'success');
     refreshAll();
-    notifyCatalogChange('CATALOG_CHANGED', { reason: 'UNDO_SALE', productId: prod.id });
+    notifyCatalogChange('CATALOG_CHANGED', { reason: 'UNDO_SALE' });
 }
 
 function addStock(productId, amount, notes = '') {
@@ -1749,6 +1956,24 @@ function renderHome() {
     renderHomeReports();
 }
 
+function toggleHomeSaleDropdown(saleId) {
+    const drop = document.getElementById(`bp-drop-${saleId}`);
+    const row = document.getElementById(`bp-row-${saleId}`);
+    const icon = document.getElementById(`bp-icon-${saleId}`);
+    if (!drop) return;
+    const isOpen = drop.classList.contains('open');
+    if (isOpen) {
+        drop.classList.remove('open');
+        if (row) row.classList.remove('expanded');
+        if (icon) icon.classList.remove('open');
+    } else {
+        drop.classList.add('open');
+        if (row) row.classList.add('expanded');
+        if (icon) icon.classList.add('open');
+    }
+}
+window.toggleHomeSaleDropdown = toggleHomeSaleDropdown;
+
 function renderHomeReports() {
     const selectedDate = homeCalendar.getSelectedDate();
     const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
@@ -1756,14 +1981,14 @@ function renderHomeReports() {
 
     const daySales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
 
-    // Compute KPIs for Daily Overview
-    const totalUnits = daySales.reduce((acc, s) => acc + (s.quantity || 0), 0);
+    // Compute KPIs for Daily Overview using resolveActivitySaleDetails
+    const totalUnits = daySales.reduce((acc, s) => {
+        const d = resolveActivitySaleDetails(s);
+        return acc + d.totalUnits;
+    }, 0);
     const totalRev = daySales.reduce((acc, s) => {
-        if (s.totalSaleValue != null) return acc + Number(s.totalSaleValue);
-        if (s.sellingPrice != null) return acc + (Number(s.sellingPrice) * (s.quantity || 1));
-        const p = getProduct(s.productId);
-        const price = (p && p.price) ? p.price : (s.unitPrice || 0);
-        return acc + (price * (s.quantity || 0));
+        const d = resolveActivitySaleDetails(s);
+        return acc + d.totalSaleValue;
     }, 0);
     const txCount = daySales.length;
 
@@ -1799,64 +2024,123 @@ function renderHomeReports() {
 
     let rowsHtml = '';
     daySales.forEach(sale => {
-        const prod = getProduct(sale.productId);
-        const name = (prod ? getProductDisplayName(prod) : null) || sale.productName || 'Unknown Product';
-        const qty = sale.quantity || 1;
-        const price = (prod && prod.price) ? prod.price : (sale.unitPrice || 0);
-        const lineTotal = (sale.totalSaleValue != null)
-            ? Number(sale.totalSaleValue)
-            : ((sale.sellingPrice != null) ? (Number(sale.sellingPrice) * qty) : (price * qty));
+        const details = resolveActivitySaleDetails(sale);
+        const name = details.displayName;
+        const qty = details.totalUnits;
+        const lineTotal = details.totalSaleValue;
         const timeStr = formatTime(sale.timestamp);
-        const catName = getCategoryName(sale.categoryId || (prod ? prod.categoryId : null));
+        const catName = getCategoryName(sale.categoryId || (details.product ? details.product.categoryId : null));
+        const isPos = Boolean(sale.notes && /pos/i.test(sale.notes));
+        const isOptom = details.isOptom;
 
-        const isPos = Boolean(sale.notes && /pos\s*sale/i.test(sale.notes));
-        let customNote = '';
-        if (sale.notes) {
-            const rawNote = sale.notes.trim();
-            if (/^pos\s*sale[:\s(]/i.test(rawNote)) {
-                let stripped = rawNote
-                    .replace(/^pos\s*sale\s*\([^)]*\)/i, '')
-                    .replace(/^pos\s*sale[:\s]*[\d\s.,x@*a-zA-Zʻʼ']+/i, '')
-                    .trim();
-                stripped = stripped.replace(/^[·\-:,]\s*/, '').trim();
-                if (stripped) {
-                    customNote = stripped;
-                }
-            } else if (/^sold\s+\d+\s+unit/i.test(rawNote)) {
-                // generic default sale note
-            } else {
-                customNote = rawNote;
-            }
+        let imgHtml = '';
+        if (isOptom) {
+            imgHtml = `
+                <div class="bp-img-optom">
+                    <span class="bp-optom-icon">📦</span>
+                    <span class="bp-optom-badge">${qty}x</span>
+                </div>`;
+        } else if (details.product && details.product.image) {
+            imgHtml = `<img src="${escapeHtml(details.product.image)}" alt="${escapeHtml(name)}" loading="lazy">`;
+        } else {
+            imgHtml = `<div class="bp-img-placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
         }
 
-        const imgHtml = (prod && prod.image)
-            ? `<img src="${escapeHtml(prod.image)}" alt="${escapeHtml(name)}" loading="lazy">`
-            : `<div class="bp-img-placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+        const customNote = formatActivityNote(sale.notes, sale);
 
-        rowsHtml += `
-            <div class="bp-row">
-                <div class="bp-img-wrap">
-                    ${imgHtml}
-                </div>
-                <div class="bp-info">
-                    <div class="bp-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
-                    <div class="bp-meta">
-                        <span class="bp-meta-time">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
-                            ${timeStr}
-                        </span>
-                        ${catName && catName !== 'Unknown' ? `<span class="bp-meta-cat">· ${escapeHtml(catName)}</span>` : ''}
-                        ${isPos ? `<span class="bp-source-badge pos">POS</span>` : ''}
-                        ${qty > 1 ? `<span class="bp-unit-rate">· @ ${formatCurrency(price)}</span>` : ''}
-                        ${customNote ? `<span class="bp-note-text" title="${escapeHtml(customNote)}">${escapeHtml(customNote)}</span>` : ''}
+        // Multi-item / breakdown dropdown content
+        let dropdownHtml = '';
+        const hasBreakdown = (details.items && details.items.length > 0) || (isOptom && details.discount > 0);
+        if (hasBreakdown) {
+            const itemsList = (details.items && details.items.length > 0) ? details.items : (details.product ? [{
+                productName: details.displayName,
+                quantity: qty,
+                salePrice: details.product.price,
+                subtotal: details.subtotal
+            }] : []);
+
+            const itemsListHtml = itemsList.map(it => {
+                const itName = it.productName || it.product_name_snapshot || 'Item';
+                const itQty = Number(it.quantity || 1);
+                const itPrice = Number(it.salePrice || it.basePrice || it.price || 0);
+                const itSub = Number(it.subtotal || itQty * itPrice);
+                return `
+                    <div class="bp-dropdown-item-row">
+                        <div class="bp-dropdown-item-info">
+                            <span class="bp-dropdown-bullet">•</span>
+                            <span class="bp-dropdown-item-title">${escapeHtml(itName)}</span>
+                            <span class="bp-dropdown-item-calc">${itQty} × ${formatCurrency(itPrice)}</span>
+                        </div>
+                        <div class="bp-dropdown-item-price">${formatCurrency(itSub)}</div>
+                    </div>
+                `;
+            }).join('');
+
+            dropdownHtml = `
+                <div class="bp-dropdown-content" id="bp-drop-${sale.id}">
+                    <div class="bp-dropdown-header">
+                        <span>${tr('pos.whatWasSold')}</span>
+                        <span>${tr('pos.price')}</span>
+                    </div>
+                    <div class="bp-dropdown-items-list">
+                        ${itemsListHtml}
+                    </div>
+                    ${details.discount > 0 ? `
+                        <div class="bp-dropdown-discount-row">
+                            <span class="bp-disc-label">🏷️ ${tr('pos.discount')}</span>
+                            <span class="bp-disc-val">−${formatCurrency(details.discount)}</span>
+                        </div>
+                    ` : ''}
+                    <div class="bp-dropdown-footer">
+                        <div class="bp-foot-row">
+                            <span>${tr('pos.subtotal')}:</span>
+                            <span>${formatCurrency(details.subtotal)}</span>
+                        </div>
+                        <div class="bp-foot-row bp-foot-total">
+                            <span>${tr('home.salesSum')}:</span>
+                            <span class="bp-foot-total-val">${formatCurrency(lineTotal)}</span>
+                        </div>
                     </div>
                 </div>
-                <div class="bp-qty-cell">
-                    <span class="bp-qty-pill">${qty}</span>
+            `;
+        }
+
+        rowsHtml += `
+            <div class="bp-card-container ${isOptom ? 'is-optom-card' : ''}">
+                <div class="bp-row ${hasBreakdown ? 'has-breakdown' : ''}" id="bp-row-${sale.id}" ${hasBreakdown ? `onclick="toggleHomeSaleDropdown('${sale.id}')"` : ''}>
+                    <div class="bp-img-wrap ${isOptom ? 'optom-wrap' : ''}">
+                        ${imgHtml}
+                    </div>
+                    <div class="bp-info">
+                        <div class="bp-name-line">
+                            <span class="bp-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+                            ${isOptom ? `<span class="bp-source-badge optom">${tr('pos.optomBadge') || 'Optom'}</span>` : ''}
+                        </div>
+                        <div class="bp-meta">
+                            <span class="bp-meta-time">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                                ${timeStr}
+                            </span>
+                            ${catName && catName !== 'Unknown' ? `<span class="bp-meta-cat">· ${escapeHtml(catName)}</span>` : ''}
+                            ${isPos ? `<span class="bp-source-badge pos">POS</span>` : ''}
+                            ${isOptom && details.items?.length ? `<span class="bp-meta-cat">· ${details.items.length} xil</span>` : ''}
+                            ${!isOptom && qty > 1 && details.product?.price ? `<span class="bp-unit-rate">· @ ${formatCurrency(details.product.price)}</span>` : ''}
+                            ${customNote && !isOptom ? `<span class="bp-note-text" title="${escapeHtml(customNote)}">${escapeHtml(customNote)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="bp-qty-cell">
+                        <span class="bp-qty-pill">${qty}</span>
+                    </div>
+                    <div class="bp-sum-cell">
+                        <span class="bp-sum-val">${formatCurrency(lineTotal)}</span>
+                        ${hasBreakdown ? `
+                            <span class="bp-toggle-chevron" id="bp-icon-${sale.id}">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </span>
+                        ` : ''}
+                    </div>
                 </div>
-                <div class="bp-sum-cell">
-                    <span class="bp-sum-val">${formatCurrency(lineTotal)}</span>
-                </div>
+                ${dropdownHtml}
             </div>
         `;
     });
@@ -1917,16 +2201,20 @@ function renderActivityItem(a) {
     const label = typeLabels[a.type] || a.type;
     const systemLabel = tr('activity.system');
     const qtyLabel = tr('activity.qty');
+    const details = resolveActivitySaleDetails(a);
+    const title = a.type === 'sale' ? details.displayName : (a.productName || a.categoryName || systemLabel);
+    const noteFormatted = formatActivityNote(a.notes, a);
+
     return `
         <div class="activity-item ${a.type}">
             <div class="activity-icon ${a.type}">${label[0]}</div>
             <div class="activity-content">
-                <div class="activity-title">${a.productName || a.categoryName || systemLabel} — ${label}</div>
+                <div class="activity-title">${escapeHtml(title)} — ${label}</div>
                 <div class="activity-meta">
                     <span>${formatDateTime(a.timestamp)}</span>
                     ${a.quantity ? `<span>${qtyLabel}: ${a.quantity}</span>` : ''}
                 </div>
-                ${a.notes ? `<div class="activity-note">${escapeHtml(a.notes)}</div>` : ''}
+                ${noteFormatted ? `<div class="activity-note">${escapeHtml(noteFormatted)}</div>` : ''}
             </div>
         </div>
     `;
@@ -2378,21 +2666,26 @@ function renderActivity() {
         return;
     }
 
-    tbody.innerHTML = acts.map(a => `
-        <tr>
-            <td>${formatDateTime(a.timestamp)}</td>
-            <td><span class="badge badge-${a.type}">${tr('type.' + a.type)}</span></td>
-            <td>${escapeHtml(a.productName || '-')}</td>
-            <td>${escapeHtml(a.categoryName || '-')}</td>
-            <td>${a.quantity || '-'}</td>
-            <td>${escapeHtml(a.notes || '')}</td>
-            <td class="actions-cell">
-                ${a.type === 'sale' && !a.undone ? `<button class="btn btn-sm btn-secondary" onclick="undoSale('${a.id}')">${tr('sale.undo')}</button>` : ''}
-                <button class="btn btn-sm btn-secondary" onclick="editNotePrompt('${a.id}')">${tr('activity.editNote')}</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteActivity('${a.id}')">${tr('common.delete')}</button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = acts.map(a => {
+        const details = resolveActivitySaleDetails(a);
+        const prodName = a.type === 'sale' ? details.displayName : (a.productName || '-');
+        const noteFormatted = formatActivityNote(a.notes, a);
+        return `
+            <tr>
+                <td>${formatDateTime(a.timestamp)}</td>
+                <td><span class="badge badge-${a.type}">${tr('type.' + a.type)}</span></td>
+                <td>${escapeHtml(prodName)}</td>
+                <td>${escapeHtml(a.categoryName || '-')}</td>
+                <td>${a.quantity || '-'}</td>
+                <td>${escapeHtml(noteFormatted || '')}</td>
+                <td class="actions-cell">
+                    ${a.type === 'sale' && !a.undone ? `<button class="btn btn-sm btn-secondary" onclick="undoSale('${a.id}')">${tr('sale.undo')}</button>` : ''}
+                    <button class="btn btn-sm btn-secondary" onclick="editNotePrompt('${a.id}')">${tr('activity.editNote')}</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteActivity('${a.id}')">${tr('common.delete')}</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function editNotePrompt(id) {
@@ -2602,7 +2895,7 @@ const fx = (() => {
         const {from, to} = getCurrencies();
         const converted = convert(1, from, to);
 
-        captionEl.textContent = `1 ${currencyName(from)} equals`;
+        captionEl.textContent = `1 ${currencyName(from)} ${tr('pos.equals') || 'teng'}`;
         unitEl.textContent    = currencyName(to);
         valueEl.textContent   = converted == null ? '—' : formatAmount(converted, to);
 
@@ -2615,10 +2908,23 @@ const fx = (() => {
             const dateStr = d.toLocaleString(lang, {
                 month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
             });
-            metaEl.textContent = `${dateStr} · From cbu.uz`;
+            metaEl.textContent = `${dateStr} · ${tr('fx.fromCbu') || 'cbu.uz dan'}`;
         } else {
             metaEl.textContent = 'Loading…';
         }
+        updateCurrencyOptionLabels();
+    }
+
+    function updateCurrencyOptionLabels() {
+        ['fxCurrencyA', 'fxCurrencyB'].forEach(selId => {
+            const sel = document.getElementById(selId);
+            if (!sel) return;
+            Array.from(sel.options).forEach(opt => {
+                const key = `fx.${opt.value.toLowerCase()}`;
+                const text = tr(key);
+                if (text && text !== key) opt.textContent = text;
+            });
+        });
     }
 
     function syncConverter(source) {

@@ -3553,6 +3553,10 @@ canvas {
 /* Sales Sum Cell */
 .bp-sum-cell {
     text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .bp-sum-val {
@@ -3565,6 +3569,233 @@ canvas {
 
 [data-theme="dark"] .bp-sum-val {
     color: #F4F1EA;
+}
+
+/* Optom & Breakdown Dropdown for Blueprint Reports */
+.bp-card-container {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-surface-2);
+    overflow: hidden;
+    transition: var(--transition-fast);
+}
+
+[data-theme="dark"] .bp-card-container {
+    background: rgba(255, 255, 255, 0.025);
+    border-color: rgba(255, 255, 255, 0.07);
+}
+
+.bp-card-container:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-xs);
+}
+
+[data-theme="dark"] .bp-card-container:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.bp-card-container .bp-row {
+    border: none;
+    border-radius: 0;
+    background: transparent !important;
+}
+
+.bp-row.has-breakdown {
+    cursor: pointer;
+    user-select: none;
+}
+
+.bp-name-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.bp-source-badge.optom {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .bp-source-badge.optom {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border-color: rgba(251, 191, 36, 0.3);
+}
+
+.bp-img-optom {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(245, 158, 11, 0.05));
+    border-radius: inherit;
+}
+
+.bp-optom-icon {
+    font-size: 1.25rem;
+}
+
+.bp-optom-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: var(--bg-surface);
+    color: var(--ink-strong);
+    font-size: 0.625rem;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border-soft);
+    line-height: 1.2;
+}
+
+.bp-toggle-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-muted);
+    transition: transform 0.2s ease;
+}
+
+.bp-toggle-chevron.open,
+.bp-row.expanded .bp-toggle-chevron {
+    transform: rotate(180deg);
+}
+
+/* Dropdown Content */
+.bp-dropdown-content {
+    display: none;
+    border-top: 1px dashed var(--border);
+    padding: 12px 18px;
+    background: var(--bg-surface);
+    flex-direction: column;
+    gap: 10px;
+}
+
+[data-theme="dark"] .bp-dropdown-content {
+    background: rgba(0, 0, 0, 0.2);
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.bp-dropdown-content.open {
+    display: flex;
+}
+
+.bp-dropdown-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted);
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 6px;
+}
+
+.bp-dropdown-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.bp-dropdown-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8125rem;
+    padding: 2px 0;
+}
+
+.bp-dropdown-item-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.bp-dropdown-bullet {
+    color: var(--gold, #d97706);
+    font-size: 0.875rem;
+}
+
+.bp-dropdown-item-title {
+    font-weight: 500;
+    color: var(--ink-strong);
+}
+
+.bp-dropdown-item-calc {
+    font-size: 0.75rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.bp-dropdown-item-price {
+    font-weight: 600;
+    color: var(--ink-strong);
+    font-variant-numeric: tabular-nums;
+}
+
+.bp-dropdown-discount-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    background: rgba(239, 68, 68, 0.08);
+    border-left: 3px solid #ef4444;
+    border-radius: var(--radius-xs);
+    font-size: 0.8125rem;
+}
+
+.bp-disc-label {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+.bp-disc-val {
+    color: #ef4444;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.bp-dropdown-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 8px;
+    align-items: flex-end;
+}
+
+.bp-foot-row {
+    display: flex;
+    gap: 16px;
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.bp-foot-total {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+}
+
+.bp-foot-total-val {
+    color: var(--gold, #d97706);
+    font-weight: 800;
+}
+
+[data-theme="dark"] .bp-foot-total-val {
+    color: #fbbf24;
 }
 
 /* Mobile Responsive for Reports and Home */

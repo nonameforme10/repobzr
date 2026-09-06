@@ -90,11 +90,20 @@ async function getSnapshot() {
             WHEN a.type = 'cash_out' THEN a.product_name 
             ELSE NULL 
           END AS "reason",
-          COALESCE(p.price::float, 0) AS "sellingPrice",
-          (COALESCE(p.price::float, 0) * COALESCE(a.quantity::float, 1)) AS "totalSaleValue"
-          ${hasDetails ? `, a.sale_id AS "saleId", COALESCE(a.discount::bigint, 0) AS discount, COALESCE(a.subtotal::bigint, 0) AS subtotal, COALESCE(a.items_count, 1) AS "itemsCount", a.items_json AS items` : ''}
+          CASE 
+            WHEN a.type = 'sale' AND (${hasDetails ? 'COALESCE(s.total, NULLIF(a.subtotal, 0) - COALESCE(a.discount, 0), 0)' : '0'}) > 0 AND a.quantity > 0 
+              THEN ROUND((${hasDetails ? 'COALESCE(s.total, a.subtotal - COALESCE(a.discount, 0))' : '0'})::numeric / a.quantity::numeric, 0)::float
+            ELSE COALESCE(p.price::float, 0) 
+          END AS "sellingPrice",
+          CASE 
+            WHEN a.type = 'sale' AND (${hasDetails ? 'COALESCE(s.total, NULLIF(a.subtotal, 0) - COALESCE(a.discount, 0), 0)' : '0'}) > 0 
+              THEN (${hasDetails ? 'COALESCE(s.total::float, (a.subtotal::float - COALESCE(a.discount::float, 0)))' : '0'})::float
+            ELSE (COALESCE(p.price::float, 0) * COALESCE(a.quantity::float, 1))
+          END AS "totalSaleValue"
+          ${hasDetails ? `, a.sale_id AS "saleId", COALESCE(s.discount::bigint, a.discount::bigint, 0) AS discount, COALESCE(s.subtotal::bigint, a.subtotal::bigint, 0) AS subtotal, COALESCE(a.items_count, 1) AS "itemsCount", COALESCE(a.items_json, '[]'::jsonb) AS items, (COALESCE(a.items_count, 1) > 1 OR COALESCE(a.discount, 0) > 0 OR a.product_name ILIKE '%optom%') AS "isOptom"` : ''}
         FROM activities a
         LEFT JOIN products p ON a.product_id = p.id
+        ${hasDetails ? 'LEFT JOIN sales s ON a.sale_id = s.id' : ''}
         ORDER BY a.timestamp DESC 
         LIMIT 500
       `),
@@ -524,6 +533,8 @@ async function processSyncBatch(deviceId, operations = []) {
               timestamp: Number(timestamp || now),
               productId: firstProduct ? firstProduct.productId : null,
               productName: displayProductName,
+              categoryId: firstProduct ? firstProduct.categoryId : null,
+              categoryName: isOptom ? 'Optom Multi-Sale' : 'POS Sale',
               quantity: totalUnitsSold,
               sellingPrice: processedItems.length === 1 ? firstProduct.salePrice : Math.round(totalNum / totalUnitsSold),
               totalSaleValue: totalNum,
