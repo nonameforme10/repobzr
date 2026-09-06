@@ -1521,49 +1521,321 @@ function refreshAll() {
     updateCharts();
 }
 
-// ---------- Home ----------
+// ---------- Home Calendar & Blueprint Reports ----------
+const homeCalendar = {
+    selectedDate: new Date(),
+    viewDate: new Date(),
+    viewMode: 'days', // 'days' | 'months'
+    initialized: false,
+
+    init() {
+        if (this.initialized) return;
+        this.initialized = true;
+
+        const todayBtn = document.getElementById('calTodayBtn');
+        const selectorBtn = document.getElementById('calMonthSelector');
+        const prevBtn = document.getElementById('calPrevBtn');
+        const nextBtn = document.getElementById('calNextBtn');
+
+        todayBtn?.addEventListener('click', () => {
+            this.selectedDate = new Date();
+            this.viewDate = new Date();
+            this.viewMode = 'days';
+            this.render();
+            renderHomeReports();
+        });
+
+        selectorBtn?.addEventListener('click', () => {
+            this.viewMode = (this.viewMode === 'days') ? 'months' : 'days';
+            this.render();
+        });
+
+        prevBtn?.addEventListener('click', () => {
+            if (this.viewMode === 'days') {
+                this.viewDate.setMonth(this.viewDate.getMonth() - 1);
+            } else {
+                this.viewDate.setFullYear(this.viewDate.getFullYear() - 1);
+            }
+            this.render();
+        });
+
+        nextBtn?.addEventListener('click', () => {
+            if (this.viewMode === 'days') {
+                this.viewDate.setMonth(this.viewDate.getMonth() + 1);
+            } else {
+                this.viewDate.setFullYear(this.viewDate.getFullYear() + 1);
+            }
+            this.render();
+        });
+    },
+
+    getSelectedDate() {
+        return this.selectedDate;
+    },
+
+    selectDate(year, month, day) {
+        this.selectedDate = new Date(year, month, day);
+        this.viewDate = new Date(year, month, day);
+        this.viewMode = 'days';
+        this.render();
+        renderHomeReports();
+    },
+
+    selectMonth(monthIndex) {
+        this.viewDate.setMonth(monthIndex);
+        this.viewMode = 'days';
+        this.render();
+    },
+
+    render() {
+        const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'en';
+        const fullDateEl = document.getElementById('calFullDate');
+        const monthTitleEl = document.getElementById('calMonthTitle');
+        const monthSelector = document.getElementById('calMonthSelector');
+        const daysView = document.getElementById('calDaysView');
+        const monthsView = document.getElementById('calMonthsView');
+        const weekdaysEl = document.getElementById('calWeekdays');
+        const daysGridEl = document.getElementById('calDaysGrid');
+        const monthsGridEl = document.getElementById('calMonthsGrid');
+        const overviewSub = document.getElementById('overviewDateSubtitle');
+
+        if (!fullDateEl) return;
+
+        // Top bar date e.g. "воскресенье, 6 сентября"
+        const locale = (lang === 'ru') ? 'ru-RU' : ((lang === 'uz') ? 'uz-UZ' : 'en-US');
+        const fullDateStr = this.selectedDate.toLocaleDateString(locale, {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
+        });
+        fullDateEl.textContent = fullDateStr;
+
+        if (overviewSub) {
+            overviewSub.textContent = this.selectedDate.toLocaleDateString(locale, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        const currentYear = this.viewDate.getFullYear();
+        const currentMonth = this.viewDate.getMonth();
+
+        const monthNames = {
+            ru: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'],
+            uz: ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr'],
+            en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+        };
+
+        const shortMonths = {
+            ru: ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'],
+            uz: ['yan', 'fev', 'mar', 'apr', 'may', 'iyn', 'iyl', 'avg', 'sen', 'okt', 'noy', 'dek'],
+            en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        };
+
+        const weekdays = {
+            ru: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+            uz: ['Du', 'Se', 'Cho', 'Pa', 'Ju', 'Sha', 'Yak'],
+            en: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
+        };
+
+        const activeMonths = monthNames[lang] || monthNames.en;
+        const activeShortMonths = shortMonths[lang] || shortMonths.en;
+        const activeWeekdays = weekdays[lang] || weekdays.en;
+
+        if (this.viewMode === 'days') {
+            monthSelector?.classList.remove('expanded');
+            if (monthTitleEl) {
+                monthTitleEl.textContent = `${activeMonths[currentMonth]} ${currentYear}`;
+            }
+            if (daysView) daysView.style.display = 'block';
+            if (monthsView) monthsView.style.display = 'none';
+
+            if (weekdaysEl) {
+                weekdaysEl.innerHTML = activeWeekdays.map(w => `<span>${w}</span>`).join('');
+            }
+
+            if (daysGridEl) {
+                daysGridEl.innerHTML = '';
+
+                // Monday-start week: 0 for Monday, 6 for Sunday
+                const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
+                const startDayIndex = (firstDayOfMonth + 6) % 7;
+
+                const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+                const today = new Date();
+                const isCurrentYear = today.getFullYear() === currentYear;
+                const isCurrentMonth = today.getMonth() === currentMonth;
+                const todayDate = today.getDate();
+
+                const isSelectedYear = this.selectedDate.getFullYear() === currentYear;
+                const isSelectedMonth = this.selectedDate.getMonth() === currentMonth;
+                const selectedDay = this.selectedDate.getDate();
+
+                // Trailing days of previous month
+                for (let i = startDayIndex - 1; i >= 0; i--) {
+                    const dayNum = daysInPrevMonth - i;
+                    const prevMonth = (currentMonth === 0) ? 11 : currentMonth - 1;
+                    const prevYear = (currentMonth === 0) ? currentYear - 1 : currentYear;
+                    const cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.className = 'cal-day-cell other-month';
+                    cell.textContent = dayNum;
+                    cell.onclick = () => this.selectDate(prevYear, prevMonth, dayNum);
+                    daysGridEl.appendChild(cell);
+                }
+
+                // Days of current month
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.className = 'cal-day-cell';
+                    if (isCurrentYear && isCurrentMonth && d === todayDate) {
+                        cell.classList.add('today');
+                    }
+                    if (isSelectedYear && isSelectedMonth && d === selectedDay) {
+                        cell.classList.add('selected');
+                    }
+                    cell.textContent = d;
+                    cell.onclick = () => this.selectDate(currentYear, currentMonth, d);
+                    daysGridEl.appendChild(cell);
+                }
+
+                // Leading days of next month (complete grid to 35 or 42 cells)
+                const totalRendered = startDayIndex + daysInMonth;
+                const targetCells = totalRendered <= 35 ? 35 : 42;
+                const remaining = targetCells - totalRendered;
+                for (let n = 1; n <= remaining; n++) {
+                    const nextMonth = (currentMonth === 11) ? 0 : currentMonth + 1;
+                    const nextYear = (currentMonth === 11) ? currentYear + 1 : currentYear;
+                    const cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.className = 'cal-day-cell other-month';
+                    cell.textContent = n;
+                    cell.onclick = () => this.selectDate(nextYear, nextMonth, n);
+                    daysGridEl.appendChild(cell);
+                }
+            }
+        } else {
+            // Months View (Windows 11 style)
+            monthSelector?.classList.add('expanded');
+            if (monthTitleEl) {
+                monthTitleEl.textContent = (lang === 'ru') ? `${currentYear} г.` : `${currentYear}`;
+            }
+            if (daysView) daysView.style.display = 'none';
+            if (monthsView) monthsView.style.display = 'block';
+
+            if (monthsGridEl) {
+                monthsGridEl.innerHTML = '';
+                for (let m = 0; m < 12; m++) {
+                    const cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.className = 'cal-month-cell';
+                    if (this.viewDate.getMonth() === m) {
+                        cell.classList.add('selected');
+                    }
+                    cell.textContent = activeShortMonths[m];
+                    cell.onclick = () => this.selectMonth(m);
+                    monthsGridEl.appendChild(cell);
+                }
+            }
+        }
+    }
+};
+
 function renderHome() {
-    const datePicker = document.getElementById('homeDatePicker');
-    const tbody = document.getElementById('homeReportsTableBody');
-    if (!datePicker || !tbody) return;
-    
-    // Set default date to today if empty
-    if (!datePicker.value) {
-        const today = new Date();
-        const yyyy = today.getFullYear();
-        const mm = String(today.getMonth() + 1).padStart(2, '0');
-        const dd = String(today.getDate()).padStart(2, '0');
-        datePicker.value = `${yyyy}-${mm}-${dd}`;
+    homeCalendar.init();
+    homeCalendar.render();
+    renderHomeReports();
+}
+
+function renderHomeReports() {
+    const selectedDate = homeCalendar.getSelectedDate();
+    const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
+    const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).getTime();
+
+    const daySales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
+
+    // Compute KPIs for Daily Overview
+    const totalUnits = daySales.reduce((acc, s) => acc + (s.quantity || 0), 0);
+    const totalRev = daySales.reduce((acc, s) => {
+        const p = getProduct(s.productId);
+        const price = (p && p.price) ? p.price : (s.unitPrice || 0);
+        return acc + (price * (s.quantity || 0));
+    }, 0);
+    const txCount = daySales.length;
+
+    const daySoldEl = document.getElementById('homeDaySold');
+    if (daySoldEl) daySoldEl.textContent = totalUnits;
+
+    const dayRevEl = document.getElementById('homeDayRevenue');
+    if (dayRevEl) dayRevEl.textContent = formatCurrency(totalRev);
+
+    const dayTxEl = document.getElementById('homeDayTransactions');
+    if (dayTxEl) dayTxEl.textContent = txCount;
+
+    const summaryBadge = document.getElementById('homeReportsSummaryBadge');
+    if (summaryBadge) {
+        summaryBadge.textContent = `${totalUnits} ${tr('home.unitsSold')} · ${formatCurrency(totalRev)}`;
     }
 
-    const selectedDate = new Date(datePicker.value);
-    const startOfDay = new Date(selectedDate.setHours(0,0,0,0)).getTime();
-    const endOfDay = new Date(selectedDate.setHours(23,59,59,999)).getTime();
+    // Render Blueprint Reports Rows
+    const reportsList = document.getElementById('homeReportsList');
+    if (!reportsList) return;
 
-    const sales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
-    
-    if (sales.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="empty-cell">No sales on this date</td></tr>';
+    if (daySales.length === 0) {
+        reportsList.innerHTML = `
+            <div class="bp-empty-state">
+                <div class="bp-empty-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div>${tr('home.noSales')}</div>
+            </div>
+        `;
         return;
     }
 
-    let html = '';
-    sales.forEach(sale => {
+    let rowsHtml = '';
+    daySales.forEach(sale => {
         const prod = getProduct(sale.productId);
-        const pic = (prod && prod.image) ? `<img src="${escapeHtml(prod.image)}" style="width:40px;height:40px;border-radius:4px;object-fit:cover;">` : `<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#999;font-size:10px;">No pic</div>`;
-        const name = sale.productName || 'Unknown';
+        const name = sale.productName || (prod ? getProductDisplayName(prod) : 'Unknown Product');
         const qty = sale.quantity || 1;
-        const sum = prod ? formatCurrency((prod.price || 0) * qty) : '-';
-        html += `
-            <tr>
-                <td>${pic}</td>
-                <td>${escapeHtml(name)}</td>
-                <td>${qty}</td>
-                <td style="font-weight:bold;">${sum}</td>
-            </tr>
+        const price = (prod && prod.price) ? prod.price : (sale.unitPrice || 0);
+        const lineTotal = price * qty;
+        const timeStr = formatTime(sale.timestamp);
+        const catName = getCategoryName(sale.categoryId || (prod ? prod.categoryId : null));
+
+        const imgHtml = (prod && prod.image)
+            ? `<img src="${escapeHtml(prod.image)}" alt="${escapeHtml(name)}" loading="lazy">`
+            : `<div class="bp-img-placeholder"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>`;
+
+        rowsHtml += `
+            <div class="bp-row">
+                <div class="bp-img-wrap">
+                    ${imgHtml}
+                </div>
+                <div class="bp-info">
+                    <div class="bp-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+                    <div class="bp-meta">
+                        <span>🕒 ${timeStr}</span>
+                        ${catName && catName !== 'Unknown' ? `<span>· ${escapeHtml(catName)}</span>` : ''}
+                        ${sale.notes ? `<span>· ${escapeHtml(sale.notes)}</span>` : ''}
+                    </div>
+                </div>
+                <div class="bp-qty-cell">
+                    <span class="bp-qty-pill">${qty}</span>
+                </div>
+                <div class="bp-sum-cell">
+                    <span class="bp-sum-val">${formatCurrency(lineTotal)}</span>
+                </div>
+            </div>
         `;
     });
-    tbody.innerHTML = html;
+
+    reportsList.innerHTML = rowsHtml;
 }
 
 // ---------- Dashboard ----------
@@ -3095,6 +3367,9 @@ function navigateTo(page) {
             setTimeout(updateCharts, 60);
         });
     }
+    if (page === 'home') {
+        renderHome();
+    }
 }
 
 // ==================== EVENT LISTENERS ====================
@@ -3139,7 +3414,6 @@ function setupEventListeners() {
     document.getElementById('addProductBtn')?.addEventListener('click', openAddProduct);
 
     // Filters
-    document.getElementById('homeDatePicker')?.addEventListener('change', renderHome);
     document.getElementById('productCategoryFilter')?.addEventListener('change', renderProducts);
     document.getElementById('productSort')?.addEventListener('change', renderProducts);
     document.getElementById('activityFilter')?.addEventListener('change', renderActivity);
@@ -3196,6 +3470,7 @@ function setupEventListeners() {
         updateCurrencySwitcherUI();
         const revEl = document.getElementById('dashRevenue');
         if (revEl) revEl.textContent = formatCurrency(getTodayRevenue());
+        renderHomeReports();
     };
     document.addEventListener('currency:change', onCurrencyUpdated);
     document.addEventListener('currency:rates', onCurrencyUpdated);
@@ -3273,6 +3548,7 @@ async function init() {
     await loadState();
     await purgeDemoDataIfPresent();
     currency.load();                  // hydrate cached active code + rates
+    homeCalendar.init();
     setupEventListeners();
     refreshAll();
     navigateTo('home');

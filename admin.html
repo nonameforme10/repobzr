@@ -35,6 +35,7 @@
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('/sw.js').then(function(registration) {
                     console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    registration.update();
                 }, function(err) {
                     console.log('ServiceWorker registration failed: ', err);
                 });
@@ -42,13 +43,13 @@
         }
     </script>
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/style.css?v=8">
+    <link rel="stylesheet" href="/style.css?v=10">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-    <script src="/i18n.js?v=8" defer></script>
+    <script src="/i18n.js?v=10" defer></script>
 </head>
 <body>
     <div id="app">
@@ -176,26 +177,119 @@
 
                 <!-- HOME PAGE -->
                 <section class="page active" id="page-home">
-                    <div class="glass" style="padding: 20px; margin-bottom: 20px;">
-                        <input type="date" id="homeDatePicker" class="form-input" style="max-width: 200px;">
-                    </div>
-                    
-                    <div class="glass" style="padding: 20px;">
-                        <h3>Reports</h3>
-                        <div class="activity-table-container">
-                            <table class="activity-table">
-                                <thead>
-                                    <tr>
-                                        <th>Picture</th>
-                                        <th>What was sold</th>
-                                        <th>Quantity</th>
-                                        <th>Sales sum</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="homeReportsTableBody">
-                                    <tr><td colspan="4" class="empty-cell">No sales on this date</td></tr>
-                                </tbody>
-                            </table>
+                    <div class="home-container">
+                        <div class="home-top-section">
+                            <!-- Windows 11 Style Calendar Widget -->
+                            <div class="cal-widget glass" id="homeCalendarWidget">
+                                <div class="cal-top-bar">
+                                    <span class="cal-full-date" id="calFullDate">воскресенье, 6 сентября</span>
+                                    <button class="cal-today-btn" id="calTodayBtn" type="button" data-i18n-title="home.today" title="Today">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="20 6 9 17 4 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                
+                                <div class="cal-nav-bar">
+                                    <button class="cal-month-selector" id="calMonthSelector" type="button">
+                                        <span id="calMonthTitle">Сентябрь 2026</span>
+                                        <svg class="cal-chevron-down" id="calChevronIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="6 9 12 15 18 9"/>
+                                        </svg>
+                                    </button>
+                                    <div class="cal-nav-arrows">
+                                        <button class="cal-arrow-btn" id="calPrevBtn" type="button" aria-label="Previous">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="18 15 12 9 6 15"/>
+                                            </svg>
+                                        </button>
+                                        <button class="cal-arrow-btn" id="calNextBtn" type="button" aria-label="Next">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="6 9 12 15 18 9"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Days View -->
+                                <div class="cal-days-view" id="calDaysView">
+                                    <div class="cal-weekdays" id="calWeekdays">
+                                        <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+                                    </div>
+                                    <div class="cal-days-grid" id="calDaysGrid">
+                                        <!-- Days dynamically rendered -->
+                                    </div>
+                                </div>
+
+                                <!-- Months View (toggleable) -->
+                                <div class="cal-months-view" id="calMonthsView" style="display: none;">
+                                    <div class="cal-months-grid" id="calMonthsGrid">
+                                        <!-- Months dynamically rendered -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Daily Overview KPI Summary -->
+                            <div class="home-day-overview glass">
+                                <div class="overview-header">
+                                    <div>
+                                        <h3 data-i18n="home.dailyOverview">Daily Overview</h3>
+                                        <div class="overview-subtitle" id="overviewDateSubtitle">6 September 2026</div>
+                                    </div>
+                                </div>
+                                <div class="overview-stats-grid">
+                                    <div class="ov-card">
+                                        <div class="ov-icon ov-icon-sold">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                                        </div>
+                                        <div class="ov-data">
+                                            <div class="ov-val" id="homeDaySold">0</div>
+                                            <div class="ov-lbl" data-i18n="home.totalSold">Total Units Sold</div>
+                                        </div>
+                                    </div>
+                                    <div class="ov-card">
+                                        <div class="ov-icon ov-icon-rev">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                        </div>
+                                        <div class="ov-data">
+                                            <div class="ov-val" id="homeDayRevenue">0 soʻm</div>
+                                            <div class="ov-lbl" data-i18n="home.totalRevenue">Total Revenue</div>
+                                        </div>
+                                    </div>
+                                    <div class="ov-card">
+                                        <div class="ov-icon ov-icon-tx">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                                        </div>
+                                        <div class="ov-data">
+                                            <div class="ov-val" id="homeDayTransactions">0</div>
+                                            <div class="ov-lbl" data-i18n="home.transactions">Transactions</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Reports Section (Strictly Blueprint-compliant) -->
+                        <div class="home-reports-section glass">
+                            <div class="home-reports-header">
+                                <div>
+                                    <h3 data-i18n="home.reports">Reports</h3>
+                                    <span class="reports-caption" id="homeReportsCaption" data-i18n="home.reportsCaption">Showing reports and sales for the selected date</span>
+                                </div>
+                                <div class="reports-summary-badge" id="homeReportsSummaryBadge">0 items</div>
+                            </div>
+
+                            <div class="blueprint-reports-table">
+                                <div class="blueprint-reports-head">
+                                    <div class="bp-col bp-col-pic" data-i18n="home.picture">Picture</div>
+                                    <div class="bp-col bp-col-sold" data-i18n="home.whatWasSold">What was sold</div>
+                                    <div class="bp-col bp-col-qty" data-i18n="home.quantity">Quantity</div>
+                                    <div class="bp-col bp-col-sum" data-i18n="home.salesSum">Sales sum</div>
+                                </div>
+                                <div class="blueprint-reports-body" id="homeReportsList">
+                                    <!-- Dynamic rows matching blueprint -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -473,6 +567,6 @@
         </div>
     </div>
 
-    <script src="/script.js?v=8" defer></script>
+    <script src="/script.js?v=10" defer></script>
 </body>
 </html>

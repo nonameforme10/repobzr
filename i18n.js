@@ -59,6 +59,21 @@
             'action.confirmClearAllData': 'Are you sure you want to delete ALL data from the database and local storage? This will erase all products, categories, sales, and history. This action cannot be undone.',
             'action.clearAllDataSuccess': 'Database and local data cleared successfully.',
 
+            // Home & Calendar & Reports
+            'home.title':               'Home',
+            'home.dailyOverview':       'Daily Overview',
+            'home.totalSold':           'Total Units Sold',
+            'home.totalRevenue':        'Total Revenue',
+            'home.transactions':        'Transactions',
+            'home.reports':             'Reports',
+            'home.reportsCaption':      'Showing reports and sales for the selected date',
+            'home.picture':             'Picture',
+            'home.whatWasSold':         'What was sold',
+            'home.quantity':            'Quantity',
+            'home.salesSum':            'Sales sum',
+            'home.noSales':             'No sales recorded for this date',
+            'home.today':               'Today',
+
             // Topbar
             'topbar.searchPlaceholder': 'Search products...',
             'topbar.toggleTheme':       'Toggle theme',
@@ -321,6 +336,21 @@
             'action.confirmClearAllData': 'Вы уверены, что хотите удалить ВСЕ данные из базы данных и локального хранилища? Будут удалены все товары, категории, продажи и история. Это действие нельзя отменить.',
             'action.clearAllDataSuccess': 'База данных и локальные данные успешно очищены.',
 
+            // Home & Calendar & Reports
+            'home.title':               'Главная',
+            'home.dailyOverview':       'Обзор за день',
+            'home.totalSold':           'Всего продано шт.',
+            'home.totalRevenue':        'Общая выручка',
+            'home.transactions':        'Сделок',
+            'home.reports':             'Отчеты',
+            'home.reportsCaption':      'Показаны отчеты и продажи за выбранную дату',
+            'home.picture':             'Фото',
+            'home.whatWasSold':         'Что продано',
+            'home.quantity':            'Количество',
+            'home.salesSum':            'Сумма продаж',
+            'home.noSales':             'На эту дату продаж нет',
+            'home.today':               'Сегодня',
+
             'topbar.searchPlaceholder': 'Поиск товаров...',
             'topbar.toggleTheme':       'Сменить тему',
             'topbar.language':          'Язык',
@@ -568,6 +598,21 @@
             'action.clearAllData': 'Bazani tozalash',
             'action.confirmClearAllData': 'Barcha maʼlumotlarni bazadan va xotiradan butunlay oʻchirmoqchimisiz? Barcha mahsulotlar, toifalar, sotuvlar va tarix oʻchiriladi. Bu amalni ortga qaytarib boʻlmaydi.',
             'action.clearAllDataSuccess': 'Baza va barcha maʼlumotlar muvaffaqiyatli tozalandi.',
+
+            // Home & Calendar & Reports
+            'home.title':               'Asosiy',
+            'home.dailyOverview':       'Kunlik xulosa',
+            'home.totalSold':           'Jami sotilgan dona',
+            'home.totalRevenue':        'Jami tushum',
+            'home.transactions':        'Savdolar soni',
+            'home.reports':             'Hisobotlar',
+            'home.reportsCaption':      'Tanlangan sana boʻyicha hisobotlar va savdolar',
+            'home.picture':             'Rasm',
+            'home.whatWasSold':         'Nima sotildi',
+            'home.quantity':            'Miqdor',
+            'home.salesSum':            'Savdo summasi',
+            'home.noSales':             'Ushbu sanada savdolar yoʻq',
+            'home.today':               'Bugun',
 
             'topbar.searchPlaceholder': 'Mahsulot qidirish...',
             'topbar.toggleTheme':       'Mavzuni almashtirish',

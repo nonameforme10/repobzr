@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bazar-pos-v3';
+const CACHE_NAME = 'bazar-pos-v10';
 const ASSETS_TO_CACHE = [
   '/',
   '/admin',
@@ -79,31 +79,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Handle other static assets (Cache First, then Network)
+  // Handle other static assets
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then(cachedResponse => {
-      if (cachedResponse) {
-        // Return from cache, but update it in background (Stale-While-Revalidate)
-        fetch(event.request).then(networkResponse => {
-          if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
-          }
-        }).catch(() => {});
-        return cachedResponse;
+    fetch(event.request).then(networkResponse => {
+      if (networkResponse && networkResponse.status === 200) {
+        const responseToCache = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, responseToCache);
+        });
       }
-      
-      return fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(err => {
-        console.warn('[SW] Network fetch failed for', event.request.url);
-        throw err;
-      });
+      return networkResponse;
+    }).catch(() => {
+      return caches.match(event.request);
     })
   );
 });
