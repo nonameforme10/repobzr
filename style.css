@@ -1005,7 +1005,7 @@ canvas {
 /* Product Image Thumbnail on Card */
 .product-card-thumb-wrap {
     width: 100%;
-    height: 160px;
+    height: 200px;
     border-radius: var(--radius-sm);
     overflow: hidden;
     margin-bottom: 12px;
