@@ -2836,8 +2836,10 @@
       font-family: inherit;
       cursor: pointer;
       text-align: left;
-      transition: background 120ms ease, color 120ms ease;
+      transition: background 120ms ease, color 120ms ease, transform 120ms ease;
       margin-bottom: 2px;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .sidebar-nav-btn svg {
       flex-shrink: 0;
@@ -2861,6 +2863,38 @@
     [data-theme="dark"] .sidebar-nav-btn.active {
       background: rgba(92, 225, 230, 0.12);
       color: #5CE1E6;
+    }
+    .sidebar-nav-btn .nav-drag-handle {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink-subtle);
+      opacity: 0;
+      cursor: grab;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: opacity 120ms ease;
+      flex-shrink: 0;
+    }
+    .sidebar-nav-btn:hover .nav-drag-handle,
+    .sidebar-nav-btn.is-dragging .nav-drag-handle {
+      opacity: 0.45;
+    }
+    .sidebar-nav-btn .nav-drag-handle:hover {
+      color: var(--ink-strong);
+      opacity: 0.9 !important;
+    }
+    .sidebar-nav-btn .nav-drag-handle svg {
+      stroke: none !important;
+      fill: currentColor !important;
+    }
+    .sidebar-nav-btn.is-dragging {
+      opacity: 0.35 !important;
+      background: var(--bg-surface-2) !important;
+      outline: 2px dashed var(--accent) !important;
+      outline-offset: -2px;
+      cursor: grabbing !important;
     }
 
     /* ── SIDEBAR STATS BLOCK ── */
@@ -3154,16 +3188,19 @@
   <!-- DESKTOP SIDEBAR (hidden on mobile via CSS) -->
   <aside class="pos-desktop-sidebar" id="desktopSidebar" style="display:none;">
     <!-- Navigation -->
-    <nav class="sidebar-nav-section">
+    <nav class="sidebar-nav-section" id="posDesktopNav">
       <span class="sidebar-nav-label">NAVIGATION</span>
-      <button class="sidebar-nav-btn active" id="sidebar-btn-home" data-tab="home" type="button">
+      <button class="sidebar-nav-btn active" id="sidebar-btn-home" data-tab="home" type="button" draggable="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
           <polyline points="9 22 9 12 15 12 15 22"></polyline>
         </svg>
         <span data-i18n="pos.navHome">Home</span>
+        <span class="nav-drag-handle" title="Tartiblash uchun suring" aria-label="Reorder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+        </span>
       </button>
-      <button class="sidebar-nav-btn" id="sidebar-btn-audit" data-tab="audit" type="button">
+      <button class="sidebar-nav-btn" id="sidebar-btn-audit" data-tab="audit" type="button" draggable="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
           <polyline points="14 2 14 8 20 8"></polyline>
@@ -3172,15 +3209,37 @@
           <polyline points="10 9 9 9 8 9"></polyline>
         </svg>
         <span data-i18n="pos.navAudit">Audit</span>
+        <span class="nav-drag-handle" title="Tartiblash uchun suring" aria-label="Reorder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+        </span>
       </button>
-      <button class="sidebar-nav-btn" id="sidebar-btn-settings" data-tab="settings" type="button">
+      <button class="sidebar-nav-btn" id="sidebar-btn-settings" data-tab="settings" type="button" draggable="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
         <span data-i18n="pos.navSettings">Settings</span>
+        <span class="nav-drag-handle" title="Tartiblash uchun suring" aria-label="Reorder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/></svg>
+        </span>
       </button>
     </nav>
+    <script>
+      (function() {
+        try {
+          var saved = JSON.parse(localStorage.getItem('bazar_sellers_nav_order') || '[]');
+          if (Array.isArray(saved) && saved.length > 0) {
+            var nav = document.getElementById('posDesktopNav');
+            if (nav) {
+              saved.forEach(function(tab) {
+                var btn = nav.querySelector('.sidebar-nav-btn[data-tab="' + tab + '"]');
+                if (btn) nav.appendChild(btn);
+              });
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
 
     <!-- Today's Stats -->
     <div class="sidebar-stats" style="margin-top:16px;">
@@ -5736,11 +5795,194 @@ function setupDesktopSidebar() {
   toggleSidebarVisibility();
   window.addEventListener('resize', toggleSidebarVisibility);
 
+  // Drag and drop sortable navigation for desktop sidebar
+  let posLastDragEndTime = 0;
+  const posNav = document.getElementById('posDesktopNav');
+
+  function savePosSidebarNavOrder() {
+    if (!posNav) return;
+    const btns = posNav.querySelectorAll('.sidebar-nav-btn');
+    const order = Array.from(btns).map(b => b.dataset.tab).filter(Boolean);
+    try {
+      localStorage.setItem('bazar_sellers_nav_order', JSON.stringify(order));
+    } catch(e) {}
+  }
+
+  function restorePosSidebarNavOrder() {
+    if (!posNav) return;
+    try {
+      const raw = localStorage.getItem('bazar_sellers_nav_order');
+      if (!raw) return;
+      const order = JSON.parse(raw);
+      if (Array.isArray(order) && order.length > 0) {
+        order.forEach(tab => {
+          const btn = posNav.querySelector(`.sidebar-nav-btn[data-tab="${tab}"]`);
+          if (btn) posNav.appendChild(btn);
+        });
+      }
+    } catch(e) {}
+  }
+
+  if (posNav) {
+    restorePosSidebarNavOrder();
+    let draggedBtn = null;
+
+    posNav.addEventListener('dragstart', (e) => {
+      const btn = e.target.closest('.sidebar-nav-btn');
+      if (!btn) return;
+      draggedBtn = btn;
+      posLastDragEndTime = Date.now();
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', btn.dataset.tab || '');
+      setTimeout(() => {
+        if (draggedBtn === btn) btn.classList.add('is-dragging');
+      }, 0);
+    });
+
+    posNav.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!draggedBtn) return;
+      const target = e.target.closest('.sidebar-nav-btn');
+      if (target && target !== draggedBtn && target.parentElement === posNav) {
+        const rect = target.getBoundingClientRect();
+        const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+        const sibling = next ? target.nextSibling : target;
+        if (sibling !== draggedBtn && draggedBtn.nextSibling !== sibling) {
+          posNav.insertBefore(draggedBtn, sibling);
+        }
+      }
+    });
+
+    const cleanupPosDrag = () => {
+      if (draggedBtn) {
+        draggedBtn.classList.remove('is-dragging');
+        draggedBtn = null;
+        posLastDragEndTime = Date.now();
+        savePosSidebarNavOrder();
+      }
+    };
+
+    posNav.addEventListener('dragend', cleanupPosDrag);
+    posNav.addEventListener('drop', (e) => {
+      e.preventDefault();
+      cleanupPosDrag();
+    });
+
+    // Touch Support for Mobile / Tablet Dragging
+    let posTouchBtn = null;
+    let posTouchClone = null;
+    let posTouchOffsetY = 0;
+    let posTouchMoved = false;
+    let posHoldTimer = null;
+    let posStartTouchX = 0;
+    let posStartTouchY = 0;
+    let posIsTouchDragging = false;
+
+    function startPosTouchDrag(btn, touch) {
+      posTouchBtn = btn;
+      posTouchMoved = false;
+      posIsTouchDragging = true;
+      const rect = btn.getBoundingClientRect();
+      posTouchOffsetY = touch.clientY - rect.top;
+
+      posTouchClone = btn.cloneNode(true);
+      posTouchClone.className = 'sidebar-nav-btn nav-item-drag-clone';
+      posTouchClone.style.width = rect.width + 'px';
+      posTouchClone.style.top = (touch.clientY - posTouchOffsetY) + 'px';
+      posTouchClone.style.left = rect.left + 'px';
+      document.body.appendChild(posTouchClone);
+
+      btn.classList.add('is-dragging');
+      if (navigator.vibrate) {
+        try { navigator.vibrate(50); } catch(e) {}
+      }
+    }
+
+    posNav.addEventListener('touchstart', (e) => {
+      clearTimeout(posHoldTimer);
+      const btn = e.target.closest('.sidebar-nav-btn');
+      if (!btn) return;
+
+      const touch = e.touches[0];
+      posStartTouchX = touch.clientX;
+      posStartTouchY = touch.clientY;
+
+      if (e.target.closest('.nav-drag-handle')) {
+        startPosTouchDrag(btn, touch);
+        e.preventDefault();
+        return;
+      }
+
+      posHoldTimer = setTimeout(() => {
+        startPosTouchDrag(btn, touch);
+      }, 400);
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+      const touch = e.touches[0];
+
+      if (!posIsTouchDragging) {
+        if (posHoldTimer) {
+          const dist = Math.hypot(touch.clientX - posStartTouchX, touch.clientY - posStartTouchY);
+          if (dist > 10) {
+            clearTimeout(posHoldTimer);
+            posHoldTimer = null;
+          }
+        }
+        return;
+      }
+
+      posTouchMoved = true;
+      if (posTouchClone) {
+        posTouchClone.style.top = (touch.clientY - posTouchOffsetY) + 'px';
+        posTouchClone.style.display = 'none';
+        const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+        posTouchClone.style.display = 'flex';
+
+        const target = elem ? elem.closest('#posDesktopNav .sidebar-nav-btn') : null;
+        if (target && target !== posTouchBtn && target.parentElement === posNav) {
+          const rect = target.getBoundingClientRect();
+          const next = (touch.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+          const sibling = next ? target.nextSibling : target;
+          if (sibling !== posTouchBtn && posTouchBtn.nextSibling !== sibling) {
+            posNav.insertBefore(posTouchBtn, sibling);
+          }
+        }
+      }
+      e.preventDefault();
+    }, { passive: false });
+
+    const endPosTouch = () => {
+      clearTimeout(posHoldTimer);
+      posHoldTimer = null;
+      if (posTouchClone) {
+        posTouchClone.remove();
+        posTouchClone = null;
+      }
+      if (posTouchBtn) {
+        posTouchBtn.classList.remove('is-dragging');
+        posTouchBtn = null;
+        if (posTouchMoved || posIsTouchDragging) {
+          posLastDragEndTime = Date.now();
+        }
+        posIsTouchDragging = false;
+        savePosSidebarNavOrder();
+      }
+    };
+
+    document.addEventListener('touchend', endPosTouch);
+    document.addEventListener('touchcancel', endPosTouch);
+  }
+
   // Wire sidebar nav buttons directly to switchTab
   ['home', 'audit', 'settings'].forEach(tab => {
     const btn = document.getElementById(`sidebar-btn-${tab}`);
     if (!btn) return;
-    btn.addEventListener('click', () => switchTab(tab));
+    btn.addEventListener('click', (e) => {
+      if (Date.now() - posLastDragEndTime < 250) return;
+      switchTab(tab);
+    });
   });
 
   // Wire sidebar cash-out button

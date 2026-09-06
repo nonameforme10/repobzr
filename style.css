@@ -233,13 +233,16 @@ canvas {
     text-decoration: none;
     font-size: 0.875rem;
     font-weight: 500;
-    transition: var(--transition-fast);
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
     cursor: pointer;
     border: none;
     background: none;
     width: 100%;
     text-align: left;
     letter-spacing: -0.005em;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
 }
 
 .nav-item svg {
@@ -272,6 +275,67 @@ canvas {
     height: 18px;
     background: var(--accent);
     border-radius: 0 3px 3px 0;
+}
+
+/* Drag & Drop Reordering for Sidebar */
+.nav-drag-handle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink-subtle);
+    opacity: 0;
+    cursor: grab;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: opacity var(--transition-fast), color var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.nav-item:hover .nav-drag-handle,
+.nav-item.is-dragging .nav-drag-handle {
+    opacity: 0.45;
+}
+
+.nav-drag-handle:hover {
+    color: var(--ink-strong);
+    opacity: 0.9 !important;
+}
+
+.nav-drag-handle svg {
+    stroke: none !important;
+    fill: currentColor !important;
+    transition: none !important;
+}
+
+.nav-item.is-dragging {
+    opacity: 0.35 !important;
+    background: var(--bg-surface-2) !important;
+    outline: 2px dashed var(--accent) !important;
+    outline-offset: -2px;
+    cursor: grabbing !important;
+}
+
+.nav-item.is-dragging * {
+    cursor: grabbing !important;
+}
+
+.nav-item-drag-clone {
+    position: fixed;
+    z-index: 999999;
+    pointer-events: none;
+    background: var(--bg-surface);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    color: var(--ink-strong);
+    opacity: 0.95;
+    transform: scale(1.03);
+    font-size: 0.875rem;
+    font-weight: 600;
 }
 
 .sidebar-footer {

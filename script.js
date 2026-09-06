@@ -3397,15 +3397,217 @@ function navigateTo(page) {
     }
 }
 
+// ==================== SIDEBAR DRAG-AND-DROP SORTING ====================
+let lastDragEndTime = 0;
+
+function saveSidebarNavOrder() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+    const items = nav.querySelectorAll('.nav-item');
+    const order = Array.from(items).map(el => el.dataset.page).filter(Boolean);
+    try {
+        localStorage.setItem('bazar_admin_nav_order', JSON.stringify(order));
+    } catch (e) {
+        console.warn('[sidebar] Failed to save nav order:', e);
+    }
+}
+
+function restoreSidebarNavOrder() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+    try {
+        const raw = localStorage.getItem('bazar_admin_nav_order');
+        if (!raw) return;
+        const order = JSON.parse(raw);
+        if (Array.isArray(order) && order.length > 0) {
+            order.forEach(page => {
+                const item = nav.querySelector(`.nav-item[data-page="${page}"]`);
+                if (item) nav.appendChild(item);
+            });
+        }
+    } catch (e) {
+        console.warn('[sidebar] Failed to restore nav order:', e);
+    }
+}
+
+function setupSidebarSortable() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+
+    restoreSidebarNavOrder();
+
+    let draggedItem = null;
+
+    // Desktop HTML5 Drag & Drop
+    nav.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.nav-item');
+        if (!item) return;
+        draggedItem = item;
+        lastDragEndTime = Date.now();
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.dataset.page || '');
+        
+        setTimeout(() => {
+            if (draggedItem === item) {
+                item.classList.add('is-dragging');
+            }
+        }, 0);
+    });
+
+    nav.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (!draggedItem) return;
+
+        const target = e.target.closest('.nav-item');
+        if (target && target !== draggedItem && target.parentElement === nav) {
+            const rect = target.getBoundingClientRect();
+            const next = (e.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+            const sibling = next ? target.nextSibling : target;
+            if (sibling !== draggedItem && draggedItem.nextSibling !== sibling) {
+                nav.insertBefore(draggedItem, sibling);
+            }
+        }
+    });
+
+    const cleanupDrag = () => {
+        if (draggedItem) {
+            draggedItem.classList.remove('is-dragging');
+            draggedItem = null;
+            lastDragEndTime = Date.now();
+            saveSidebarNavOrder();
+        }
+    };
+
+    nav.addEventListener('dragend', cleanupDrag);
+    nav.addEventListener('drop', (e) => {
+        e.preventDefault();
+        cleanupDrag();
+    });
+
+    // Touch Support for Mobile / Tablet Dragging
+    let touchItem = null;
+    let touchClone = null;
+    let touchOffsetY = 0;
+    let touchMoved = false;
+    let holdTimer = null;
+    let startTouchX = 0;
+    let startTouchY = 0;
+    let isTouchDragging = false;
+
+    function startTouchDrag(item, touch) {
+        touchItem = item;
+        touchMoved = false;
+        isTouchDragging = true;
+        const rect = item.getBoundingClientRect();
+        touchOffsetY = touch.clientY - rect.top;
+
+        touchClone = item.cloneNode(true);
+        touchClone.className = 'nav-item nav-item-drag-clone';
+        touchClone.style.width = rect.width + 'px';
+        touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+        touchClone.style.left = rect.left + 'px';
+        document.body.appendChild(touchClone);
+
+        item.classList.add('is-dragging');
+        if (navigator.vibrate) {
+            try { navigator.vibrate(50); } catch(e) {}
+        }
+    }
+
+    nav.addEventListener('touchstart', (e) => {
+        clearTimeout(holdTimer);
+        const item = e.target.closest('.nav-item');
+        if (!item) return;
+
+        const touch = e.touches[0];
+        startTouchX = touch.clientX;
+        startTouchY = touch.clientY;
+
+        // If touching drag handle directly, start immediately
+        if (e.target.closest('.nav-drag-handle')) {
+            startTouchDrag(item, touch);
+            e.preventDefault();
+            return;
+        }
+
+        // If holding anywhere on the item, activate drag after a short hold (~400ms)
+        holdTimer = setTimeout(() => {
+            startTouchDrag(item, touch);
+        }, 400);
+    }, { passive: false });
+
+    document.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+
+        // If not dragging yet, check if finger moved (user is scrolling)
+        if (!isTouchDragging) {
+            if (holdTimer) {
+                const dist = Math.hypot(touch.clientX - startTouchX, touch.clientY - startTouchY);
+                if (dist > 10) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
+                }
+            }
+            return;
+        }
+
+        // Active touch drag
+        touchMoved = true;
+        if (touchClone) {
+            touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+            touchClone.style.display = 'none';
+            const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+            touchClone.style.display = 'flex';
+
+            const target = elem ? elem.closest('#sidebarNav .nav-item') : null;
+            if (target && target !== touchItem && target.parentElement === nav) {
+                const rect = target.getBoundingClientRect();
+                const next = (touch.clientY - rect.top) / (rect.bottom - rect.top) > 0.5;
+                const sibling = next ? target.nextSibling : target;
+                if (sibling !== touchItem && touchItem.nextSibling !== sibling) {
+                    nav.insertBefore(touchItem, sibling);
+                }
+            }
+        }
+        e.preventDefault();
+    }, { passive: false });
+
+    const endTouch = () => {
+        clearTimeout(holdTimer);
+        holdTimer = null;
+        if (touchClone) {
+            touchClone.remove();
+            touchClone = null;
+        }
+        if (touchItem) {
+            touchItem.classList.remove('is-dragging');
+            touchItem = null;
+            if (touchMoved || isTouchDragging) {
+                lastDragEndTime = Date.now();
+            }
+            isTouchDragging = false;
+            saveSidebarNavOrder();
+        }
+    };
+
+    document.addEventListener('touchend', endTouch);
+    document.addEventListener('touchcancel', endTouch);
+}
+
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
     // Navigation
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
             e.preventDefault();
+            if (Date.now() - lastDragEndTime < 250) return;
             navigateTo(item.dataset.page);
         });
     });
+
+    // Setup drag-and-drop sortable sidebar
+    setupSidebarSortable();
 
     // Sidebar toggle and overlay
     const sidebar = document.getElementById('sidebar');
