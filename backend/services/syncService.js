@@ -430,7 +430,17 @@ async function processSyncBatch(deviceId, operations = []) {
             // Append product update delta to changes
             await client.query(
               'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
-              ['product', pid, 'UPDATE', { id: pid, quantity: newQty, sold: newSold, version: newVersion, isDeleted: false, updatedAt: now }, now]
+              ['product', pid, 'UPDATE', {
+                id: pid,
+                name: prod.name,
+                categoryId: prod.category_id,
+                price: Number(prod.price),
+                quantity: newQty,
+                sold: newSold,
+                version: newVersion,
+                isDeleted: false,
+                updatedAt: now
+              }, now]
             );
           }
 
@@ -566,6 +576,415 @@ async function processSyncBatch(deviceId, operations = []) {
           );
 
           // Record sync operation idempotency
+          await client.query(
+            'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [op.id, deviceId, op.type, op.createdAt || now, now, { accepted: true, saleId }, currentHash]
+          );
+
+          await client.query('COMMIT');
+          accepted.push(op.id);
+          continue;
+        } else if (op.type === 'UPDATE_SALE_TRANSACTION') {
+          const { saleId, items, discount = 0, notes, activityId, timestamp } = payload;
+          if (!isValidId(saleId)) {
+            throw { code: 'INVALID_PAYLOAD', message: 'Valid saleId is required' };
+          }
+          if (!Array.isArray(items) || items.length === 0 || items.length > 100) {
+            throw { code: 'INVALID_PAYLOAD', message: 'items must be a non-empty array with max 100 items' };
+          }
+
+          // 1. Check existing sale and lock it
+          const saleRes = await client.query('SELECT * FROM sales WHERE id = $1 FOR UPDATE', [saleId]);
+          if (saleRes.rows.length === 0) {
+            throw { code: 'SALE_NOT_FOUND', message: `Sale ${saleId} not found` };
+          }
+          const existingSale = saleRes.rows[0];
+
+          // 2. Fetch existing sale_items to determine previous quantities
+          const oldItemsRes = await client.query('SELECT * FROM sale_items WHERE sale_id = $1', [saleId]);
+          const oldQtyMap = new Map();
+          for (const row of oldItemsRes.rows) {
+            if (row.product_id) {
+              oldQtyMap.set(row.product_id, (oldQtyMap.get(row.product_id) || 0) + Number(row.quantity || 0));
+            }
+          }
+
+          // 3. Validate new items and calculate new quantities per product
+          const newQtyMap = new Map();
+          for (const item of items) {
+            if (!item || !isValidId(item.productId)) {
+              throw { code: 'INVALID_PAYLOAD', message: 'Valid productId is required for each line item' };
+            }
+            const q = Math.floor(Number(item.quantity) || 0);
+            if (!Number.isInteger(q) || q <= 0 || q > 100000) {
+              throw { code: 'INVALID_PAYLOAD', message: `Invalid quantity ${item.quantity} for product ${item.productId}` };
+            }
+            const sp = Math.floor(Number(item.salePrice) || 0);
+            if (!Number.isFinite(sp) || sp < 0) {
+              throw { code: 'INVALID_PAYLOAD', message: `Invalid salePrice ${item.salePrice} for product ${item.productId}` };
+            }
+            newQtyMap.set(item.productId, (newQtyMap.get(item.productId) || 0) + q);
+          }
+
+          // 4. Collect all distinct product IDs and lock them in alphabetical order
+          const allProductIds = [...new Set([...oldQtyMap.keys(), ...newQtyMap.keys()])].filter(Boolean).sort();
+          const prodRes = await client.query(
+            `SELECT id, name, category_id, quantity::float, sold::float, price::bigint, is_deleted, version 
+             FROM products 
+             WHERE id = ANY($1::varchar[]) 
+             ORDER BY id ASC 
+             FOR UPDATE`,
+            [allProductIds]
+          );
+
+          const productMap = new Map();
+          for (const row of prodRes.rows) {
+            productMap.set(row.id, row);
+          }
+
+          // 5. Stock check: ensure requested increase doesn't exceed available stock
+          let stockError = null;
+          for (const pid of allProductIds) {
+            const prod = productMap.get(pid);
+            if (!prod) continue;
+            const oldQ = oldQtyMap.get(pid) || 0;
+            const newQ = newQtyMap.get(pid) || 0;
+            const diff = newQ - oldQ; // positive = selling more; negative = returning stock
+            if (diff > 0 && prod.quantity !== null && prod.quantity !== undefined) {
+              if (prod.quantity < diff) {
+                stockError = {
+                  code: 'INSUFFICIENT_STOCK',
+                  message: `Cannot increase quantity by ${diff} for "${prod.name}", available stock is only ${prod.quantity}`,
+                  productId: pid,
+                  productName: prod.name,
+                  availableStock: prod.quantity,
+                  requestedIncrease: diff
+                };
+                break;
+              }
+            }
+          }
+
+          if (stockError) {
+            await client.query(
+              'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+              [op.id, deviceId, op.type, op.createdAt || now, now, { rejected: stockError }, currentHash]
+            );
+            await client.query('COMMIT');
+            rejected.push({ id: op.id, ...stockError });
+            continue;
+          }
+
+          // 6. Apply stock & sold reconciliation for all affected products
+          for (const pid of allProductIds) {
+            const prod = productMap.get(pid);
+            if (!prod) continue;
+            const oldQ = oldQtyMap.get(pid) || 0;
+            const newQ = newQtyMap.get(pid) || 0;
+            const diff = newQ - oldQ;
+            if (diff === 0) continue; // no change in stock for this product
+
+            const updatedQty = (prod.quantity !== null && prod.quantity !== undefined)
+              ? (prod.quantity - diff)
+              : null;
+            const updatedSold = Math.max(0, (prod.sold || 0) + diff);
+            const updatedVersion = (prod.version || 1) + 1;
+
+            await client.query(
+              'UPDATE products SET quantity = $1, sold = $2, version = $3, updated_at = $4 WHERE id = $5',
+              [updatedQty, updatedSold, updatedVersion, now, pid]
+            );
+
+            await client.query(
+              'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+              ['product', pid, 'UPDATE', {
+                id: pid,
+                name: prod.name,
+                categoryId: prod.category_id,
+                price: Number(prod.price),
+                quantity: updatedQty,
+                sold: updatedSold,
+                version: updatedVersion,
+                isDeleted: false,
+                updatedAt: now
+              }, now]
+            );
+          }
+
+          // 7. Calculate new subtotals and line items
+          let calculatedSubtotal = 0n;
+          const processedItems = [];
+          for (const item of items) {
+            const prod = productMap.get(item.productId);
+            const qty = BigInt(Math.floor(Number(item.quantity)));
+            const salePrice = BigInt(Math.floor(Number(item.salePrice)));
+            const basePrice = BigInt(Math.floor(Number(prod ? prod.price : (item.basePrice || 0))));
+            const subtotal = qty * salePrice;
+            calculatedSubtotal += subtotal;
+
+            processedItems.push({
+              id: item.id || ('si_' + now.toString(36) + '_' + Math.random().toString(36).substr(2, 7)),
+              productId: item.productId,
+              productName: prod ? prod.name : (item.productName || 'Mahsulot'),
+              categoryId: prod ? prod.category_id : null,
+              quantity: Number(qty),
+              basePrice: Number(basePrice),
+              salePrice: Number(salePrice),
+              subtotal: Number(subtotal)
+            });
+          }
+
+          const subtotalNum = Number(calculatedSubtotal);
+          const manualDiscount = Math.max(0, Math.floor(Number(discount) || 0));
+          if (manualDiscount > subtotalNum) {
+            throw {
+              code: 'INVALID_DISCOUNT',
+              message: `Discount (${manualDiscount}) cannot exceed transaction subtotal (${subtotalNum})`
+            };
+          }
+          const totalNum = subtotalNum - manualDiscount;
+
+          // Allocate discount proportionally across line items
+          let allocatedSum = 0;
+          for (let i = 0; i < processedItems.length; i++) {
+            const it = processedItems[i];
+            if (i === processedItems.length - 1) {
+              it.allocatedDiscount = manualDiscount - allocatedSum;
+            } else {
+              const alloc = subtotalNum > 0
+                ? Math.floor((manualDiscount * it.subtotal) / subtotalNum)
+                : 0;
+              it.allocatedDiscount = alloc;
+              allocatedSum += alloc;
+            }
+          }
+
+          // 8. Update sales table
+          await client.query(
+            `UPDATE sales 
+             SET subtotal = $1, discount = $2, total = $3, notes = $4, updated_at = $5 
+             WHERE id = $6`,
+            [
+              subtotalNum,
+              manualDiscount,
+              totalNum,
+              notes ? notes.trim() : existingSale.notes,
+              now,
+              saleId
+            ]
+          );
+
+          // 9. Replace sale_items table rows
+          await client.query('DELETE FROM sale_items WHERE sale_id = $1', [saleId]);
+          for (const it of processedItems) {
+            await client.query(
+              `INSERT INTO sale_items (id, sale_id, product_id, product_name_snapshot, quantity, base_price, sale_price, subtotal, allocated_discount, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              [
+                it.id,
+                saleId,
+                it.productId,
+                it.productName,
+                it.quantity,
+                it.basePrice,
+                it.salePrice,
+                it.subtotal,
+                it.allocatedDiscount,
+                existingSale.created_at || now
+              ]
+            );
+          }
+
+          // 10. Update activities table
+          const totalUnitsSold = processedItems.reduce((sum, i) => sum + i.quantity, 0);
+          const firstProduct = processedItems[0];
+          const isOptom = processedItems.length > 1 || manualDiscount > 0;
+          const displayProductName = isOptom ? 'Optom sale' : (firstProduct ? firstProduct.productName : 'Sale');
+          const summaryNote = processedItems.length === 1
+            ? `POS sale (${firstProduct.quantity}x @ ${firstProduct.salePrice})`
+            : `POS multi-item sale (${processedItems.length} items, ${totalUnitsSold} units, total: ${totalNum} UZS${manualDiscount > 0 ? `, discount: -${manualDiscount}` : ''})`;
+
+          const hasDetails = await checkActivitiesDetailsColumns(client);
+          const actNotes = notes ? notes.trim() : summaryNote;
+
+          if (hasDetails) {
+            await client.query(
+              `UPDATE activities 
+               SET quantity = $1, notes = $2, discount = $3, subtotal = $4, items_count = $5, items_json = $6, product_name = $7, product_id = $8, category_id = $9
+               WHERE sale_id = $10 OR id = $11`,
+              [
+                totalUnitsSold,
+                actNotes,
+                manualDiscount,
+                subtotalNum,
+                processedItems.length,
+                JSON.stringify(processedItems),
+                displayProductName,
+                firstProduct ? firstProduct.productId : null,
+                firstProduct ? firstProduct.categoryId : null,
+                saleId,
+                activityId || saleId
+              ]
+            );
+          } else {
+            await client.query(
+              `UPDATE activities 
+               SET quantity = $1, notes = $2, product_name = $3, product_id = $4, category_id = $5
+               WHERE sale_id = $6 OR id = $7`,
+              [
+                totalUnitsSold,
+                actNotes,
+                displayProductName,
+                firstProduct ? firstProduct.productId : null,
+                firstProduct ? firstProduct.categoryId : null,
+                saleId,
+                activityId || saleId
+              ]
+            );
+          }
+
+          // 11. Append delta changes
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['sale', saleId, 'UPDATE', {
+              id: saleId,
+              sellerId: existingSale.seller_id,
+              status: 'COMPLETED',
+              subtotal: subtotalNum,
+              discount: manualDiscount,
+              total: totalNum,
+              currency: 'UZS',
+              notes: actNotes,
+              items: processedItems,
+              createdAt: Number(existingSale.created_at || now),
+              updatedAt: now
+            }, now]
+          );
+
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['activity', activityId || saleId, 'UPDATE', {
+              id: activityId || saleId,
+              type: 'sale',
+              saleId,
+              productId: firstProduct ? firstProduct.productId : null,
+              productName: displayProductName,
+              categoryId: firstProduct ? firstProduct.categoryId : null,
+              categoryName: isOptom ? 'Optom Multi-Sale' : 'POS Sale',
+              quantity: totalUnitsSold,
+              sellingPrice: processedItems.length === 1 ? firstProduct.salePrice : Math.round(totalNum / totalUnitsSold),
+              totalSaleValue: totalNum,
+              subtotal: subtotalNum,
+              discount: manualDiscount,
+              itemsCount: processedItems.length,
+              items: processedItems,
+              isOptom,
+              notes: actNotes,
+              timestamp: Number(existingSale.created_at || now)
+            }, now]
+          );
+
+          // 12. Record idempotency
+          await client.query(
+            'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [op.id, deviceId, op.type, op.createdAt || now, now, { accepted: true, saleId }, currentHash]
+          );
+
+          await client.query('COMMIT');
+          accepted.push(op.id);
+          continue;
+        } else if (op.type === 'VOID_SALE_TRANSACTION' || op.type === 'DELETE_SALE_TRANSACTION') {
+          const { saleId, activityId, notes, timestamp } = payload;
+          if (!isValidId(saleId)) {
+            throw { code: 'INVALID_PAYLOAD', message: 'Valid saleId is required' };
+          }
+
+          // 1. Lock existing sale
+          const saleRes = await client.query('SELECT * FROM sales WHERE id = $1 FOR UPDATE', [saleId]);
+          if (saleRes.rows.length === 0) {
+            // Already absent or deleted, accept idempotently
+            accepted.push(op.id);
+            await client.query('COMMIT');
+            continue;
+          }
+          const sale = saleRes.rows[0];
+
+          // 2. Fetch sale_items to restore stock if sale was COMPLETED
+          if (sale.status !== 'VOIDED' && !sale.is_deleted) {
+            const itemsRes = await client.query('SELECT * FROM sale_items WHERE sale_id = $1', [saleId]);
+            const restoreQtyMap = new Map();
+            for (const row of itemsRes.rows) {
+              if (row.product_id) {
+                restoreQtyMap.set(row.product_id, (restoreQtyMap.get(row.product_id) || 0) + Number(row.quantity || 0));
+              }
+            }
+
+            const pids = [...restoreQtyMap.keys()].filter(Boolean).sort();
+            if (pids.length > 0) {
+              const prodRes = await client.query(
+                `SELECT id, name, category_id, quantity::float, sold::float, price::bigint, version 
+                 FROM products 
+                 WHERE id = ANY($1::varchar[]) 
+                 ORDER BY id ASC 
+                 FOR UPDATE`,
+                [pids]
+              );
+
+              for (const prod of prodRes.rows) {
+                const returnQty = restoreQtyMap.get(prod.id) || 0;
+                const newQty = (prod.quantity !== null && prod.quantity !== undefined)
+                  ? (prod.quantity + returnQty)
+                  : null;
+                const newSold = Math.max(0, (prod.sold || 0) - returnQty);
+                const newVersion = (prod.version || 1) + 1;
+
+                await client.query(
+                  'UPDATE products SET quantity = $1, sold = $2, version = $3, updated_at = $4 WHERE id = $5',
+                  [newQty, newSold, newVersion, now, prod.id]
+                );
+
+                await client.query(
+                  'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+                  ['product', prod.id, 'UPDATE', {
+                    id: prod.id,
+                    name: prod.name,
+                    categoryId: prod.category_id,
+                    price: Number(prod.price),
+                    quantity: newQty,
+                    sold: newSold,
+                    version: newVersion,
+                    isDeleted: false,
+                    updatedAt: now
+                  }, now]
+                );
+              }
+            }
+          }
+
+          // 3. Mark sale as voided / deleted
+          await client.query(
+            "UPDATE sales SET status = 'VOIDED', is_deleted = TRUE, updated_at = $1 WHERE id = $2",
+            [now, saleId]
+          );
+
+          // 4. Update or soft delete activity record
+          await client.query(
+            "UPDATE activities SET notes = $1 WHERE sale_id = $2 OR id = $3",
+            [notes ? notes.trim() : 'Sale deleted / voided', saleId, activityId || saleId]
+          );
+
+          // 5. Append changes
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['sale', saleId, 'DELETE', { id: saleId, isDeleted: true, status: 'VOIDED', updatedAt: now }, now]
+          );
+
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['activity', activityId || saleId, 'DELETE', { id: activityId || saleId, saleId, isDeleted: true, updatedAt: now }, now]
+          );
+
+          // 6. Record sync operation idempotency
           await client.query(
             'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
             [op.id, deviceId, op.type, op.createdAt || now, now, { accepted: true, saleId }, currentHash]
@@ -815,15 +1234,12 @@ async function processSyncBatch(deviceId, operations = []) {
             throw { code: 'PRODUCT_DELETED', message: `Cannot update soft-deleted product ${id}` };
           }
 
-          // Concurrency check: reject stale update if expectedVersion is provided and differs
+          // Concurrency check: if expectedVersion differs, log and auto-reconcile catalog attributes
+          // while strictly preserving server's authoritative stock and sold counts
           if (expectedVersion !== undefined && expectedVersion !== null) {
             const expVer = Number(expectedVersion);
             if (Number.isFinite(expVer) && product.version !== expVer) {
-              throw {
-                code: 'VERSION_CONFLICT',
-                message: `Stale update: product version is ${product.version}, but client expected ${expVer}`,
-                currentVersion: product.version
-              };
+              console.log(`[sync] Safe auto-reconcile: product ${id} version is ${product.version} (client sent ${expVer}). Preserving sales & stock.`);
             }
           }
 

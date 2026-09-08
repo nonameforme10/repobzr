@@ -751,27 +751,33 @@ const syncEngine = {
                 }
             } else if (ch.entityType === 'activity') {
                 const act = ch.data;
-                const actId = act.id || ch.entityId;
+                const actId = act?.id || ch.entityId;
                 const idx = state.activities.findIndex(a => a.id === actId);
-                if (idx !== -1) {
+                if (ch.action === 'DELETE' || ch.data?.isDeleted) {
+                    if (idx !== -1) { state.activities.splice(idx, 1); modified = true; }
+                    await localDb.delete('activities', actId);
+                } else if (idx !== -1) {
                     state.activities[idx] = { ...state.activities[idx], ...act };
                     await localDb.put('activities', state.activities[idx]);
                     modified = true;
-                } else {
+                } else if (act) {
                     state.activities.unshift(act);
                     await localDb.put('activities', act);
                     modified = true;
                 }
             } else if (ch.entityType === 'sale') {
                 const sale = ch.data;
-                const saleId = sale.id || ch.entityId;
+                const saleId = sale?.id || ch.entityId;
                 if (!Array.isArray(state.sales)) state.sales = [];
                 const idx = state.sales.findIndex(s => s.id === saleId);
-                if (idx !== -1) {
+                if (ch.action === 'DELETE' || ch.data?.isDeleted) {
+                    if (idx !== -1) { state.sales.splice(idx, 1); modified = true; }
+                    await localDb.delete('sales', saleId);
+                } else if (idx !== -1) {
                     state.sales[idx] = { ...state.sales[idx], ...sale };
                     await localDb.put('sales', state.sales[idx]);
                     modified = true;
-                } else {
+                } else if (sale) {
                     state.sales.unshift(sale);
                     await localDb.put('sales', sale);
                     modified = true;
