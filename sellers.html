@@ -46,9 +46,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/style.css?v=24">
+<link rel="stylesheet" href="/style.css?v=25">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
-<script src="/i18n.js?v=24"></script>
+<script src="/i18n.js?v=25"></script>
 <script>
   // Robustness guard: ensure all POS keys exist even if an older cached i18n.js was loaded
   (function () {
@@ -1503,58 +1503,107 @@
   }
   .cart-item-card {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
-    padding: 10px 12px;
+    padding: 12px;
     background: var(--bg-surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    transition: var(--transition-fast);
   }
   .cart-item-img {
-    width: 46px;
-    height: 46px;
+    width: 48px;
+    height: 48px;
     border-radius: var(--radius-sm);
     object-fit: cover;
     flex-shrink: 0;
     background: var(--bg-surface);
     border: 1px solid var(--border);
+    margin-top: 1px;
   }
-  .cart-item-details {
+  .cart-item-main {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .cart-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
   }
   .cart-item-name {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     color: var(--ink-strong);
-    white-space: nowrap;
+    line-height: 1.3;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
-  .cart-item-pricing {
-    font-size: 0.75rem;
+  .cart-item-remove-btn {
+    width: 26px;
+    height: 26px;
+    border: none;
+    background: transparent;
     color: var(--ink-muted);
+    cursor: pointer;
+    border-radius: var(--radius-xs);
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-top: 3px;
+    justify-content: center;
+    font-size: 0.875rem;
+    flex-shrink: 0;
+    margin-top: -2px;
+    margin-right: -2px;
+    transition: var(--transition-fast);
   }
-  .cart-item-price-input {
-    width: 72px;
-    padding: 2px 6px;
-    font-size: 0.8125rem;
-    font-weight: 600;
+  .cart-item-remove-btn:hover {
+    color: var(--danger);
+    background: var(--danger-soft);
+  }
+  .cart-item-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cart-price-input-wrap {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
-    background: var(--bg-surface);
-    color: var(--ink-strong);
-    text-align: right;
+    padding: 2px 6px;
+    height: 28px;
+    box-sizing: border-box;
   }
-  .cart-item-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+  .cart-price-input-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent-soft);
+  }
+  .cart-item-price-input {
+    width: 52px;
+    border: none;
+    background: transparent;
+    color: var(--ink-strong);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-align: right;
+    padding: 0;
+    outline: none;
+  }
+  .cart-price-unit {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--ink-muted);
+    margin-left: 3px;
+    user-select: none;
   }
   .cart-qty-ctrl {
     display: inline-flex;
@@ -1563,48 +1612,35 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
     overflow: hidden;
+    height: 28px;
+    box-sizing: border-box;
   }
   .cart-qty-btn {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border: none;
     background: transparent;
     color: var(--ink-strong);
-    font-size: 0.9375rem;
+    font-size: 1rem;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: var(--transition-fast);
+    padding: 0;
   }
   .cart-qty-btn:hover {
     background: var(--bg-surface-2);
     color: var(--accent);
   }
   .cart-qty-val {
-    width: 24px;
+    min-width: 24px;
+    padding: 0 2px;
     text-align: center;
     font-size: 0.8125rem;
     font-weight: 700;
     color: var(--ink-strong);
-  }
-  .cart-item-remove-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: transparent;
-    color: var(--danger);
-    cursor: pointer;
-    border-radius: var(--radius-xs);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.7;
-    transition: var(--transition-fast);
-  }
-  .cart-item-remove-btn:hover {
-    opacity: 1;
-    background: rgba(220, 53, 69, 0.12);
   }
   .cart-item-subtotal {
     font-size: 0.875rem;
@@ -1612,6 +1648,7 @@
     color: var(--ink-strong);
     text-align: right;
     white-space: nowrap;
+    margin-left: auto;
   }
   .btn-add-more-products {
     width: 100%;
@@ -4674,6 +4711,35 @@
         <div id="price-live-preview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
       </div>
 
+      <!-- Discount Section -->
+      <div class="form-group" style="margin-top: 14px; margin-bottom: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+          <label class="field-label" for="sale-discount-input" style="margin-bottom:0;" data-i18n="pos.orderDiscount">Umumiy chegirma</label>
+          <span style="font-size:0.75rem; color:var(--ink-muted);" data-i18n="pos.orderDiscountHint">Qoʻlda chegirma ming soʻmda</span>
+        </div>
+        <div class="price-input-wrap">
+          <input class="price-input" type="number" id="sale-discount-input" step="any" min="0" inputmode="decimal" placeholder="0">
+          <span class="price-symbol" data-i18n="pos.thousandSum">ming soʻm</span>
+        </div>
+        <div id="sale-discount-live-preview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
+        <!-- Preset shortcut chips -->
+        <div class="discount-preset-chips" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="disc-chip sale-disc-chip" data-amt="5">5 ming</button>
+          <button type="button" class="disc-chip sale-disc-chip" data-amt="10">10 ming</button>
+          <button type="button" class="disc-chip sale-disc-chip" data-amt="20">20 ming</button>
+          <button type="button" class="disc-chip sale-disc-chip" data-amt="0" style="color:var(--danger);">Tozalash</button>
+        </div>
+        <!-- Discount validation error banner -->
+        <div id="sale-discount-error" class="qty-warn" style="display:none; margin-top:8px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span data-i18n="pos.discountExceedsSubtotal">Chegirma jami summadan oshmasligi kerak!</span>
+        </div>
+      </div>
+
       <!-- Summary -->
       <div class="summary">
         <div class="summary-row">
@@ -4690,10 +4756,18 @@
           <span class="s-val" id="sum-sell">—</span>
         </div>
         <div class="summary-row">
-          <span class="s-label" data-i18n="pos.totalSaleAmount">Total sale amount</span>
+          <span class="s-label">Oraliq jami (Subtotal)</span>
           <span class="s-val" id="sum-sell-total">—</span>
         </div>
-        <div class="summary-profit even" id="sum-profit-row">
+        <div class="summary-row" id="sum-discount-row" style="display:none;">
+          <span class="s-label" data-i18n="pos.orderDiscount">Umumiy chegirma</span>
+          <span class="s-val" id="sum-discount-val" style="color:var(--danger);">0 soʻm</span>
+        </div>
+        <div class="summary-row" id="sum-final-row" style="font-size:1.125rem; font-weight:700; margin-top:4px;">
+          <span class="s-label" style="color:var(--ink-strong);" data-i18n="pos.finalTotal">JAMI TOʻLOV</span>
+          <span class="s-val" id="sum-final-val" style="color:var(--accent); font-size:1.25rem;">—</span>
+        </div>
+        <div class="summary-profit even" id="sum-profit-row" style="margin-top:8px;">
           <span id="sum-profit-label" data-i18n="pos.atBasePrice">At base catalog price</span>
           <span id="sum-profit-val">0 soʻm</span>
         </div>
@@ -4770,10 +4844,10 @@
         <div id="cart-discount-live-preview" style="margin-top:6px;font-size:0.8125rem;font-weight:600;color:var(--accent);display:none;"></div>
         <!-- Preset shortcut chips -->
         <div class="discount-preset-chips" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-          <button type="button" class="disc-chip" data-amt="5">5 ming</button>
-          <button type="button" class="disc-chip" data-amt="10">10 ming</button>
-          <button type="button" class="disc-chip" data-amt="20">20 ming</button>
-          <button type="button" class="disc-chip" data-amt="0" style="color:var(--danger);">Tozalash</button>
+          <button type="button" class="disc-chip cart-disc-chip" data-amt="5">5 ming</button>
+          <button type="button" class="disc-chip cart-disc-chip" data-amt="10">10 ming</button>
+          <button type="button" class="disc-chip cart-disc-chip" data-amt="20">20 ming</button>
+          <button type="button" class="disc-chip cart-disc-chip" data-amt="0" style="color:var(--danger);">Tozalash</button>
         </div>
         <!-- Discount validation error banner -->
         <div id="cart-discount-error" class="qty-warn" style="display:none; margin-top:8px;">
@@ -6011,6 +6085,14 @@ function openModal(productId) {
   const unitMing = activeProduct.price >= 1000 ? Math.round(activeProduct.price / 1000) : activeProduct.price;
   document.getElementById('price-input').value = unitMing;
 
+  const saleDiscInput = document.getElementById('sale-discount-input');
+  if (saleDiscInput) saleDiscInput.value = '';
+  const saleDiscPreview = document.getElementById('sale-discount-live-preview');
+  if (saleDiscPreview) saleDiscPreview.style.display = 'none';
+  const saleDiscErr = document.getElementById('sale-discount-error');
+  if (saleDiscErr) saleDiscErr.style.display = 'none';
+  document.querySelectorAll('.sale-disc-chip').forEach(c => c.classList.remove('active'));
+
   updateSummary();
   validateQty();
 
@@ -6059,10 +6141,75 @@ function updateSummary() {
     }
   }
 
+  // Discount parsing & validation for Single Product Sale
+  const discInp = document.getElementById('sale-discount-input');
+  const rawDisc = parseFloat(discInp ? discInp.value : 0);
+  const discMing = (!isNaN(rawDisc) && rawDisc > 0) ? rawDisc : 0;
+  const discountUzs = Math.max(0, Math.floor(discMing * 1000));
+  const subtotal = price * qty;
+  const isDiscountValid = discountUzs <= subtotal;
+  const finalTotal = isDiscountValid ? (subtotal - discountUzs) : subtotal;
+
+  const saleDiscPreview = document.getElementById('sale-discount-live-preview');
+  if (saleDiscPreview) {
+    if (discMing > 0) {
+      saleDiscPreview.style.display = 'block';
+      saleDiscPreview.textContent = `💰 ${discMing} ming = ${fmt(discountUzs)} chegirma`;
+    } else {
+      saleDiscPreview.style.display = 'none';
+    }
+  }
+
+  const saleDiscErr = document.getElementById('sale-discount-error');
+  if (saleDiscErr) {
+    saleDiscErr.style.display = (!isDiscountValid && discMing > 0) ? 'flex' : 'none';
+  }
+
+  // Active state on preset chips
+  document.querySelectorAll('.sale-disc-chip').forEach(chip => {
+    const amt = parseFloat(chip.dataset.amt);
+    if (amt === discMing) {
+      chip.classList.add('active');
+    } else {
+      chip.classList.remove('active');
+    }
+  });
+
   document.getElementById('sum-base').textContent = fmt(base);
   document.getElementById('sum-base-total').textContent = fmt(base * qty);
   document.getElementById('sum-sell').textContent = (isNaN(rawPrice) || rawPrice <= 0) ? '—' : fmt(price);
-  document.getElementById('sum-sell-total').textContent = (isNaN(rawPrice) || rawPrice <= 0) ? '—' : fmt(price * qty);
+  document.getElementById('sum-sell-total').textContent = (isNaN(rawPrice) || rawPrice <= 0) ? '—' : fmt(subtotal);
+
+  const sumDiscRow = document.getElementById('sum-discount-row');
+  const sumDiscVal = document.getElementById('sum-discount-val');
+  if (sumDiscRow && sumDiscVal) {
+    if (discountUzs > 0) {
+      sumDiscRow.style.display = 'flex';
+      sumDiscVal.textContent = `−${fmt(discountUzs)}`;
+    } else {
+      sumDiscRow.style.display = 'none';
+    }
+  }
+
+  const sumFinalVal = document.getElementById('sum-final-val');
+  if (sumFinalVal) {
+    sumFinalVal.textContent = (isNaN(rawPrice) || rawPrice <= 0) ? '—' : fmt(finalTotal);
+  }
+
+  // Instant Sell button dynamic quantity and state
+  const btnInstantSell = document.getElementById('btn-instant-sell');
+  if (btnInstantSell) {
+    const btnInstantSellText = btnInstantSell.querySelector('[data-i18n="pos.instantSell"]');
+    if (btnInstantSellText) {
+      btnInstantSellText.textContent = `${t('pos.instantSell')} (${qty} dona)`;
+    }
+    btnInstantSell.disabled = (!isDiscountValid && discMing > 0) || confirmLock;
+  }
+
+  const btnAddCart = document.getElementById('btn-add-cart');
+  if (btnAddCart) {
+    btnAddCart.disabled = (!isDiscountValid && discMing > 0) || confirmLock;
+  }
 
   const profitRow = document.getElementById('sum-profit-row');
   const profitLbl = document.getElementById('sum-profit-label');
@@ -6075,21 +6222,21 @@ function updateSummary() {
     return;
   }
 
-  const diff = price - base;
-  const total = diff * qty;
+  const totalBase = base * qty;
+  const netDiff = finalTotal - totalBase;
 
-  if (Math.abs(diff) < 0.001) {
+  if (Math.abs(netDiff) < 0.001) {
     profitRow.className = 'summary-profit even';
     profitLbl.textContent = t('pos.atBasePrice');
     profitVal.textContent = fmt(0);
-  } else if (diff > 0) {
+  } else if (netDiff > 0) {
     profitRow.className = 'summary-profit profit';
     profitLbl.textContent = t('pos.extraProfit');
-    profitVal.textContent = `+${fmt(total)}`;
+    profitVal.textContent = `+${fmt(netDiff)}`;
   } else {
     profitRow.className = 'summary-profit discount';
     profitLbl.textContent = t('pos.discount');
-    profitVal.textContent = `−${fmt(Math.abs(total))}`;
+    profitVal.textContent = `−${fmt(Math.abs(netDiff))}`;
   }
 }
 
@@ -6137,6 +6284,21 @@ document.getElementById('qty-input').addEventListener('input', () => {
 });
 document.getElementById('price-input').addEventListener('input', () => {
   updateSummary();
+});
+
+const saleDiscInput = document.getElementById('sale-discount-input');
+if (saleDiscInput) {
+  saleDiscInput.addEventListener('input', () => {
+    updateSummary();
+  });
+}
+
+document.querySelectorAll('.sale-disc-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const amt = parseFloat(chip.dataset.amt) || 0;
+    if (saleDiscInput) saleDiscInput.value = amt > 0 ? amt : '';
+    updateSummary();
+  });
 });
 
 // ── CART STATE & MANAGEMENT ──────────────────────────────────────────────
@@ -6416,21 +6578,23 @@ function renderCartUI() {
         return `
           <div class="cart-item-card" data-idx="${idx}">
             <img src="${imgSrc}" alt="${escapeHtml(locName)}" class="cart-item-img" onerror="this.onerror=null;this.src='assets/logo-icon.webp';">
-            <div class="cart-item-details">
-              <div class="cart-item-name" title="${escapeHtml(locName)}">${escapeHtml(locName)}</div>
-              <div class="cart-item-pricing">
-                <input type="number" step="any" min="0" class="cart-item-price-input" data-idx="${idx}" value="${unitMing}">
-                <span>ming × ${item.quantity}</span>
+            <div class="cart-item-main">
+              <div class="cart-item-header">
+                <div class="cart-item-name" title="${escapeHtml(locName)}">${escapeHtml(locName)}</div>
+                <button type="button" class="cart-item-remove-btn" data-idx="${idx}" title="Oʻchirish" aria-label="Remove">✕</button>
               </div>
-            </div>
-            <div class="cart-item-actions">
-              <div class="cart-qty-ctrl">
-                <button type="button" class="cart-qty-btn btn-cart-dec" data-idx="${idx}">−</button>
-                <span class="cart-qty-val">${item.quantity}</span>
-                <button type="button" class="cart-qty-btn btn-cart-inc" data-idx="${idx}">+</button>
+              <div class="cart-item-controls">
+                <div class="cart-price-input-wrap" title="Dona narxi (ming soʻm)">
+                  <input type="number" step="any" min="0" class="cart-item-price-input" data-idx="${idx}" value="${unitMing}">
+                  <span class="cart-price-unit">ming</span>
+                </div>
+                <div class="cart-qty-ctrl">
+                  <button type="button" class="cart-qty-btn btn-cart-dec" data-idx="${idx}" aria-label="Decrease">−</button>
+                  <span class="cart-qty-val">${item.quantity}</span>
+                  <button type="button" class="cart-qty-btn btn-cart-inc" data-idx="${idx}" aria-label="Increase">+</button>
+                </div>
+                <div class="cart-item-subtotal">${fmt(item.subtotal)}</div>
               </div>
-              <div class="cart-item-subtotal">${fmt(item.subtotal)}</div>
-              <button type="button" class="cart-item-remove-btn" data-idx="${idx}" title="Oʻchirish">✕</button>
             </div>
           </div>`;
       }).join('');
@@ -6497,7 +6661,7 @@ function renderCartUI() {
   }
 
   // Active state on preset chips
-  document.querySelectorAll('.disc-chip').forEach(chip => {
+  document.querySelectorAll('.cart-disc-chip').forEach(chip => {
     const amt = parseFloat(chip.dataset.amt);
     if (amt === totals.discountMing) {
       chip.classList.add('active');
@@ -6732,11 +6896,20 @@ if (btnAddCart) {
     if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast(t('pos.toastValidPrice'), 'warn'); return; }
 
     const added = addToCart(p, qty, price);
-    if (added) closeModal();
+    if (added) {
+      const discInp = document.getElementById('sale-discount-input');
+      const rawDisc = parseFloat(discInp ? discInp.value : 0);
+      const discMing = (!isNaN(rawDisc) && rawDisc > 0) ? rawDisc : 0;
+      if (discMing > 0) {
+        activeCart.discount = (activeCart.discount || 0) + discMing;
+        saveCartToStorage();
+      }
+      closeModal();
+    }
   });
 }
 
-// "Darhol sotish" (Instant Sell 1 item)
+// "Darhol sotish" (Instant Sell)
 const btnInstantSell = document.getElementById('btn-instant-sell');
 if (btnInstantSell) {
   btnInstantSell.addEventListener('click', async () => {
@@ -6752,6 +6925,17 @@ if (btnInstantSell) {
     if (!isUntracked && qty > p.stock) { showToast(t('pos.toastStockLimit', { stock: p.stock }), 'warn'); return; }
     if (isNaN(rawPrice) || rawPrice <= 0 || isNaN(price) || price <= 0) { showToast(t('pos.toastValidPrice'), 'warn'); return; }
 
+    const discInp = document.getElementById('sale-discount-input');
+    const rawDisc = parseFloat(discInp ? discInp.value : 0);
+    const discMing = (!isNaN(rawDisc) && rawDisc > 0) ? rawDisc : 0;
+    const discountUzs = Math.max(0, Math.floor(discMing * 1000));
+    const subtotal = qty * price;
+
+    if (discountUzs > subtotal) {
+      showToast(t('pos.discountExceedsSubtotal'), 'warn');
+      return;
+    }
+
     await executeSaleTransaction({
       items: [{
         productId: p.id,
@@ -6761,9 +6945,9 @@ if (btnInstantSell) {
         basePrice: p.price,
         salePrice: price,
         quantity: qty,
-        subtotal: qty * price
+        subtotal: subtotal
       }],
-      discountUzs: 0
+      discountUzs: discountUzs
     });
   });
 }
@@ -6835,7 +7019,7 @@ if (cartDiscountInp) {
 }
 
 // Preset discount chips listener
-document.querySelectorAll('.disc-chip').forEach(chip => {
+document.querySelectorAll('.cart-disc-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     const amt = parseFloat(chip.dataset.amt) || 0;
     activeCart.discount = amt;
