@@ -981,7 +981,7 @@ async function saveState() {
     syncEngine.updateUI();
 }
 
-// ==================== EXPORT (PNG & EXCEL) ====================
+/// ==================== EXPORT (PNG & EXCEL) ====================
 async function exportAsPng() {
     const btn = document.getElementById('exportPngBtn');
     const originalHtml = btn ? btn.innerHTML : '';
@@ -990,56 +990,194 @@ async function exportAsPng() {
         btn.innerHTML = `<svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg> <span>${tr('action.exporting')}</span>`;
     }
 
-    // Determine target based on explicit data-export-target
-    let target = null;
-    const activePage = document.querySelector('.page.active');
-    if (activePage) {
-        target = activePage.querySelector('[data-export-target]') || activePage;
-    }
-    if (!target) {
-        target = document.querySelector('[data-export-target="home"]') || document.getElementById('contentArea');
-    }
-
-    document.body.classList.add('is-exporting-png');
-
     try {
         if (typeof html2canvas === 'undefined') {
             throw new Error('html2canvas library is not loaded');
         }
 
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        const bgColor = isDark ? '#0E0D0B' : '#FAF8F3';
-
-        const canvas = await html2canvas(target, {
-            backgroundColor: bgColor,
-            scale: 2,
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-            ignoreElements: (el) => {
-                if (el.classList && (
-                    el.classList.contains('sidebar') ||
-                    el.classList.contains('topbar') ||
-                    el.classList.contains('sidebar-overlay') ||
-                    el.classList.contains('modal-overlay') ||
-                    el.classList.contains('toast-container') ||
-                    el.classList.contains('confirm-overlay') ||
-                    el.classList.contains('page-actions')
-                )) {
-                    return true;
-                }
-                return false;
-            }
-        });
-
         const selectedDate = (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function')
             ? window.homeCalendar.getSelectedDate()
             : new Date();
-        const dateStr = formatDateFile(selectedDate);
-        const fileName = `bazar-${currentPage || 'report'}-${dateStr}.png`;
+        const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
+        const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).getTime();
+
+        const dayActivities = state.activities.filter(a => !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
+        const daySales = dayActivities.filter(a => a.type === 'sale');
+        const dayCashOuts = dayActivities.filter(a => a.type === 'cash_out');
+
+        const totalUnits = daySales.reduce((acc, s) => acc + resolveActivitySaleDetails(s).totalUnits, 0);
+        const totalRev = daySales.reduce((acc, s) => acc + resolveActivitySaleDetails(s).totalSaleValue, 0);
+        const totalSpends = dayCashOuts.reduce((acc, c) => acc + (Number(c.amount) || Number(c.quantity) || 0), 0);
+        const netCash = totalRev - totalSpends;
+        const txCount = daySales.length;
+
+        const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+        const locale = lang === 'ru' ? 'ru-RU' : (lang === 'uz' ? 'uz-UZ' : 'en-US');
+        const dateStr = selectedDate.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+
+        const dayReportItems = dayActivities.filter(a => a.type === 'sale' || a.type === 'cash_out');
+        dayReportItems.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+
+        // Colors based on theme
+        const bgWrap = isDark ? '#0A0D14' : '#F4F1EA';
+        const bgCard = isDark ? '#141A26' : '#FFFFFF';
+        const textPrimary = isDark ? '#F8FAFC' : '#0F172A';
+        const textSecondary = isDark ? '#94A3B8' : '#64748B';
+        const borderCard = isDark ? '#232D3F' : '#E2E8F0';
+
+        // Build elegant Executive Report DOM Card (860px fixed width, perfect for Telegram/Print)
+        const exportContainer = document.createElement('div');
+        exportContainer.style.cssText = `
+            position: fixed;
+            left: -9999px;
+            top: 0;
+            width: 860px;
+            background: ${bgWrap};
+            padding: 32px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: ${textPrimary};
+            box-sizing: border-box;
+            z-index: -999;
+        `;
+
+        let rowsHtml = '';
+        dayReportItems.forEach((item, idx) => {
+            const rowBg = idx % 2 === 1 ? (isDark ? '#182030' : '#F8FAFC') : (isDark ? '#141A26' : '#FFFFFF');
+            if (item.type === 'cash_out') {
+                const amt = Number(item.amount) || Number(item.quantity) || 0;
+                rowsHtml += `
+                    <tr style="background: ${rowBg}; border-bottom: 1px solid ${borderCard};">
+                        <td style="padding: 10px 12px; text-align: center; color: ${textSecondary}; font-size: 12px;">${idx + 1}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 13px; font-weight: 500;">${formatTime(item.timestamp)}</td>
+                        <td style="padding: 10px 12px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.15); color: #EF4444; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Chiqim</span></td>
+                        <td style="padding: 10px 12px; font-size: 13px; font-weight: 500;">${escapeHtml(item.notes || item.reason || 'Kassadan chiqim')}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 13px;">1</td>
+                        <td style="padding: 10px 12px; text-align: right; font-size: 13px; font-weight: 700; color: #EF4444;">−${formatCurrency(amt)}</td>
+                    </tr>
+                `;
+            } else {
+                const details = resolveActivitySaleDetails(item);
+                const isPos = Boolean(item.notes && /pos/i.test(item.notes));
+                const badgeColor = isPos ? '#38BDF8' : '#EAB308';
+                const badgeBg = isPos ? 'rgba(56, 189, 248, 0.15)' : 'rgba(234, 179, 8, 0.15)';
+                const badgeText = isPos ? 'POS' : 'Savdo';
+
+                let itemDesc = escapeHtml(details.displayName);
+                if (details.items && details.items.length > 1) {
+                    itemDesc += `<div style="font-size: 11px; color: ${textSecondary}; margin-top: 2px;">${details.items.map(i => `${escapeHtml(i.productName || 'Mahsulot')} (${i.quantity}x)`).join(', ')}</div>`;
+                }
+
+                rowsHtml += `
+                    <tr style="background: ${rowBg}; border-bottom: 1px solid ${borderCard};">
+                        <td style="padding: 10px 12px; text-align: center; color: ${textSecondary}; font-size: 12px;">${idx + 1}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 13px; font-weight: 500;">${formatTime(item.timestamp)}</td>
+                        <td style="padding: 10px 12px; text-align: center;"><span style="background: ${badgeBg}; color: ${badgeColor}; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">${badgeText}</span></td>
+                        <td style="padding: 10px 12px; font-size: 13px; font-weight: 500;">${itemDesc}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 13px;"><span style="background: ${isDark ? '#232D3F' : '#E2E8F0'}; padding: 2px 7px; border-radius: 10px; font-size: 12px; font-weight: 600;">${details.totalUnits}</span></td>
+                        <td style="padding: 10px 12px; text-align: right; font-size: 13px; font-weight: 700; color: ${textPrimary};">${formatCurrency(details.totalSaleValue)}</td>
+                    </tr>
+                `;
+            }
+        });
+
+        exportContainer.innerHTML = `
+            <div style="background: ${bgCard}; border: 1px solid ${borderCard}; border-radius: 16px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid ${borderCard}; margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <img src="/assets/logo-icon.webp" width="44" height="44" style="border-radius: 10px;" alt="Logo" onerror="this.style.display='none'">
+                        <div>
+                            <div style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: #D4AF37;">BAZAR</div>
+                            <div style="font-size: 13px; color: ${textSecondary}; font-weight: 500; margin-top: 2px;">Kunlik savdo va kassa hisoboti</div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="display: inline-block; background: ${isDark ? '#1E293B' : '#EEF2F6'}; color: ${textPrimary}; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 4px;">
+                            📅 ${dateStr}
+                        </div>
+                        <div style="font-size: 12px; color: ${textSecondary};">Vaqt: ${timeStr}</div>
+                    </div>
+                </div>
+
+                <!-- KPI Grid -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px;">
+                    <div style="background: ${isDark ? 'rgba(34, 197, 94, 0.08)' : '#F0FDF4'}; border: 1px solid ${isDark ? 'rgba(34, 197, 94, 0.25)' : '#BBF7D0'}; padding: 16px; border-radius: 12px;">
+                        <div style="font-size: 11px; font-weight: 700; color: #16A34A; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">JAMI TUSHUM</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #16A34A; letter-spacing: -0.01em;">${formatCurrency(totalRev)}</div>
+                        <div style="font-size: 11px; color: ${textSecondary}; margin-top: 4px;">${txCount} ta savdo</div>
+                    </div>
+                    <div style="background: ${isDark ? '#1A2333' : '#F8FAFC'}; border: 1px solid ${borderCard}; padding: 16px; border-radius: 12px;">
+                        <div style="font-size: 11px; font-weight: 700; color: ${textSecondary}; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">JAMI SOTILDI</div>
+                        <div style="font-size: 20px; font-weight: 800; color: ${textPrimary};">${totalUnits} dona</div>
+                        <div style="font-size: 11px; color: ${textSecondary}; margin-top: 4px;">Mahsulotlar soni</div>
+                    </div>
+                    <div style="background: ${isDark ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2'}; border: 1px solid ${isDark ? 'rgba(239, 68, 68, 0.25)' : '#FECACA'}; padding: 16px; border-radius: 12px;">
+                        <div style="font-size: 11px; font-weight: 700; color: #DC2626; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">KASSADAN CHIQIM</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #DC2626;">−${formatCurrency(totalSpends)}</div>
+                        <div style="font-size: 11px; color: ${textSecondary}; margin-top: 4px;">${dayCashOuts.length} ta chiqim</div>
+                    </div>
+                    <div style="background: ${isDark ? 'rgba(2, 132, 199, 0.08)' : '#F0F9FF'}; border: 1px solid ${isDark ? 'rgba(2, 132, 199, 0.25)' : '#BAE6FD'}; padding: 16px; border-radius: 12px;">
+                        <div style="font-size: 11px; font-weight: 700; color: #0284C7; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">SOF KASSA</div>
+                        <div style="font-size: 20px; font-weight: 800; color: #0284C7;">${formatCurrency(netCash)}</div>
+                        <div style="font-size: 11px; color: ${textSecondary}; margin-top: 4px;">Kassadagi naqd pul</div>
+                    </div>
+                </div>
+
+                <!-- Table Section -->
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="font-size: 14px; font-weight: 700; color: ${textPrimary};">Tranzaksiyalar tafsiloti</div>
+                        <div style="font-size: 12px; color: ${textSecondary}; font-weight: 500;">Jami: ${dayReportItems.length} ta yozuv</div>
+                    </div>
+
+                    <table style="width: 100%; border-collapse: collapse; border: 1px solid ${borderCard}; border-radius: 8px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: ${isDark ? '#1E293B' : '#334155'}; color: #FFFFFF;">
+                                <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-align: center; width: 40px;">№</th>
+                                <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-align: center; width: 70px;">Vaqt</th>
+                                <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-align: center; width: 85px;">Tur</th>
+                                <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-align: left;">Mahsulot / Izoh</th>
+                                <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-align: center; width: 60px;">Miqdor</th>
+                                <th style="padding: 10px 12px; font-size: 11px; font-weight: 700; text-align: right; width: 140px;">Summa</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml || `<tr><td colspan="6" style="padding: 24px; text-align: center; color: ${textSecondary}; font-size: 13px;">Ushbu sanada hech qanday savdo yoki chiqim boʻlmagan.</td></tr>`}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: ${isDark ? '#1E293B' : '#E2E8F0'}; font-weight: 800; border-top: 2px solid ${borderCard};">
+                                <td colspan="4" style="padding: 12px; font-size: 13px; text-align: left; color: ${textPrimary};">JAMI SOF TUSHUM</td>
+                                <td style="padding: 12px; font-size: 13px; text-align: center; color: ${textPrimary};">${totalUnits}</td>
+                                <td style="padding: 12px; font-size: 15px; text-align: right; color: #16A34A;">${formatCurrency(netCash)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <!-- Footer -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid ${borderCard}; font-size: 11px; color: ${textSecondary};">
+                    <div>✓ Bazar savdo va ombor boshqaruvi tizimi</div>
+                    <div>Hisobot generatsiya qilindi: ${timeStr}</div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(exportContainer);
+
+        const canvas = await html2canvas(exportContainer, {
+            scale: 2,
+            backgroundColor: bgWrap,
+            useCORS: true,
+            allowTaint: false,
+            logging: false
+        });
+
+        document.body.removeChild(exportContainer);
 
         const link = document.createElement('a');
-        link.download = fileName;
+        link.download = `bazar-hisobot-${formatDateFile(selectedDate)}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
 
@@ -1048,7 +1186,6 @@ async function exportAsPng() {
         console.error('[exportAsPng error]', err);
         showToast(tr('action.exportError') || 'Export failed', 'error');
     } finally {
-        document.body.classList.remove('is-exporting-png');
         if (btn) {
             btn.disabled = false;
             btn.innerHTML = originalHtml;
@@ -1065,13 +1202,16 @@ async function exportAsExcel() {
     }
 
     try {
-        if (typeof XLSX === 'undefined') {
-            throw new Error('XLSX library is not loaded');
+        if (typeof ExcelJS === 'undefined') {
+            throw new Error('ExcelJS library is not loaded');
         }
 
-        const wb = XLSX.utils.book_new();
+        const wb = new ExcelJS.Workbook();
+        wb.creator = 'Bazar';
+        wb.lastModifiedBy = 'Bazar POS';
+        wb.created = new Date();
+        wb.modified = new Date();
 
-        // 1. DATA PREPARATION FROM LOCAL STATE (Zero API dependency, 100% offline)
         const selectedDate = (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function')
             ? window.homeCalendar.getSelectedDate()
             : new Date();
@@ -1082,84 +1222,169 @@ async function exportAsExcel() {
         const daySales = dayActivities.filter(a => a.type === 'sale');
         const dayCashOuts = dayActivities.filter(a => a.type === 'cash_out');
 
-        const totalUnits = daySales.reduce((acc, s) => {
-            const d = resolveActivitySaleDetails(s);
-            return acc + d.totalUnits;
-        }, 0);
-        const totalRev = daySales.reduce((acc, s) => {
-            const d = resolveActivitySaleDetails(s);
-            return acc + d.totalSaleValue;
-        }, 0);
-        const totalSpends = dayCashOuts.reduce((acc, c) => {
-            return acc + (Number(c.amount) || Number(c.quantity) || 0);
-        }, 0);
+        const totalUnits = daySales.reduce((acc, s) => acc + resolveActivitySaleDetails(s).totalUnits, 0);
+        const totalRev = daySales.reduce((acc, s) => acc + resolveActivitySaleDetails(s).totalSaleValue, 0);
+        const totalSpends = dayCashOuts.reduce((acc, c) => acc + (Number(c.amount) || Number(c.quantity) || 0), 0);
         const netCash = totalRev - totalSpends;
         const txCount = daySales.length;
 
-        // ---------- SHEET 1: Kunlik hisobot (Daily Report) ----------
-        const dailyAoa = [
-            ['Bazar — Kunlik hisobot', ''],
-            ['Hisobot sanasi (Report date)', formatDateFile(selectedDate)],
-            ['Eksport qilingan vaqt', formatDateTime(Date.now())],
-            [],
-            ['KOʻRSATKICH (Metric)', 'QIYMAT (Value)'],
-            ['Jami sotilgan dona (Sold units)', totalUnits],
-            ['Jami tushum (Revenue)', totalRev],
-            ['Kassadan chiqim (Cash out)', totalSpends],
-            ['Kassadagi sof naqd pul (Net register cash)', netCash],
-            ['Savdolar soni (Transactions)', txCount],
-            [],
-            ['TRANZAKSIYALAR JADVALI (Transactions Table)'],
-            [
-                '№',
-                'Tranzaksiya ID',
-                'Vaqt',
-                'Tur',
-                'Mahsulot / Tavsif',
-                'Toifa',
-                'Miqdor',
-                'Birlik narxi (soʻm)',
-                'Qator summasi (soʻm)',
-                'Chegirma (soʻm)',
-                'Yakuniy summa (soʻm)',
-                'Toʻlov / Manba'
-            ]
+        const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
+        const locale = lang === 'ru' ? 'ru-RU' : (lang === 'uz' ? 'uz-UZ' : 'en-US');
+        const dateFormatted = selectedDate.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const timeFormatted = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+
+        // ==========================================
+        // SHEET 1: KUNLIK HISOBOT (Executive Daily Report)
+        // ==========================================
+        const wsDaily = wb.addWorksheet('Kunlik hisobot', {
+            views: [{ showGridLines: true, state: 'frozen', ySplit: 7 }],
+            pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 }
+        });
+
+        wsDaily.columns = [
+            { key: 'num', width: 6 },
+            { key: 'time', width: 10 },
+            { key: 'type', width: 15 },
+            { key: 'product', width: 42 },
+            { key: 'qty', width: 10 },
+            { key: 'unitPrice', width: 18 },
+            { key: 'discount', width: 16 },
+            { key: 'total', width: 22 }
         ];
 
+        // 1. Title Banner
+        wsDaily.mergeCells('A1:H1');
+        const titleCell = wsDaily.getCell('A1');
+        titleCell.value = 'BAZAR — KUNLIK SAVDO HISOBOTI';
+        titleCell.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+        titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+        titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsDaily.getRow(1).height = 38;
+
+        // 2. Subtitle / Metadata
+        wsDaily.mergeCells('A2:H2');
+        const subCell = wsDaily.getCell('A2');
+        subCell.value = `Sana: ${dateFormatted}   |   Hisobot vaqti: ${timeFormatted}   |   Valyuta: UZS (soʻm)`;
+        subCell.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF475569' } };
+        subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        subCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsDaily.getRow(2).height = 22;
+
+        // 3. KPI Header Labels
+        wsDaily.mergeCells('A3:B3'); wsDaily.getCell('A3').value = 'JAMI SOTILDI';
+        wsDaily.mergeCells('C3:D3'); wsDaily.getCell('C3').value = 'JAMI TUSHUM';
+        wsDaily.mergeCells('E3:F3'); wsDaily.getCell('E3').value = 'KASSADAN CHIQIM';
+        wsDaily.mergeCells('G3:H3'); wsDaily.getCell('G3').value = 'SOF KASSA';
+
+        ['A3', 'C3', 'E3', 'G3'].forEach(ref => {
+            const c = wsDaily.getCell(ref);
+            c.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF64748B' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            c.alignment = { vertical: 'middle', horizontal: 'center' };
+            c.border = {
+                top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+            };
+        });
+        wsDaily.getRow(3).height = 20;
+
+        // 4. KPI Values
+        wsDaily.mergeCells('A4:B4'); wsDaily.getCell('A4').value = totalUnits; wsDaily.getCell('A4').numFmt = '#,##0 "dona"';
+        wsDaily.mergeCells('C4:D4'); wsDaily.getCell('C4').value = totalRev; wsDaily.getCell('C4').numFmt = '#,##0 "so\'m"';
+        wsDaily.mergeCells('E4:F4'); wsDaily.getCell('E4').value = totalSpends; wsDaily.getCell('E4').numFmt = '#,##0 "so\'m"';
+        wsDaily.mergeCells('G4:H4'); wsDaily.getCell('G4').value = netCash; wsDaily.getCell('G4').numFmt = '#,##0 "so\'m"';
+
+        const kpiColors = ['FF0F172A', 'FF16A34A', 'FFDC2626', 'FF0284C7'];
+        ['A4', 'C4', 'E4', 'G4'].forEach((ref, idx) => {
+            const c = wsDaily.getCell(ref);
+            c.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: kpiColors[idx] } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            c.alignment = { vertical: 'middle', horizontal: 'center' };
+            c.border = { bottom: { style: 'medium', color: { argb: 'FFCBD5E1' } } };
+        });
+        wsDaily.getRow(4).height = 32;
+
+        // Row 5: Gap
+        wsDaily.getRow(5).height = 10;
+
+        // 5. Section Header
+        wsDaily.mergeCells('A6:H6');
+        const sec = wsDaily.getCell('A6');
+        sec.value = 'KUNLIK TRANZAKSIYALAR ROʻYXATI';
+        sec.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+        sec.alignment = { vertical: 'middle', horizontal: 'left' };
+        wsDaily.getRow(6).height = 22;
+
+        // 6. Table Headers
+        const tableHeaders = ['№', 'Vaqt', 'Tur', 'Mahsulot / Izoh', 'Miqdor', 'Birlik narxi', 'Chegirma', 'Yakuniy summa'];
+        const hRow = wsDaily.addRow(tableHeaders);
+        hRow.height = 26;
+        hRow.eachCell((c, colNum) => {
+            c.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+            c.border = {
+                top: { style: 'thin', color: { argb: 'FF1E293B' } },
+                bottom: { style: 'medium', color: { argb: 'FF0F172A' } }
+            };
+            if (colNum >= 5) c.alignment = { vertical: 'middle', horizontal: 'right' };
+            else c.alignment = { vertical: 'middle', horizontal: 'center' };
+            if (colNum === 4) c.alignment = { vertical: 'middle', horizontal: 'left' };
+        });
+
+        // 7. Table Data
         const dayReportItems = dayActivities.filter(a => a.type === 'sale' || a.type === 'cash_out' || a.type === 'return');
         dayReportItems.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
 
-        let rowIdx = 1;
+        let rowCounter = 1;
         let sumSubtotal = 0;
         let sumDiscounts = 0;
         let sumFinal = 0;
         let sumUnits = 0;
 
-        dayReportItems.forEach(item => {
+        dayReportItems.forEach((item, itemIdx) => {
+            const isEven = itemIdx % 2 === 1;
+            const rowBg = isEven ? 'FFF8FAFC' : 'FFFFFFFF';
+
             if (item.type === 'cash_out') {
                 const amt = Number(item.amount) || Number(item.quantity) || 0;
                 sumFinal -= amt;
-                dailyAoa.push([
-                    rowIdx++,
-                    item.id || item.transactionId || '',
+                const row = wsDaily.addRow([
+                    rowCounter++,
                     formatTime(item.timestamp),
                     'Chiqim',
                     item.notes || item.reason || 'Kassadan chiqim',
-                    'Kassa chiqimi',
                     1,
                     -amt,
-                    -amt,
-                    0,
-                    -amt,
-                    item.source || 'Kassa'
+                    '-',
+                    -amt
                 ]);
+                row.height = 24;
+                row.eachCell((cell, colNum) => {
+                    cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF1E293B' } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                    };
+                    if (colNum === 1 || colNum === 2) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    else if (colNum === 3) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        cell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FFDC2626' } };
+                    } else if (colNum === 4) cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                    else if (colNum === 5) { cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.numFmt = '#,##0'; }
+                    else if (colNum === 6) { cell.alignment = { vertical: 'middle', horizontal: 'right' }; cell.numFmt = '#,##0 "so\'m"'; }
+                    else if (colNum === 7) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    else if (colNum === 8) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                        cell.numFmt = '#,##0 "so\'m"';
+                        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFDC2626' } };
+                    }
+                });
             } else if (item.type === 'sale') {
                 const details = resolveActivitySaleDetails(item);
                 const isPos = Boolean(item.notes && /pos/i.test(item.notes));
-                const sourceStr = item.source || (isPos ? 'POS' : 'Kassa');
-                const catName = getCategoryName(item.categoryId || (details.product ? details.product.categoryId : null));
+                const typeStr = isPos ? 'Savdo (POS)' : 'Savdo';
 
-                // Extract authoritative recorded manual discount (never inferred or recalculated)
                 let recordedDiscount = 0;
                 if (item.discount != null && !isNaN(Number(item.discount)) && Number(item.discount) > 0) {
                     recordedDiscount = Number(item.discount);
@@ -1167,9 +1392,7 @@ async function exportAsExcel() {
                     recordedDiscount = Number(details.linkedSale.discount);
                 } else if (item.notes) {
                     const m = item.notes.match(/(?:discount|chegirma):\s*-?([0-9\s]+)/i);
-                    if (m) {
-                        recordedDiscount = parseInt(m[1].replace(/\s+/g, ''), 10) || 0;
-                    }
+                    if (m) recordedDiscount = parseInt(m[1].replace(/\s+/g, ''), 10) || 0;
                 }
 
                 const lineSubtotal = details.subtotal || (details.totalSaleValue + recordedDiscount);
@@ -1182,42 +1405,69 @@ async function exportAsExcel() {
                 sumDiscounts += recordedDiscount;
                 sumFinal += finalVal;
 
-                dailyAoa.push([
-                    rowIdx++,
-                    item.saleId || item.id || '',
+                const row = wsDaily.addRow([
+                    rowCounter++,
                     formatTime(item.timestamp),
-                    'Savdo',
+                    typeStr,
                     details.displayName,
-                    catName,
                     units,
                     unitPrice,
-                    lineSubtotal,
-                    recordedDiscount,
-                    finalVal,
-                    sourceStr
+                    recordedDiscount > 0 ? recordedDiscount : '-',
+                    finalVal
                 ]);
+                row.height = 24;
+                row.eachCell((cell, colNum) => {
+                    cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF1E293B' } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                    };
+                    if (colNum === 1 || colNum === 2 || colNum === 3) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    else if (colNum === 4) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                        if (details.items && details.items.length > 1) cell.font = { name: 'Segoe UI', size: 10, bold: true };
+                    } else if (colNum === 5) { cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.numFmt = '#,##0'; }
+                    else if (colNum === 6) { cell.alignment = { vertical: 'middle', horizontal: 'right' }; cell.numFmt = '#,##0 "so\'m"'; }
+                    else if (colNum === 7) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                        if (typeof cell.value === 'number') cell.numFmt = '#,##0 "so\'m"';
+                        else cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    } else if (colNum === 8) {
+                        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                        cell.numFmt = '#,##0 "so\'m"';
+                        cell.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+                    }
+                });
 
-                // If multi-item breakdown exists, list individual items under transaction
+                // Render item breakdown neatly indented
                 if (details.items && details.items.length > 1) {
                     details.items.forEach(it => {
                         const itName = it.productName || it.product_name_snapshot || 'Mahsulot';
                         const itQty = Number(it.quantity || 1);
                         const itPrice = Number(it.salePrice || it.basePrice || it.price || 0);
                         const itSub = Number(it.subtotal || (itQty * itPrice));
-                        dailyAoa.push([
+
+                        const subRow = wsDaily.addRow([
                             '',
                             '',
                             '',
-                            '  ↳ ' + itName,
-                            itName,
-                            catName,
+                            '   • ' + itName,
                             itQty,
                             itPrice,
-                            itSub,
-                            '',
-                            itSub,
-                            sourceStr
+                            '-',
+                            itSub
                         ]);
+                        subRow.height = 20;
+                        subRow.eachCell((cell, colNum) => {
+                            cell.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF64748B' } };
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+                            cell.border = { bottom: { style: 'thin', color: { argb: 'FFF1F5F9' } } };
+                            if (colNum === 4) cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                            else if (colNum === 5) { cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.numFmt = '#,##0'; }
+                            else if (colNum === 6 || colNum === 8) { cell.alignment = { vertical: 'middle', horizontal: 'right' }; cell.numFmt = '#,##0 "so\'m"'; }
+                            else if (colNum === 7) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        });
                     });
                 }
             } else if (item.type === 'return') {
@@ -1225,188 +1475,336 @@ async function exportAsExcel() {
                 const qty = Number(item.quantity) || 1;
                 sumUnits -= qty;
                 sumFinal -= amt;
-                dailyAoa.push([
-                    rowIdx++,
-                    item.id || '',
+                const row = wsDaily.addRow([
+                    rowCounter++,
                     formatTime(item.timestamp),
                     'Qaytarish',
                     item.productName || 'Mahsulot qaytarildi',
-                    getCategoryName(item.categoryId),
                     qty,
                     -amt,
-                    -amt,
-                    0,
-                    -amt,
-                    item.source || 'POS'
+                    '-',
+                    -amt
                 ]);
+                row.height = 24;
+                row.eachCell((cell, colNum) => {
+                    cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF1E293B' } };
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                    };
+                    if (colNum === 1 || colNum === 2 || colNum === 3) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    else if (colNum === 4) cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                    else if (colNum === 5) { cell.alignment = { vertical: 'middle', horizontal: 'center' }; cell.numFmt = '#,##0'; }
+                    else if (colNum === 6 || colNum === 8) { cell.alignment = { vertical: 'middle', horizontal: 'right' }; cell.numFmt = '#,##0 "so\'m"'; }
+                    else if (colNum === 7) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                });
             }
         });
 
-        // Add summary row to Daily sheet
-        dailyAoa.push([
-            'JAMI (TOTAL)',
+        // 8. Total Summary Row
+        const totalRow = wsDaily.addRow([
+            'JAMI',
             '',
             '',
-            '',
-            '',
-            '',
+            'Sof kassa tushumi',
             sumUnits,
             '',
-            sumSubtotal,
-            sumDiscounts,
-            sumFinal,
-            ''
+            sumDiscounts > 0 ? sumDiscounts : '-',
+            sumFinal
         ]);
+        totalRow.height = 32;
+        totalRow.eachCell((c, colNum) => {
+            c.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0F172A' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+            c.border = {
+                top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+                bottom: { style: 'double', color: { argb: 'FF0F172A' } }
+            };
+            if (colNum === 1) c.alignment = { vertical: 'middle', horizontal: 'center' };
+            else if (colNum === 4) c.alignment = { vertical: 'middle', horizontal: 'left' };
+            else if (colNum === 5) { c.alignment = { vertical: 'middle', horizontal: 'center' }; c.numFmt = '#,##0'; }
+            else if (colNum === 7) {
+                c.alignment = { vertical: 'middle', horizontal: 'right' };
+                if (typeof c.value === 'number') c.numFmt = '#,##0 "so\'m"';
+                else c.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (colNum === 8) {
+                c.alignment = { vertical: 'middle', horizontal: 'right' };
+                c.numFmt = '#,##0 "so\'m"';
+                c.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FF16A34A' } };
+            }
+        });
 
-        const wsDaily = XLSX.utils.aoa_to_sheet(dailyAoa);
-        wsDaily['!cols'] = [
-            { wch: 6 },   // №
-            { wch: 22 },  // Tranzaksiya ID
-            { wch: 10 },  // Vaqt
-            { wch: 12 },  // Tur
-            { wch: 32 },  // Mahsulot / Tavsif
-            { wch: 18 },  // Toifa
-            { wch: 10 },  // Miqdor
-            { wch: 20 },  // Birlik narxi
-            { wch: 22 },  // Qator summasi
-            { wch: 18 },  // Chegirma
-            { wch: 22 },  // Yakuniy summa
-            { wch: 16 }   // To'lov / Manba
-        ];
-        XLSX.utils.book_append_sheet(wb, wsDaily, 'Kunlik hisobot');
+        // Enable AutoFilter
+        wsDaily.autoFilter = {
+            from: 'A7',
+            to: 'H' + (wsDaily.rowCount - 1)
+        };
 
-        // ---------- SHEET 2: Mahsulotlar (Products Inventory) ----------
-        const prodAoa = [
-            [
-                '№',
-                'Mahsulot nomi (Product name)',
-                'Toifa (Category)',
-                'Asosiy narx (Base price)',
-                'Qoldiq (Stock)',
-                'Sotilgan (Sold)',
-                'Tushum (Revenue)',
-                'Jami qiymati (Total value)'
-            ]
+        // ==========================================
+        // SHEET 2: MAHSULOTLAR (Inventory Catalog)
+        // ==========================================
+        const wsProd = wb.addWorksheet('Mahsulotlar', {
+            views: [{ showGridLines: true, state: 'frozen', ySplit: 4 }]
+        });
+
+        wsProd.columns = [
+            { key: 'num', width: 6 },
+            { key: 'name', width: 34 },
+            { key: 'cat', width: 20 },
+            { key: 'price', width: 18 },
+            { key: 'stock', width: 14 },
+            { key: 'sold', width: 14 },
+            { key: 'val', width: 22 }
         ];
+
+        wsProd.mergeCells('A1:G1');
+        const prodTitle = wsProd.getCell('A1');
+        prodTitle.value = 'BAZAR — MAHSULOTLAR VA OMBOR QOLDIGʻI';
+        prodTitle.font = { name: 'Segoe UI', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
+        prodTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+        prodTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsProd.getRow(1).height = 36;
+
+        wsProd.mergeCells('A2:G2');
+        const prodSub = wsProd.getCell('A2');
+        prodSub.value = `Hisobot vaqti: ${timeFormatted}   |   Jami mahsulot turlari: ${state.products.length} ta`;
+        prodSub.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF475569' } };
+        prodSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        prodSub.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsProd.getRow(2).height = 22;
+
+        wsProd.getRow(3).height = 10;
+
+        const prodHeaders = ['№', 'Mahsulot nomi', 'Toifa', 'Asosiy narx', 'Qoldiq', 'Sotilgan', 'Jami ombor qiymati'];
+        const prodHRow = wsProd.addRow(prodHeaders);
+        prodHRow.height = 26;
+        prodHRow.eachCell((c, colNum) => {
+            c.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+            c.border = {
+                top: { style: 'thin', color: { argb: 'FF1E293B' } },
+                bottom: { style: 'medium', color: { argb: 'FF0F172A' } }
+            };
+            if (colNum >= 4) c.alignment = { vertical: 'middle', horizontal: 'right' };
+            else if (colNum === 1) c.alignment = { vertical: 'middle', horizontal: 'center' };
+            else c.alignment = { vertical: 'middle', horizontal: 'left' };
+        });
 
         let totalStockTracked = 0;
         let totalSoldAll = 0;
-        let totalRevenueAll = 0;
-        let totalInventoryValue = 0;
+        let totalValuation = 0;
 
-        state.products.forEach((p, idx) => {
+        state.products.forEach((p, pIdx) => {
+            const isEven = pIdx % 2 === 1;
+            const rowBg = isEven ? 'FFF8FAFC' : 'FFFFFFFF';
+
             const pName = getProductDisplayName(p);
-            const pCat = getCategoryName(p.categoryId);
+            let pCat = getCategoryName(p.categoryId);
+            if (!pCat || pCat === 'Unknown' || pCat === 'Nomaʼlum') pCat = '—';
+
             const pPrice = Number(p.price) || 0;
             const isStockTracked = p.quantity !== null && p.quantity !== undefined;
             const pStock = isStockTracked ? Number(p.quantity) : 'Cheksiz';
             const pSold = Number(p.sold) || 0;
-            const pRevenue = pSold * pPrice;
             const pVal = isStockTracked ? (Number(p.quantity) * pPrice) : 0;
 
             if (isStockTracked) totalStockTracked += Number(p.quantity);
             totalSoldAll += pSold;
-            totalRevenueAll += pRevenue;
-            totalInventoryValue += pVal;
+            totalValuation += pVal;
 
-            prodAoa.push([
-                idx + 1,
+            const row = wsProd.addRow([
+                pIdx + 1,
                 pName,
                 pCat,
                 pPrice,
                 pStock,
                 pSold,
-                pRevenue,
                 pVal
             ]);
+            row.height = 22;
+            row.eachCell((cell, colNum) => {
+                cell.font = { name: 'Segoe UI', size: 10, color: { argb: 'FF1E293B' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                    bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                };
+                if (colNum === 1) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                else if (colNum === 2 || colNum === 3) cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                else if (colNum === 4 || colNum === 7) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                    cell.numFmt = '#,##0 "so\'m"';
+                } else if (colNum === 5) {
+                    if (typeof cell.value === 'number') {
+                        cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                        cell.numFmt = '#,##0';
+                    } else {
+                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    }
+                } else if (colNum === 6) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                    cell.numFmt = '#,##0';
+                }
+            });
         });
 
-        // Summary row for Products
-        prodAoa.push([
-            'JAMI (TOTAL)',
+        // Products Summary Row
+        const prodTotalRow = wsProd.addRow([
+            'JAMI',
             '',
             '',
             '',
             totalStockTracked,
             totalSoldAll,
-            totalRevenueAll,
-            totalInventoryValue
+            totalValuation
         ]);
+        prodTotalRow.height = 28;
+        prodTotalRow.eachCell((c, colNum) => {
+            c.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+            c.border = {
+                top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+                bottom: { style: 'double', color: { argb: 'FF0F172A' } }
+            };
+            if (colNum === 1) c.alignment = { vertical: 'middle', horizontal: 'center' };
+            else if (colNum === 5 || colNum === 6) {
+                c.alignment = { vertical: 'middle', horizontal: 'right' };
+                c.numFmt = '#,##0';
+            } else if (colNum === 7) {
+                c.alignment = { vertical: 'middle', horizontal: 'right' };
+                c.numFmt = '#,##0 "so\'m"';
+                c.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF0284C7' } };
+            }
+        });
 
-        const wsProd = XLSX.utils.aoa_to_sheet(prodAoa);
-        wsProd['!cols'] = [
-            { wch: 6 },   // №
-            { wch: 32 },  // Mahsulot nomi
-            { wch: 20 },  // Toifa
-            { wch: 22 },  // Asosiy narx
-            { wch: 15 },  // Qoldiq
-            { wch: 15 },  // Sotilgan
-            { wch: 22 },  // Tushum
-            { wch: 24 }   // Jami qiymati
+        wsProd.autoFilter = {
+            from: 'A4',
+            to: 'G' + (wsProd.rowCount - 1)
+        };
+
+        // ==========================================
+        // SHEET 3: BARCHA FAOLIYAT (Audit Log)
+        // ==========================================
+        const wsAct = wb.addWorksheet('Barcha faoliyat', {
+            views: [{ showGridLines: true, state: 'frozen', ySplit: 4 }]
+        });
+
+        wsAct.columns = [
+            { key: 'num', width: 6 },
+            { key: 'id', width: 24 },
+            { key: 'time', width: 22 },
+            { key: 'type', width: 16 },
+            { key: 'desc', width: 34 },
+            { key: 'qty', width: 12 },
+            { key: 'sum', width: 20 },
+            { key: 'source', width: 14 }
         ];
-        XLSX.utils.book_append_sheet(wb, wsProd, 'Mahsulotlar');
 
-        // ---------- SHEET 3: Barcha faoliyat (All Activity) ----------
-        const actAoa = [
-            [
-                '№',
-                'Sana va vaqt (Timestamp)',
-                'Harakat turi (Activity)',
-                'Mahsulot / Obyekt (Product)',
-                'Miqdor (Quantity)',
-                'Summa (Amount soʻm)',
-                'Foydalanuvchi / Manba (User/Source)',
-                'Tafsilotlar (Details)'
-            ]
-        ];
+        wsAct.mergeCells('A1:H1');
+        const actTitle = wsAct.getCell('A1');
+        actTitle.value = 'BAZAR — FAOLIYAT VA AUDIT TARIXI';
+        actTitle.font = { name: 'Segoe UI', size: 15, bold: true, color: { argb: 'FFFFFFFF' } };
+        actTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+        actTitle.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsAct.getRow(1).height = 36;
 
-        const allActivities = [...state.activities];
-        allActivities.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+        wsAct.mergeCells('A2:H2');
+        const actSub = wsAct.getCell('A2');
+        actSub.value = `Barcha operatsiyalar va oʻzgarishlar jurnali   |   Jami yozuvlar: ${state.activities.length} ta`;
+        actSub.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF475569' } };
+        actSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        actSub.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsAct.getRow(2).height = 22;
 
-        allActivities.forEach((act, idx) => {
-            const timeStr = formatDateTime(act.timestamp);
-            let actionTypeStr = act.type;
-            if (act.type === 'sale') actionTypeStr = 'Savdo';
-            else if (act.type === 'cash_out') actionTypeStr = 'Kassadan chiqim';
-            else if (act.type === 'return') actionTypeStr = 'Qaytarish';
-            else if (act.type === 'create') actionTypeStr = 'Yaratildi';
-            else if (act.type === 'update') actionTypeStr = 'Yangilandi';
-            else if (act.type === 'delete') actionTypeStr = 'Oʻchirildi';
+        wsAct.getRow(3).height = 10;
 
-            const prodOrEntity = act.productName || (act.type === 'cash_out' ? (act.reason || 'Kassadan chiqim') : (act.notes || ''));
+        const actHeaders = ['№', 'Tranzaksiya ID', 'Sana va vaqt', 'Harakat turi', 'Mahsulot / Tavsif', 'Miqdor', 'Summa', 'Manba'];
+        const actHRow = wsAct.addRow(actHeaders);
+        actHRow.height = 26;
+        actHRow.eachCell((c, colNum) => {
+            c.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+            c.border = {
+                top: { style: 'thin', color: { argb: 'FF1E293B' } },
+                bottom: { style: 'medium', color: { argb: 'FF0F172A' } }
+            };
+            if (colNum === 1 || colNum === 2 || colNum === 3 || colNum === 4 || colNum === 8) {
+                c.alignment = { vertical: 'middle', horizontal: 'center' };
+            } else if (colNum === 5) {
+                c.alignment = { vertical: 'middle', horizontal: 'left' };
+            } else {
+                c.alignment = { vertical: 'middle', horizontal: 'right' };
+            }
+        });
+
+        const allActs = [...state.activities].sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+        allActs.forEach((act, actIdx) => {
+            const isEven = actIdx % 2 === 1;
+            const rowBg = isEven ? 'FFF8FAFC' : 'FFFFFFFF';
+
+            let typeStr = act.type;
+            if (act.type === 'sale') typeStr = 'Savdo';
+            else if (act.type === 'cash_out') typeStr = 'Chiqim';
+            else if (act.type === 'return') typeStr = 'Qaytarish';
+            else if (act.type === 'create') typeStr = 'Yaratildi';
+            else if (act.type === 'update') typeStr = 'Yangilandi';
+            else if (act.type === 'delete') typeStr = 'Oʻchirildi';
+
+            const prodOrEntity = act.productName || (act.type === 'cash_out' ? (act.reason || 'Kassadan chiqim') : (act.notes || '—'));
             const qtyVal = act.quantity != null && !isNaN(Number(act.quantity)) ? Number(act.quantity) : '';
             const amtVal = act.totalSaleValue != null ? Number(act.totalSaleValue) : (act.amount != null ? Number(act.amount) : '');
             const sourceVal = act.source || (act.notes && /pos/i.test(act.notes) ? 'POS' : 'Admin');
-            const detailsVal = act.notes || '';
 
-            actAoa.push([
-                idx + 1,
-                timeStr,
-                actionTypeStr,
+            const row = wsAct.addRow([
+                actIdx + 1,
+                act.saleId || act.id || '—',
+                formatDateTime(act.timestamp),
+                typeStr,
                 prodOrEntity,
                 qtyVal,
-                amtVal,
-                sourceVal,
-                detailsVal
+                amtVal !== '' ? amtVal : '-',
+                sourceVal
             ]);
+            row.height = 22;
+            row.eachCell((cell, colNum) => {
+                cell.font = { name: 'Segoe UI', size: 9, color: { argb: 'FF1E293B' } };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                    bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+                };
+                if (colNum === 1 || colNum === 3 || colNum === 4 || colNum === 8) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                } else if (colNum === 2) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    cell.font = { name: 'Consolas', size: 9, color: { argb: 'FF475569' } };
+                } else if (colNum === 5) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+                } else if (colNum === 6) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                    if (typeof cell.value === 'number') cell.numFmt = '#,##0';
+                } else if (colNum === 7) {
+                    cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                    if (typeof cell.value === 'number') cell.numFmt = '#,##0 "so\'m"';
+                }
+            });
         });
 
-        const wsAct = XLSX.utils.aoa_to_sheet(actAoa);
-        wsAct['!cols'] = [
-            { wch: 6 },   // №
-            { wch: 22 },  // Sana va vaqt
-            { wch: 18 },  // Harakat turi
-            { wch: 28 },  // Mahsulot / Obyekt
-            { wch: 12 },  // Miqdor
-            { wch: 22 },  // Summa
-            { wch: 20 },  // Foydalanuvchi / Manba
-            { wch: 36 }   // Tafsilotlar
-        ];
-        XLSX.utils.book_append_sheet(wb, wsAct, 'Barcha faoliyat');
+        wsAct.autoFilter = {
+            from: 'A4',
+            to: 'H' + (wsAct.rowCount - 1)
+        };
 
-        // 3. GENERATE & DOWNLOAD
-        const fileName = `bazar-hisobot-${formatDateFile(selectedDate)}.xlsx`;
-        XLSX.writeFile(wb, fileName);
+        // Write & Download in Browser
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bazar-hisobot-${formatDateFile(selectedDate)}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
 
         showToast(tr('action.exportSuccess'), 'success');
     } catch (err) {

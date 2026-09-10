@@ -14,7 +14,7 @@ const ASSETS_TO_CACHE = [
   '/assets/logo.webp',
   '/assets/logo-icon.webp',
   '/assets/vendor/html2canvas.min.js',
-  '/assets/vendor/xlsx.full.min.js',
+  '/assets/vendor/exceljs.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 
