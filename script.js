@@ -1257,6 +1257,7 @@ async function exportAsExcel() {
         const dateFormatted = selectedDate.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const now = new Date();
         const exportTimeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const timeFormatted = exportTimeStr;
         const exportDateStr = now.toLocaleDateString(locale, { year: 'numeric', month: 'numeric', day: 'numeric' });
         const downloadTimestamp = `${exportDateStr}, ${exportTimeStr}`;
 
@@ -1610,7 +1611,7 @@ async function exportAsExcel() {
 
         wsProd.mergeCells('A2:G2');
         const prodSub = wsProd.getCell('A2');
-        prodSub.value = `Hisobot vaqti: ${timeFormatted}   |   Jami mahsulot turlari: ${state.products.length} ta`;
+        prodSub.value = `Eksport vaqti: ${downloadTimestamp}   |   Jami mahsulot turlari: ${state.products.length} ta`;
         prodSub.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF475569' } };
         prodSub.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
         prodSub.alignment = { vertical: 'middle', horizontal: 'center' };
