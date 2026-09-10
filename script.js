@@ -891,7 +891,7 @@ const syncEngine = {
         }
 
         if (Array.isArray(snapshot.activities)) {
-            state.activities = snapshot.activities;
+            state.activities = snapshot.activities.map(a => ({ ...a, timestamp: Number(a.timestamp) })).sort((a, b) => b.timestamp - a.timestamp);
             if (state.activities.length > 0) await localDb.putAll('activities', state.activities);
         } else {
             state.activities = [];
@@ -910,6 +910,7 @@ const syncEngine = {
             try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
         }
 
+        await saveState();
         refreshAll();
         notifyCatalogChange('CATALOG_CHANGED', { reason: 'SNAPSHOT_SYNC' });
     },
@@ -4504,19 +4505,16 @@ async function init() {
         });
     }
 
-    // 4. If client has no cursor or no activities, bootstrap from /api/data snapshot
-    const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
-    if (lastSyncSeq === 0 || (!state.activities || state.activities.length === 0)) {
-        try {
-            const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
-            if (snapRes.ok) {
-                const snap = await snapRes.json();
-                await syncEngine.mergeSnapshot(snap);
-                await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
-            }
-        } catch (e) {
-            console.warn('[init] Initial snapshot bootstrap notice:', e);
+    // 4. Proactively bootstrap latest snapshot from /api/data on startup to guarantee 100% data sync
+    try {
+        const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+        if (snapRes.ok) {
+            const snap = await snapRes.json();
+            await syncEngine.mergeSnapshot(snap);
+            await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
         }
+    } catch (e) {
+        console.warn('[init] Initial snapshot bootstrap notice:', e);
     }
 
     // 5. Start backend network sync and currency fetch
