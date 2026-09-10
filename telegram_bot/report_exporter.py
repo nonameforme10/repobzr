@@ -362,176 +362,286 @@ def generate_7day_excel_report(seven_day_data: Dict[str, Any]) -> bytes:
 
 
 # ============================================================================
-# 3. SINGLE-DAY PNG EXPORT (860px Pillow Image)
+# 3. SINGLE-DAY PNG EXPORT — Executive Report Card (matches web dashboard)
 # ============================================================================
+
+def _draw_badge(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, bg: tuple, fg: tuple, font) -> int:
+    """Draw a pill badge and return its width."""
+    bbox = font.getbbox(text)
+    tw = bbox[2] - bbox[0]
+    badge_w = tw + 14
+    badge_h = 18
+    draw.rounded_rectangle([(x, y), (x + badge_w, y + badge_h)], radius=5, fill=bg)
+    draw.text((x + 7, y + 2), text, fill=fg, font=font)
+    return badge_w
+
+
+def _truncate_text(text: str, max_chars: int) -> str:
+    if len(text) > max_chars:
+        return text[:max_chars - 1] + "\u2026"
+    return text
+
+
+def _build_sale_display_name(items: list, sale: dict) -> str:
+    """Build a human-readable display name for a sale transaction."""
+    if not items:
+        return sale.get("notes") or "Savdo"
+    if len(items) == 1:
+        return items[0].get("productName") or "Mahsulot"
+    names = [it.get("productName") or "Mahsulot" for it in items[:2]]
+    extra = len(items) - 2
+    label = ", ".join(names)
+    if extra > 0:
+        label += f" +{extra} ta"
+    return label
+
+
 def generate_png_report(report_data: Dict[str, Any]) -> bytes:
-    width = 860
-    padding = 28
+    """
+    Generate an executive PNG card matching the web dashboard exportAsPng() layout:
+    - Dark card: BAZAR gold header + date badge (top-right)
+    - 4 KPI tiles: JAMI TUSHUM / JAMI SOTILDI / KASSADAN CHIQIM / SOF KASSA
+    - "Tranzaksiyalar tafsiloti" table sorted by timestamp:
+        - Sale rows: POS badge (teal) or Savdo badge (green) + optional sub-items
+        - Chiqim rows: CHIQIM badge (red)
+    - Footer: JAMI SOF TUSHUM | total items | net cash
+    """
+    import json as _json
 
-    items = report_data.get("items", [])
+    WIDTH = 860
+    PAD = 28
+    INNER_X = PAD + 24
+    INNER_W = WIDTH - PAD * 2 - 48
+
+    # --- Column x-positions ---
+    COL_NUM  = INNER_X          # №
+    COL_TIME = INNER_X + 30     # Vaqt
+    COL_TYPE = INNER_X + 88     # Tur (badge)
+    COL_NAME = INNER_X + 170    # Mahsulot/Izoh (flex)
+    COL_QTY  = INNER_X + INNER_W - 148  # Miqdor
+    COL_AMT  = INNER_X + INNER_W - 80   # Summa (right-aligned)
+
+    sales = report_data.get("sales", [])
     cash_outs = report_data.get("cashOuts", [])
-
-    items_count = len(items)
-    cash_out_count = len(cash_outs)
-
-    height = 340
-    if cash_out_count > 0:
-        height += 60 + (cash_out_count * 36) + 16
-    if items_count > 0:
-        height += 60 + (min(items_count, 25) * 36) + 50
-    else:
-        height += 80
-
-    image = Image.new("RGB", (width, height), color=(10, 13, 20))
-    draw = ImageDraw.Draw(image)
-
-    # Card background
-    draw.rounded_rectangle(
-        [(padding, padding), (width - padding, height - padding)],
-        radius=16,
-        fill=(20, 26, 38),
-        outline=(35, 45, 63),
-        width=2
-    )
-
-    y = padding + 24
-
-    # Header Brand
-    draw.text((padding + 24, y), "BAZAR", fill=(212, 175, 55), font=_get_font(24, bold=True))
-    draw.text((padding + 24, y + 32), "Kunlik savdo va kassa hisoboti", fill=(148, 163, 184), font=_get_font(13))
-
-    # Date Badge
-    date_text = f"📅 {report_data['date']}"
-    date_font = _get_font(13, bold=True)
-    bbox = date_font.getbbox(date_text)
-    badge_w = (bbox[2] - bbox[0]) + 24
-    badge_x = width - padding - 24 - badge_w
-
-    draw.rounded_rectangle(
-        [(badge_x, y + 4), (badge_x + badge_w, y + 38)],
-        radius=17,
-        fill=(30, 41, 59)
-    )
-    draw.text((badge_x + 12, y + 12), date_text, fill=(248, 250, 252), font=date_font)
-
-    y += 70
-
-    # Divider
-    draw.line([(padding + 24, y), (width - padding - 24, y)], fill=(35, 45, 63), width=1)
-    y += 20
-
-    # 4 KPI Cards
-    kpi_w = (width - padding * 2 - 48 - (3 * 12)) // 4
-    kpi_h = 90
     totals = report_data["totals"]
 
+    # --- Build chronological transaction list ---
+    tx_rows = []
+    for s in sales:
+        items_raw = s.get("items", [])
+        if isinstance(items_raw, str):
+            items_raw = _json.loads(items_raw)
+        tx_rows.append({
+            "type": "sale",
+            "ts": s.get("createdAt", 0),
+            "time": s.get("timeFormatted", ""),
+            "displayName": _build_sale_display_name(items_raw, s),
+            "items": items_raw,
+            "qty": sum(int(it.get("quantity", 0)) for it in items_raw) or 1,
+            "amount": s.get("total", s.get("subtotal", 0)),
+            "notes": s.get("notes", "") or "",
+        })
+    for c in cash_outs:
+        tx_rows.append({
+            "type": "cash_out",
+            "ts": c.get("timestamp", 0),
+            "time": c.get("timeFormatted", ""),
+            "displayName": c.get("reason", "Kassadan chiqim"),
+            "items": [],
+            "qty": 1,
+            "amount": c.get("amount", 0),
+            "notes": "",
+        })
+    tx_rows.sort(key=lambda r: r["ts"])
+
+    # --- Calculate row heights ---
+    ROW_H = 32
+    SUBITEM_H = 16
+    TABLE_HEADER_H = 30
+    FOOTER_H = 40
+
+    def row_pixel_h(tx):
+        if tx["type"] == "sale" and len(tx["items"]) > 1:
+            return ROW_H + len(tx["items"]) * SUBITEM_H
+        return ROW_H
+
+    tx_heights = [row_pixel_h(tx) for tx in tx_rows]
+    body_h = sum(tx_heights) if tx_rows else ROW_H
+
+    HEADER_AREA  = 200   # brand + divider + KPIs
+    SECTION_TITLE = 32
+    total_height = HEADER_AREA + SECTION_TITLE + TABLE_HEADER_H + body_h + FOOTER_H + PAD + 24
+
+    # --- Canvas ---
+    image = Image.new("RGB", (WIDTH, total_height), color=(10, 13, 20))
+    draw = ImageDraw.Draw(image)
+
+    # Outer card
+    draw.rounded_rectangle(
+        [(PAD, PAD), (WIDTH - PAD, total_height - PAD)],
+        radius=16, fill=(20, 26, 38), outline=(35, 45, 63), width=2
+    )
+
+    y = PAD + 24
+
+    # ── BAZAR brand ──
+    draw.text((INNER_X, y), "BAZAR", fill=(212, 175, 55), font=_get_font(24, bold=True))
+    draw.text((INNER_X, y + 32), "Kunlik savdo va kassa hisoboti", fill=(148, 163, 184), font=_get_font(13))
+
+    # ── Date badge (top-right) ──
+    date_text = f"\U0001F4C5 {report_data['date']}"
+    d_font = _get_font(13, bold=True)
+    dbbox = d_font.getbbox(date_text)
+    bw = (dbbox[2] - dbbox[0]) + 24
+    bx = WIDTH - PAD - 24 - bw
+    draw.rounded_rectangle([(bx, y + 4), (bx + bw, y + 38)], radius=17, fill=(30, 41, 59))
+    draw.text((bx + 12, y + 12), date_text, fill=(248, 250, 252), font=d_font)
+
+    y += 68
+    draw.line([(INNER_X, y), (WIDTH - PAD - 24, y)], fill=(35, 45, 63), width=1)
+    y += 18
+
+    # ── 4 KPI tiles ──
+    kpi_w = (INNER_W - 3 * 12) // 4
+    kpi_h = 88
     kpi_defs = [
         {
             "title": "JAMI TUSHUM",
             "val": f"{format_soom(totals['netSales'])} so'm",
             "sub": f"{totals['transactionCount']} ta savdo",
-            "bg": (20, 45, 30),
-            "border": (34, 197, 94),
-            "val_color": (34, 197, 94)
+            "bg": (18, 40, 26), "border": (34, 197, 94), "val_color": (34, 197, 94),
         },
         {
             "title": "JAMI SOTILDI",
             "val": f"{totals['itemsSold']} dona",
-            "sub": f"Chegirma: −{format_soom(totals['discount'])}" if totals["discount"] > 0 else "Mahsulotlar soni",
-            "bg": (26, 35, 51),
-            "border": (42, 55, 74),
-            "val_color": (248, 250, 252)
+            "sub": f"Chegirma: \u2212{format_soom(totals['discount'])}" if totals["discount"] > 0 else "Mahsulotlar soni",
+            "bg": (22, 32, 50), "border": (42, 55, 74), "val_color": (248, 250, 252),
         },
         {
             "title": "KASSADAN CHIQIM",
-            "val": f"−{format_soom(totals['chiqim'])} so'm",
-            "sub": f"{cash_out_count} ta chiqim",
-            "bg": (45, 20, 25),
-            "border": (239, 68, 68),
-            "val_color": (239, 68, 68)
+            "val": f"\u2212{format_soom(totals['chiqim'])} so'm",
+            "sub": f"{len(cash_outs)} ta chiqim",
+            "bg": (40, 18, 22), "border": (220, 38, 38), "val_color": (220, 38, 38),
         },
         {
             "title": "SOF KASSA",
             "val": f"{format_soom(totals['netCash'])} so'm",
             "sub": "Kassadagi naqd pul",
-            "bg": (15, 35, 55),
-            "border": (56, 189, 248),
-            "val_color": (56, 189, 248)
-        }
+            "bg": (12, 30, 50), "border": (56, 189, 248), "val_color": (56, 189, 248),
+        },
     ]
+    for i, k in enumerate(kpi_defs):
+        kx = INNER_X + i * (kpi_w + 12)
+        draw.rounded_rectangle([(kx, y), (kx + kpi_w, y + kpi_h)], radius=10,
+                                fill=k["bg"], outline=k["border"], width=1)
+        draw.text((kx + 12, y + 11), k["title"], fill=(148, 163, 184), font=_get_font(10, bold=True))
+        # Auto-shrink value font if too wide
+        vfs = 15
+        while vfs > 10:
+            vf = _get_font(vfs, bold=True)
+            vbb = vf.getbbox(k["val"])
+            if (vbb[2] - vbb[0]) < kpi_w - 18:
+                break
+            vfs -= 1
+        draw.text((kx + 12, y + 34), k["val"], fill=k["val_color"], font=_get_font(vfs, bold=True))
+        draw.text((kx + 12, y + 62), k["sub"], fill=(100, 116, 139), font=_get_font(10))
+    y += kpi_h + 22
 
-    for idx, k in enumerate(kpi_defs):
-        kx = padding + 24 + idx * (kpi_w + 12)
-        draw.rounded_rectangle(
-            [(kx, y), (kx + kpi_w, y + kpi_h)],
-            radius=10,
-            fill=k["bg"],
-            outline=k["border"],
-            width=1
-        )
-        draw.text((kx + 12, y + 12), k["title"], fill=(148, 163, 184), font=_get_font(10, bold=True))
-        draw.text((kx + 12, y + 36), k["val"], fill=k["val_color"], font=_get_font(15, bold=True))
-        draw.text((kx + 12, y + 64), k["sub"], fill=(100, 116, 139), font=_get_font(11))
+    # ── Section title ──
+    draw.text((INNER_X, y), "Tranzaksiyalar tafsiloti", fill=(248, 250, 252), font=_get_font(13, bold=True))
+    rec_txt = f"Jami: {len(tx_rows)} ta yozuv"
+    rtbb = _get_font(11).getbbox(rec_txt)
+    draw.text((WIDTH - PAD - 24 - (rtbb[2] - rtbb[0]), y + 2), rec_txt, fill=(100, 116, 139), font=_get_font(11))
+    y += SECTION_TITLE
 
-    y += kpi_h + 24
+    # ── Table header ──
+    hdr_font = _get_font(10, bold=True)
+    hdr_col = (148, 163, 184)
+    draw.rectangle([(INNER_X, y), (INNER_X + INNER_W, y + TABLE_HEADER_H)], fill=(30, 41, 59))
+    draw.text((COL_NUM + 4, y + 8), "\u2116",         fill=hdr_col, font=hdr_font)
+    draw.text((COL_TIME,    y + 8), "Vaqt",           fill=hdr_col, font=hdr_font)
+    draw.text((COL_TYPE,    y + 8), "Tur",            fill=hdr_col, font=hdr_font)
+    draw.text((COL_NAME,    y + 8), "Mahsulot / Izoh",fill=hdr_col, font=hdr_font)
+    draw.text((COL_QTY,     y + 8), "Miqdor",         fill=hdr_col, font=hdr_font)
+    draw.text((COL_AMT,     y + 8), "Summa",          fill=hdr_col, font=hdr_font)
+    y += TABLE_HEADER_H
 
-    # Chiqim Section
-    if cash_out_count > 0:
-        draw.text((padding + 24, y), "💸 KASSADAN CHIQIMLAR", fill=(239, 68, 68), font=_get_font(12, bold=True))
-        y += 20
-        table_w = width - padding * 2 - 48
-        for idx, c in enumerate(cash_outs):
-            row_bg = (24, 32, 48) if idx % 2 == 0 else (20, 26, 38)
-            draw.rectangle([(padding + 24, y), (padding + 24 + table_w, y + 28)], fill=row_bg)
-            draw.text((padding + 34, y + 6), c.get("timeFormatted", ""), fill=(148, 163, 184), font=_get_font(11))
-            draw.text((padding + 90, y + 6), c.get("reason", "Kassadan chiqim"), fill=(248, 250, 252), font=_get_font(12, bold=True))
-            amt_str = f"−{format_soom(c['amount'])} so'm"
-            draw.text((width - padding - 36 - 130, y + 6), amt_str, fill=(220, 38, 38), font=_get_font(12, bold=True))
-            y += 30
-        y += 16
+    # ── Table body ──
+    badge_font = _get_font(9, bold=True)
+    row_font   = _get_font(11)
+    bold_font  = _get_font(11, bold=True)
+    sub_font   = _get_font(10)
+    amt_font   = _get_font(11, bold=True)
 
-    # Items Section
-    draw.text((padding + 24, y), "📦 SOTILGAN MAHSULOTLAR", fill=(248, 250, 252), font=_get_font(13, bold=True))
-    y += 22
-
-    table_x = padding + 24
-    table_w = width - padding * 2 - 48
-
-    # Table Header
-    draw.rectangle([(table_x, y), (table_x + table_w, y + 28)], fill=(30, 41, 59))
-    draw.text((table_x + 10, y + 6), "#", fill=(148, 163, 184), font=_get_font(11, bold=True))
-    draw.text((table_x + 40, y + 6), "Mahsulot nomi", fill=(148, 163, 184), font=_get_font(11, bold=True))
-    draw.text((table_x + table_w - 240, y + 6), "Soni", fill=(148, 163, 184), font=_get_font(11, bold=True))
-    draw.text((table_x + table_w - 160, y + 6), "Narxi", fill=(148, 163, 184), font=_get_font(11, bold=True))
-    draw.text((table_x + table_w - 70, y + 6), "Jami", fill=(148, 163, 184), font=_get_font(11, bold=True))
-    y += 28
-
-    if items_count == 0:
-        draw.text((table_x + 20, y + 10), "Bu kunda sotuvlar qayd etilmagan", fill=(100, 116, 139), font=_get_font(12))
+    if not tx_rows:
+        draw.text((INNER_X + 20, y + 10),
+                  "Ushbu sanada hech qanday savdo yoki chiqim bo'lmagan.",
+                  fill=(100, 116, 139), font=row_font)
+        y += ROW_H
     else:
-        for idx, it in enumerate(items[:25], start=1):
-            row_bg = (24, 32, 48) if idx % 2 == 1 else (20, 26, 38)
-            draw.rectangle([(table_x, y), (table_x + table_w, y + 30)], fill=row_bg)
+        for row_idx, tx in enumerate(tx_rows):
+            rh = tx_heights[row_idx]
+            row_bg = (22, 30, 46) if row_idx % 2 == 1 else (20, 26, 38)
+            draw.rectangle([(INNER_X, y), (INNER_X + INNER_W, y + rh)], fill=row_bg)
 
-            draw.text((table_x + 10, y + 7), str(idx), fill=(100, 116, 139), font=_get_font(11))
+            mid_y = y + (ROW_H // 2) - 7
 
-            name = it["name"]
-            if len(name) > 34:
-                name = name[:32] + "…"
-            draw.text((table_x + 40, y + 7), name, fill=(248, 250, 252), font=_get_font(12, bold=True))
+            # №
+            draw.text((COL_NUM + 4, mid_y), str(row_idx + 1), fill=(100, 116, 139), font=row_font)
 
-            draw.text((table_x + table_w - 240, y + 7), f"{it['quantity']} dona", fill=(226, 232, 240), font=_get_font(12))
-            draw.text((table_x + table_w - 160, y + 7), format_soom(it["unitPrice"]), fill=(226, 232, 240), font=_get_font(12))
-            draw.text((table_x + table_w - 70, y + 7), format_soom(it["total"]), fill=(34, 197, 94), font=_get_font(12, bold=True))
-            y += 30
+            # Vaqt
+            draw.text((COL_TIME, mid_y), tx["time"], fill=(200, 210, 224), font=row_font)
 
-        if items_count > 25:
-            draw.text(
-                (table_x + 10, y + 8),
-                f"... va yana {items_count - 25} ta mahsulot (to'liq ro'yxat Excel faylida)",
-                fill=(100, 116, 139),
-                font=_get_font(11)
-            )
+            # Tur badge
+            if tx["type"] == "sale":
+                if "pos" in tx["notes"].lower():
+                    bb, bf, bt = (0, 52, 79), (56, 189, 248), "POS"
+                else:
+                    bb, bf, bt = (10, 46, 20), (34, 197, 94), "Savdo"
+            else:
+                bb, bf, bt = (60, 15, 15), (239, 68, 68), "Chiqim"
+            _draw_badge(draw, COL_TYPE, mid_y, bt, bb, bf, badge_font)
+
+            # Mahsulot / Izoh
+            disp = _truncate_text(tx["displayName"], 30)
+            draw.text((COL_NAME, mid_y), disp, fill=(240, 245, 252), font=bold_font)
+
+            # Sub-items for multi-product sales
+            if tx["type"] == "sale" and len(tx["items"]) > 1:
+                sub_y = y + ROW_H - 2
+                for it in tx["items"]:
+                    pn = it.get("productName") or "Mahsulot"
+                    q  = it.get("quantity", 1)
+                    draw.text((COL_NAME + 4, sub_y),
+                              f"\u2022 {_truncate_text(pn, 26)} ({q} dona)",
+                              fill=(100, 116, 139), font=sub_font)
+                    sub_y += SUBITEM_H
+
+            # Miqdor
+            draw.text((COL_QTY, mid_y), f"{tx['qty']} dona", fill=(200, 210, 224), font=row_font)
+
+            # Summa (right-aligned inside column)
+            if tx["type"] == "cash_out":
+                amt_str   = f"\u2212{format_soom(tx['amount'])}"
+                amt_color = (220, 38, 38)
+            else:
+                amt_str   = format_soom(tx["amount"])
+                amt_color = (248, 250, 252)
+            abb = amt_font.getbbox(amt_str)
+            draw.text((INNER_X + INNER_W - (abb[2] - abb[0]) - 4, mid_y),
+                      amt_str, fill=amt_color, font=amt_font)
+
+            y += rh
+
+    # ── Footer: JAMI SOF TUSHUM ──
+    draw.rectangle([(INNER_X, y), (INNER_X + INNER_W, y + FOOTER_H)], fill=(30, 41, 59))
+    footer_font = _get_font(12, bold=True)
+    draw.text((INNER_X + 12, y + 12), "JAMI SOF TUSHUM", fill=(212, 175, 55), font=footer_font)
+    draw.text((COL_QTY, y + 12), f"{totals['itemsSold']} dona", fill=(248, 250, 252), font=footer_font)
+    net_str = f"{format_soom(totals['netCash'])} so'm"
+    nbb = footer_font.getbbox(net_str)
+    draw.text((INNER_X + INNER_W - (nbb[2] - nbb[0]) - 4, y + 12),
+              net_str, fill=(34, 197, 94), font=footer_font)
 
     bio = BytesIO()
     image.save(bio, format="PNG")
