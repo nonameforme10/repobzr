@@ -3089,7 +3089,8 @@ canvas {
     opacity: 0.35;
 }
 
-.cal-day-cell.today:not(.selected)::after {
+.cal-day-cell.today:not(.selected)::after,
+.cal-day-cell.has-sales:not(.selected)::after {
     content: '';
     position: absolute;
     bottom: 3px;

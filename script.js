@@ -2027,6 +2027,11 @@ const homeCalendar = {
                     if (isSelectedYear && isSelectedMonth && d === selectedDay) {
                         cell.classList.add('selected');
                     }
+                    const dStart = new Date(currentYear, currentMonth, d, 0, 0, 0, 0).getTime();
+                    const dEnd = new Date(currentYear, currentMonth, d, 23, 59, 59, 999).getTime();
+                    if (Array.isArray(state.activities) && state.activities.some(a => a.type === 'sale' && !a.undone && a.timestamp >= dStart && a.timestamp <= dEnd)) {
+                        cell.classList.add('has-sales');
+                    }
                     cell.textContent = d;
                     cell.onclick = () => this.selectDate(currentYear, currentMonth, d);
                     daysGridEl.appendChild(cell);
