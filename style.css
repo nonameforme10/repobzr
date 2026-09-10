@@ -3086,12 +3086,12 @@ canvas {
 
 .home-top-section {
     display: grid;
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 340px 1fr;
     gap: 20px;
     align-items: stretch;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 900px) {
     .home-top-section {
         grid-template-columns: 1fr;
     }
@@ -3345,12 +3345,13 @@ canvas {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 22px 24px;
+    padding: 20px 22px;
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 14px;
     min-height: 385px;
+    justify-content: flex-start;
 }
 
 [data-theme="dark"] .home-day-overview {
@@ -3363,7 +3364,6 @@ canvas {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 20px;
 }
 
 .overview-header h3 {
@@ -3381,24 +3381,26 @@ canvas {
 
 .overview-stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-}
-
-@media (max-width: 640px) {
-    .overview-stats-grid {
-        grid-template-columns: 1fr;
-    }
+    flex: 1;
+    align-content: stretch;
 }
 
 .ov-card {
     background: var(--bg-surface-2);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 16px 14px;
+    padding: 13px 15px;
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    transition: transform 140ms ease, border-color 140ms ease;
+}
+
+.ov-card:hover {
+    border-color: var(--border-hover);
 }
 
 [data-theme="dark"] .ov-card {
@@ -3406,14 +3408,36 @@ canvas {
     border-color: rgba(255, 255, 255, 0.06);
 }
 
+[data-theme="dark"] .ov-card:hover {
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Featured Hero Revenue Card */
+.overview-stats-grid .ov-card.ov-card-revenue {
+    grid-column: 1 / -1;
+    padding: 15px 18px;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, var(--bg-surface-2) 100%);
+    border-color: rgba(16, 185, 129, 0.24);
+}
+
+[data-theme="dark"] .overview-stats-grid .ov-card.ov-card-revenue {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border-color: rgba(16, 185, 129, 0.28);
+}
+
 .ov-icon {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+}
+
+.ov-card-revenue .ov-icon {
+    width: 44px;
+    height: 44px;
 }
 
 .ov-icon-sold {
@@ -3445,17 +3469,24 @@ canvas {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    flex: 1;
 }
 
 .ov-val {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
     font-weight: 700;
     color: var(--ink-strong);
     font-variant-numeric: tabular-nums;
-    line-height: 1.2;
+    line-height: 1.25;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.ov-card-revenue .ov-val {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--success);
 }
 
 .ov-val.val-out {
@@ -3471,6 +3502,14 @@ canvas {
     font-weight: 500;
     color: var(--ink-muted);
     margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ov-card-revenue .ov-lbl {
+    font-size: 0.8125rem;
+    font-weight: 600;
 }
 
 /* ---------- Blueprint Reports Section ---------- */
@@ -4061,6 +4100,11 @@ canvas {
     .overview-stats-grid {
         grid-template-columns: 1fr;
         gap: 8px;
+    }
+
+    .overview-stats-grid .ov-card.ov-card-revenue {
+        grid-column: auto;
+        padding: 12px 14px;
     }
 
     .ov-card {

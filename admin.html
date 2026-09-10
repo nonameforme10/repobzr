@@ -46,10 +46,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/style.css?v=2.8.4">
+    <link rel="stylesheet" href="/style.css?v=2.8.5">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-    <script src="/i18n.js?v=2.8.4" defer></script>
+    <script src="/i18n.js?v=2.8.5" defer></script>
 </head>
 <body>
     <div id="app">
@@ -258,22 +258,22 @@
                                     </div>
                                 </div>
                                 <div class="overview-stats-grid">
-                                    <div class="ov-card">
-                                        <div class="ov-icon ov-icon-sold">
-                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-                                        </div>
-                                        <div class="ov-data">
-                                            <div class="ov-val" id="homeDaySold">0</div>
-                                            <div class="ov-lbl" data-i18n="home.totalSold">Total Units Sold</div>
-                                        </div>
-                                    </div>
-                                    <div class="ov-card">
+                                    <div class="ov-card ov-card-revenue">
                                         <div class="ov-icon ov-icon-rev">
                                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                                         </div>
                                         <div class="ov-data">
                                             <div class="ov-val" id="homeDayRevenue">0 soʻm</div>
                                             <div class="ov-lbl" data-i18n="home.totalRevenue">Total Revenue</div>
+                                        </div>
+                                    </div>
+                                    <div class="ov-card ov-card-net">
+                                        <div class="ov-icon ov-icon-net">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="1" x2="12" y2="14"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                                        </div>
+                                        <div class="ov-data">
+                                            <div class="ov-val val-net" id="homeDayNetCash">0 soʻm</div>
+                                            <div class="ov-lbl" data-i18n="home.netCash">Cash in Register</div>
                                         </div>
                                     </div>
                                     <div class="ov-card ov-card-spends">
@@ -285,16 +285,16 @@
                                             <div class="ov-lbl" data-i18n="home.totalSpends">Cash Out / Spends</div>
                                         </div>
                                     </div>
-                                    <div class="ov-card ov-card-net">
-                                        <div class="ov-icon ov-icon-net">
-                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                                    <div class="ov-card ov-card-sold">
+                                        <div class="ov-icon ov-icon-sold">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                                         </div>
                                         <div class="ov-data">
-                                            <div class="ov-val val-net" id="homeDayNetCash">0 soʻm</div>
-                                            <div class="ov-lbl" data-i18n="home.netCash">Cash in Register</div>
+                                            <div class="ov-val" id="homeDaySold">0</div>
+                                            <div class="ov-lbl" data-i18n="home.totalSold">Total Units Sold</div>
                                         </div>
                                     </div>
-                                    <div class="ov-card">
+                                    <div class="ov-card ov-card-tx">
                                         <div class="ov-icon ov-icon-tx">
                                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
                                         </div>
@@ -614,8 +614,8 @@
         </div>
     </div>
 
-    <script src="/assets/vendor/html2canvas.min.js?v=2.8.4" defer></script>
-    <script src="/assets/vendor/exceljs.min.js?v=2.8.4" defer></script>
-    <script src="/script.js?v=2.8.4" defer></script>
+    <script src="/assets/vendor/html2canvas.min.js?v=2.8.5" defer></script>
+    <script src="/assets/vendor/exceljs.min.js?v=2.8.5" defer></script>
+    <script src="/script.js?v=2.8.5" defer></script>
 </body>
 </html>
