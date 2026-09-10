@@ -46,10 +46,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="/manifest.json">
-    <link rel="stylesheet" href="/style.css?v=2.8.1">
+    <link rel="stylesheet" href="/style.css?v=2.8.4">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-    <script src="/i18n.js?v=2.8.1" defer></script>
+    <script src="/i18n.js?v=2.8.4" defer></script>
 </head>
 <body>
     <div id="app">
@@ -384,33 +384,15 @@
                     </div>
 
                     <!-- Dynamic KPI Stats Grid -->
-                    <div class="stats-grid">
+                    <div class="stats-grid analytics-kpi-grid">
                         <div class="stat-card glass">
                             <div class="stat-icon icon-primary">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                             </div>
                             <div class="stat-info">
-                                <div class="stat-label" id="analyticsSoldLabel" data-i18n="dash.soldToday">Sotilgan tovarlar</div>
+                                <div class="stat-label" id="analyticsSoldLabel" data-i18n="dash.soldInPeriod">Sotilgan tovarlar</div>
                                 <div class="stat-value" id="dashSoldToday">0</div>
                                 <div class="stat-change positive" id="analyticsPeriodBadge">Bugun</div>
-                            </div>
-                        </div>
-                        <div class="stat-card glass">
-                            <div class="stat-icon icon-success">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-label" data-i18n="dash.trackedStock">Ombordagi tovarlar</div>
-                                <div class="stat-value" id="dashTrackedStock">0</div>
-                            </div>
-                        </div>
-                        <div class="stat-card glass">
-                            <div class="stat-icon icon-warning">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                            </div>
-                            <div class="stat-info">
-                                <div class="stat-label" data-i18n="dash.topProduct">Eng koʻp sotilgan</div>
-                                <div class="stat-value" id="dashBestProduct">-</div>
                             </div>
                         </div>
                         <div class="stat-card glass stat-revenue">
@@ -426,6 +408,24 @@
                                     <button class="cs-btn"        type="button" data-code="EUR" aria-pressed="false">EUR</button>
                                 </div>
                                 <div class="rate-info" id="rateInfo" hidden></div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-warning">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.topProduct">Eng koʻp sotilgan</div>
+                                <div class="stat-value" id="dashBestProduct">-</div>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-success">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label" data-i18n="dash.trackedStock">Ombordagi tovarlar</div>
+                                <div class="stat-value" id="dashTrackedStock">0</div>
                             </div>
                         </div>
                         <div class="stat-card glass">
@@ -614,8 +614,8 @@
         </div>
     </div>
 
-    <script src="/assets/vendor/html2canvas.min.js?v=2.8.3" defer></script>
-    <script src="/assets/vendor/exceljs.min.js?v=2.8.3" defer></script>
-    <script src="/script.js?v=2.8.3" defer></script>
+    <script src="/assets/vendor/html2canvas.min.js?v=2.8.4" defer></script>
+    <script src="/assets/vendor/exceljs.min.js?v=2.8.4" defer></script>
+    <script src="/script.js?v=2.8.4" defer></script>
 </body>
 </html>

@@ -728,15 +728,27 @@ canvas {
 }
 
 /* ============================================
-   ANALYTICS DYNAMIC FILTER TOOLBAR
+   ANALYTICS DYNAMIC FILTER TOOLBAR & HEADER
    ============================================ */
 .analytics-header {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
     margin-bottom: 24px;
-    flex-wrap: wrap;
+}
+
+@media (min-width: 1240px) {
+    .analytics-header {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+    }
+}
+
+.analytics-title-wrap {
+    min-width: 0;
 }
 
 .analytics-title-wrap h2 {
@@ -757,9 +769,12 @@ canvas {
 .analytics-filter-toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    border-radius: 10px;
+    gap: 10px;
+    padding: 6px 12px;
+    border-radius: 12px;
+    background: var(--bg-surface-2, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--border-soft);
+    max-width: 100%;
     flex-wrap: wrap;
 }
 
@@ -767,8 +782,7 @@ canvas {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 3px;
-    border-radius: 8px;
+    flex-wrap: wrap;
 }
 
 .filter-preset-btn {
@@ -780,40 +794,44 @@ canvas {
     font-size: 0.8125rem;
     font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
     transition: all 0.15s ease;
 }
 
 .filter-preset-btn:hover {
     color: var(--ink-strong);
+    background: var(--bg-surface, rgba(255, 255, 255, 0.05));
 }
 
 .filter-preset-btn.active {
     background: var(--accent, #D4AF37);
     color: #000000;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
 .filter-custom-date {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding-left: 4px;
+    padding-left: 6px;
+    border-left: 1px solid var(--border-soft);
 }
 
 .custom-date-icon {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     user-select: none;
 }
 
 .analytics-date-input {
-    background: rgba(0, 0, 0, 0.15);
+    background: rgba(0, 0, 0, 0.25);
     border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.15));
     color: var(--ink-strong);
-    padding: 4px 8px;
+    padding: 5px 10px;
     border-radius: 6px;
     font-size: 0.8125rem;
     font-family: inherit;
     outline: none;
+    min-width: 135px;
     transition: border-color 0.15s ease;
 }
 
@@ -827,16 +845,68 @@ canvas {
 }
 
 @media (max-width: 768px) {
-    .analytics-header {
-        flex-direction: column;
-        align-items: stretch;
-    }
     .analytics-filter-toolbar {
+        width: 100%;
         justify-content: space-between;
     }
     .filter-presets {
         flex-wrap: wrap;
     }
+    .filter-custom-date {
+        padding-left: 0;
+        border-left: none;
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* ============================================
+   ANALYTICS KPI GRID
+   ============================================ */
+.analytics-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+/* 3-column layout on split-screen / laptop displays (revenue spans 2 for plenty of breathing room) */
+@media (min-width: 960px) and (max-width: 1399px) {
+    .analytics-kpi-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .analytics-kpi-grid .stat-card.stat-revenue {
+        grid-column: span 2;
+    }
+}
+
+/* 5-column single row on wide desktop screens */
+@media (min-width: 1400px) {
+    .analytics-kpi-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+.analytics-kpi-grid .stat-card {
+    min-width: 0;
+    padding: 16px 18px;
+    overflow: visible;
+}
+
+.analytics-kpi-grid .stat-card.stat-revenue {
+    min-width: 0;
+}
+
+.analytics-kpi-grid .stat-card.stat-revenue .stat-value {
+    font-size: 1.5rem;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.analytics-kpi-grid .stat-card #dashBestProduct {
+    font-size: 1.1875rem;
+    line-height: 1.3;
+    word-break: break-word;
 }
 
 /* ============================================

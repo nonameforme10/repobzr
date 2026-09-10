@@ -87,6 +87,8 @@
 
             // Dashboard cards
             'dash.soldToday':       'Products Sold Today',
+            'dash.soldYesterday':   'Products Sold Yesterday',
+            'dash.soldInPeriod':    'Products Sold in Period',
             'dash.liveTracking':    'Live tracking',
             'dash.totalCategories': 'Total Categories',
             'dash.trackedStock':    'Tracked Stock',
@@ -498,6 +500,8 @@
             'topbar.language':          'Язык',
 
             'dash.soldToday':       'Продано сегодня',
+            'dash.soldYesterday':   'Продано вчера',
+            'dash.soldInPeriod':    'Продано товаров',
             'dash.liveTracking':    'В реальном времени',
             'dash.totalCategories': 'Всего категорий',
             'dash.trackedStock':    'Товаров на складе',
@@ -897,6 +901,8 @@
             'topbar.language':          'Til',
 
             'dash.soldToday':       'Bugun sotilgan',
+            'dash.soldYesterday':   'Kecha sotilgan',
+            'dash.soldInPeriod':    'Davr boʻyicha sotilgan',
             'dash.liveTracking':    'Jonli kuzatuv',
             'dash.totalCategories': 'Jami kategoriyalar',
             'dash.trackedStock':    'Ombordagi tovarlar',

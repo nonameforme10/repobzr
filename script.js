@@ -3311,7 +3311,21 @@ function renderAnalytics() {
     const badgeEl = document.getElementById('analyticsPeriodBadge');
     if (badgeEl) badgeEl.textContent = range.label;
 
-    // Dynamic Units Sold
+    // Dynamic Units Sold Label & Value
+    const soldLabelEl = document.getElementById('analyticsSoldLabel');
+    if (soldLabelEl) {
+        if (analyticsFilter.mode === 'today') {
+            soldLabelEl.setAttribute('data-i18n', 'dash.soldToday');
+            soldLabelEl.textContent = tr('dash.soldToday');
+        } else if (analyticsFilter.mode === 'yesterday') {
+            soldLabelEl.setAttribute('data-i18n', 'dash.soldYesterday');
+            soldLabelEl.textContent = tr('dash.soldYesterday');
+        } else {
+            soldLabelEl.setAttribute('data-i18n', 'dash.soldInPeriod');
+            soldLabelEl.textContent = tr('dash.soldInPeriod');
+        }
+    }
+
     const soldEl = document.getElementById('dashSoldToday');
     if (soldEl) soldEl.textContent = periodSold;
 
