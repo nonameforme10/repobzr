@@ -5090,6 +5090,9 @@ function navigateTo(page) {
     if (page === 'home') {
         renderHome();
     }
+    if (page === 'activity') {
+        renderActivity();
+    }
 }
 
 // ==================== SIDEBAR DRAG-AND-DROP SORTING ====================
@@ -5349,15 +5352,6 @@ function setupEventListeners() {
     document.getElementById('resetDailyBtn')?.addEventListener('click', dailyReset);
     document.getElementById('exportPngBtn')?.addEventListener('click', exportAsPng);
     document.getElementById('exportExcelBtn')?.addEventListener('click', exportAsExcel);
-    document.getElementById('clearActivityBtn')?.addEventListener('click', () => {
-        confirmAction(tr('activity.clearHistory'), tr('activity.confirmClear'), () => {
-            state.activities = [];
-            saveState();
-            renderActivity();
-            renderDashboard();
-            showToast(tr('activity.cleared'), 'success');
-        });
-    });
 
     // Theme toggle
     const themeBtn = document.getElementById('themeToggle');
@@ -5536,6 +5530,7 @@ async function init() {
             const snap = await snapRes.json();
             await syncEngine.mergeSnapshot(snap);
             await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+            refreshAll();
         }
     } catch (e) {
         console.warn('[init] Initial snapshot bootstrap notice:', e);
@@ -5546,6 +5541,25 @@ async function init() {
     syncEngine.kick();
     setInterval(() => syncEngine.kick(), 5000);
 }
+
+// Global programmatic helper to immediately restore state from backend PostgreSQL snapshot
+window.restoreFromServer = async function() {
+    try {
+        const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+        if (snapRes.ok) {
+            const snap = await snapRes.json();
+            await syncEngine.mergeSnapshot(snap);
+            await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+            refreshAll();
+            showToast('Maʼlumotlar serverdan toʻliq tiklandi!', 'success');
+            return true;
+        }
+    } catch (e) {
+        console.error('restoreFromServer error:', e);
+        showToast('Xatolik yuz berdi: ' + e.message, 'danger');
+        return false;
+    }
+};
 
 // Start application when DOM is ready
 document.addEventListener('DOMContentLoaded', init);
