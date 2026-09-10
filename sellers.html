@@ -48,7 +48,7 @@
 <link rel="manifest" href="/manifest.json">
 <link rel="stylesheet" href="/style.css?v=25">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
-<script src="/i18n.js?v=25"></script>
+<script src="/i18n.js?v=26"></script>
 <script>
   // Robustness guard: ensure all POS keys exist even if an older cached i18n.js was loaded
   (function () {
@@ -5295,8 +5295,12 @@ const syncEngine = {
     }
   },
 
+  _lastKickTime: 0,
+
   async kick() {
-    if (this.syncing) return;
+    // Anti-stuck watchdog: If syncing for more than 15s without clearing, force reset flag
+    if (this.syncing && Date.now() - this._lastKickTime < 15000) return;
+    this._lastKickTime = Date.now();
     clearTimeout(this.retryTimer);
 
     if (!navigator.onLine) {
@@ -5346,7 +5350,7 @@ const syncEngine = {
 
   async pushOutbox() {
     const allOps = await localDb.getAll('outbox');
-    const pending = allOps.filter(o => o.status === 'pending');
+    const pending = allOps.filter(o => o.status === 'pending' || o.status === 'syncing');
     if (pending.length === 0) return;
 
     const batch = pending.slice(0, 50);
@@ -5356,16 +5360,35 @@ const syncEngine = {
     }
     await this.updateUI();
 
-    const res = await fetch(`${API_BASE_URL}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deviceId: getDeviceId(),
-        operations: batch
-      })
-    });
+    let res;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      res = await fetch(`${API_BASE_URL}/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId: getDeviceId(),
+          operations: batch
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+    } catch (fetchErr) {
+      for (const op of batch) {
+        op.status = 'pending';
+        await localDb.put('outbox', op);
+      }
+      throw fetchErr;
+    }
 
-    if (!res.ok) throw new Error(`Sync error ${res.status}`);
+    if (!res.ok) {
+      for (const op of batch) {
+        op.status = 'pending';
+        await localDb.put('outbox', op);
+      }
+      throw new Error(`Sync error ${res.status}`);
+    }
 
     const data = await res.json();
     const accepted = new Set(data.accepted || []);
@@ -5384,6 +5407,13 @@ const syncEngine = {
         }
       } else if (rejectedMap.has(op.id)) {
         const rej = rejectedMap.get(op.id);
+        // If op is void/delete and entity is already absent/voided, settle cleanly
+        if ((op.type === 'VOID_SALE_TRANSACTION' || op.type === 'DELETE_SALE_TRANSACTION' || op.type === 'DELETE_ACTIVITY') &&
+            (rej.code === 'SALE_NOT_FOUND' || rej.code === 'NOT_FOUND' || rej.code === 'ALREADY_VOIDED')) {
+          await localDb.delete('outbox', op.id);
+          continue;
+        }
+
         op.status = 'failed';
         op.errorCode = rej.code || 'REJECTED';
         op.errorMessage = rej.message || 'Rejected by server';
@@ -5432,132 +5462,156 @@ const syncEngine = {
   },
 
   async pullChanges() {
-    const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
-    const res = await fetch(`${API_BASE_URL}/sync?since=${lastSyncSeq}`, { cache: 'no-store' });
-    if (!res.ok) return;
+    let loopCount = 0;
+    while (loopCount < 10) {
+      loopCount++;
+      const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
+      let res;
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        res = await fetch(`${API_BASE_URL}/sync?since=${lastSyncSeq}`, { cache: 'no-store', signal: controller.signal });
+        clearTimeout(timeoutId);
+      } catch (err) {
+        break;
+      }
+      if (!res.ok) break;
 
-    const data = await res.json();
+      const data = await res.json();
 
-    // ── SERVER RESET DETECTION ──────────────────────────────────────────────
-    // If the server's currentSeq dropped to 0 or requiresBootstrap was signaled,
-    // refresh activities/sessions and re-hydrate state from server snapshot.
-    const serverCurrentSeq = Number(data.currentSeq || 0);
-    if (data.requiresBootstrap || (lastSyncSeq > 0 && serverCurrentSeq === 0)) {
-      await Promise.all([
-        localDb.clear('activities'),
-        localDb.clear('outbox')
-      ]);
-      sessions.sales = 0;
-      sessions.revenue = 0;
-      sessions.extraProfit = 0;
-      sessions.cashOut = 0;
-      updateHeaderStats();
+      // ── SERVER RESET DETECTION ──────────────────────────────────────────────
+      // If the server's currentSeq dropped to 0 or requiresBootstrap was signaled,
+      // refresh activities/sessions and re-hydrate state from server snapshot.
+      const serverCurrentSeq = Number(data.currentSeq || 0);
+      if (data.requiresBootstrap || (lastSyncSeq > 0 && serverCurrentSeq === 0)) {
+        await Promise.all([
+          localDb.clear('activities'),
+          localDb.clear('outbox')
+        ]);
+        sessions.sales = 0;
+        sessions.revenue = 0;
+        sessions.extraProfit = 0;
+        sessions.cashOut = 0;
+        updateHeaderStats();
 
-      // Fetch the fresh snapshot from the server
-      const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
-      if (snapRes.ok) {
-        const snap = await snapRes.json();
-        if (Array.isArray(snap.products)) {
-          await localDb.clear('products');
-          if (snap.products.length > 0) {
-            await localDb.putAll('products', snap.products);
+        // Fetch the fresh snapshot from the server
+        const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+        if (snapRes.ok) {
+          const snap = await snapRes.json();
+          if (Array.isArray(snap.products)) {
+            await localDb.clear('products');
+            if (snap.products.length > 0) {
+              await localDb.putAll('products', snap.products);
+            }
+            await loadProductsFromStorage();
+            renderGrid();
           }
+          if (Array.isArray(snap.categories)) {
+            await localDb.clear('categories');
+            if (snap.categories.length > 0) {
+              await localDb.putAll('categories', snap.categories);
+            }
+            categories = snap.categories;
+          }
+          if (Array.isArray(snap.activities)) {
+            await localDb.clear('activities');
+            if (snap.activities.length > 0) {
+              await localDb.putAll('activities', snap.activities);
+            }
+          }
+          if (Array.isArray(snap.sales)) {
+            await localDb.clear('sales');
+            if (snap.sales.length > 0) {
+              await localDb.putAll('sales', snap.sales);
+            }
+          }
+          await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+          await refreshSessionStats();
+          if (currentTab === 'audit') renderAuditView();
+        }
+        return;
+      }
+
+      if (Array.isArray(data.changes) && data.changes.length > 0) {
+        let modified = false;
+        let activitiesModified = false;
+        for (const ch of data.changes) {
+          if (ch.entityType === 'product') {
+            if (ch.action === 'DELETE' || ch.data?.isDeleted) {
+              await localDb.delete('products', ch.entityId);
+              modified = true;
+            } else if (ch.data) {
+              const allProds = await localDb.getAll('products');
+              const existing = allProds.find(p => p.id === ch.entityId);
+              const merged = existing ? { ...existing, ...ch.data } : ch.data;
+              await localDb.put('products', merged);
+              modified = true;
+            }
+          } else if (ch.entityType === 'activity') {
+            if (ch.action === 'DELETE' || ch.data?.isDeleted) {
+              await localDb.delete('activities', ch.entityId);
+              activitiesModified = true;
+            } else if (ch.data) {
+              const existing = await localDb.get('activities', ch.data.id || ch.entityId);
+              const act = {
+                ...(existing || {}),
+                ...ch.data,
+                id: ch.data.id || ch.entityId,
+                type: ch.data.type || existing?.type,
+                saleId: ch.data.saleId || existing?.saleId,
+                productId: ch.data.productId || existing?.productId,
+                productName: ch.data.productName || existing?.productName,
+                categoryId: ch.data.categoryId || existing?.categoryId,
+                categoryName: ch.data.categoryName || existing?.categoryName,
+                quantity: Number(ch.data.quantity != null ? ch.data.quantity : (existing?.quantity || 1)),
+                sellingPrice: ch.data.sellingPrice != null ? Number(ch.data.sellingPrice) : existing?.sellingPrice,
+                totalSaleValue: ch.data.totalSaleValue != null ? Number(ch.data.totalSaleValue) : existing?.totalSaleValue,
+                amount: ch.data.amount != null ? Number(ch.data.amount) : existing?.amount,
+                subtotal: ch.data.subtotal != null ? Number(ch.data.subtotal) : existing?.subtotal,
+                discount: ch.data.discount != null ? Number(ch.data.discount) : existing?.discount,
+                itemsCount: ch.data.itemsCount != null ? Number(ch.data.itemsCount) : existing?.itemsCount,
+                items: (Array.isArray(ch.data.items) && ch.data.items.length) ? ch.data.items : (existing?.items || []),
+                isOptom: ch.data.isOptom !== undefined ? ch.data.isOptom : existing?.isOptom,
+                reason: ch.data.reason || existing?.reason,
+                notes: ch.data.notes || existing?.notes,
+                timestamp: Number(ch.data.timestamp || existing?.timestamp) || Date.now(),
+                batchId: ch.data.batchId || existing?.batchId
+              };
+              await localDb.put('activities', act);
+              activitiesModified = true;
+            }
+          } else if (ch.entityType === 'sale') {
+            if (ch.action === 'DELETE' || ch.data?.isDeleted) {
+              await localDb.delete('sales', ch.entityId);
+              activitiesModified = true;
+            } else if (ch.data) {
+              await localDb.put('sales', ch.data);
+              activitiesModified = true;
+            }
+          }
+        }
+
+        const maxSeqInBatch = data.changes.reduce((max, c) => Math.max(max, Number(c.seq) || 0), lastSyncSeq);
+        await localDb.setMeta('lastSyncSeq', maxSeqInBatch);
+
+        if (modified) {
           await loadProductsFromStorage();
           renderGrid();
         }
-        if (Array.isArray(snap.categories)) {
-          await localDb.clear('categories');
-          if (snap.categories.length > 0) {
-            await localDb.putAll('categories', snap.categories);
-          }
-          categories = snap.categories;
+        if (activitiesModified) {
+          await refreshSessionStats();
+          if (currentTab === 'audit') renderAuditView();
         }
-        if (Array.isArray(snap.activities)) {
-          await localDb.clear('activities');
-          if (snap.activities.length > 0) {
-            await localDb.putAll('activities', snap.activities);
-          }
-        }
-        if (Array.isArray(snap.sales)) {
-          await localDb.clear('sales');
-          if (snap.sales.length > 0) {
-            await localDb.putAll('sales', snap.sales);
-          }
-        }
-        await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
-        await refreshSessionStats();
-        if (currentTab === 'audit') renderAuditView();
-      }
-      return;
-    }
 
-    if (Array.isArray(data.changes) && data.changes.length > 0) {
-      let modified = false;
-      let activitiesModified = false;
-      for (const ch of data.changes) {
-        if (ch.entityType === 'product') {
-          if (ch.action === 'DELETE' || ch.data?.isDeleted) {
-            await localDb.delete('products', ch.entityId);
-            modified = true;
-          } else if (ch.data) {
-            const allProds = await localDb.getAll('products');
-            const existing = allProds.find(p => p.id === ch.entityId);
-            const merged = existing ? { ...existing, ...ch.data } : ch.data;
-            await localDb.put('products', merged);
-            modified = true;
-          }
-        } else if (ch.entityType === 'activity') {
-          if (ch.action === 'DELETE' || ch.data?.isDeleted) {
-            await localDb.delete('activities', ch.entityId);
-            activitiesModified = true;
-          } else if (ch.data) {
-            const existing = await localDb.get('activities', ch.data.id || ch.entityId);
-            const act = {
-              ...(existing || {}),
-              ...ch.data,
-              id: ch.data.id || ch.entityId,
-              type: ch.data.type || existing?.type,
-              saleId: ch.data.saleId || existing?.saleId,
-              productId: ch.data.productId || existing?.productId,
-              productName: ch.data.productName || existing?.productName,
-              categoryId: ch.data.categoryId || existing?.categoryId,
-              categoryName: ch.data.categoryName || existing?.categoryName,
-              quantity: Number(ch.data.quantity != null ? ch.data.quantity : (existing?.quantity || 1)),
-              sellingPrice: ch.data.sellingPrice != null ? Number(ch.data.sellingPrice) : existing?.sellingPrice,
-              totalSaleValue: ch.data.totalSaleValue != null ? Number(ch.data.totalSaleValue) : existing?.totalSaleValue,
-              amount: ch.data.amount != null ? Number(ch.data.amount) : existing?.amount,
-              subtotal: ch.data.subtotal != null ? Number(ch.data.subtotal) : existing?.subtotal,
-              discount: ch.data.discount != null ? Number(ch.data.discount) : existing?.discount,
-              itemsCount: ch.data.itemsCount != null ? Number(ch.data.itemsCount) : existing?.itemsCount,
-              items: (Array.isArray(ch.data.items) && ch.data.items.length) ? ch.data.items : (existing?.items || []),
-              isOptom: ch.data.isOptom !== undefined ? ch.data.isOptom : existing?.isOptom,
-              reason: ch.data.reason || existing?.reason,
-              notes: ch.data.notes || existing?.notes,
-              timestamp: Number(ch.data.timestamp || existing?.timestamp) || Date.now(),
-              batchId: ch.data.batchId || existing?.batchId
-            };
-            await localDb.put('activities', act);
-            activitiesModified = true;
-          }
-        } else if (ch.entityType === 'sale') {
-          if (ch.action === 'DELETE' || ch.data?.isDeleted) {
-            await localDb.delete('sales', ch.entityId);
-            activitiesModified = true;
-          } else if (ch.data) {
-            await localDb.put('sales', ch.data);
-            activitiesModified = true;
-          }
+        if (maxSeqInBatch < serverCurrentSeq && data.changes.length >= 200) {
+          continue;
+        }
+      } else {
+        if (serverCurrentSeq > lastSyncSeq) {
+          await localDb.setMeta('lastSyncSeq', serverCurrentSeq);
         }
       }
-      await localDb.setMeta('lastSyncSeq', data.currentSeq || 0);
-      if (modified) {
-        await loadProductsFromStorage();
-        renderGrid();
-      }
-      if (activitiesModified) {
-        await refreshSessionStats();
-        if (currentTab === 'audit') renderAuditView();
-      }
+      break;
     }
   },
 

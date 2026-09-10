@@ -104,6 +104,7 @@ async function getSnapshot() {
         FROM activities a
         LEFT JOIN products p ON a.product_id = p.id
         ${hasDetails ? 'LEFT JOIN sales s ON a.sale_id = s.id' : ''}
+        ${hasDetails ? 'WHERE (s.is_deleted IS NULL OR s.is_deleted = FALSE)' : ''}
         ORDER BY a.timestamp DESC 
         LIMIT 500
       `),
@@ -179,8 +180,9 @@ async function getChangesSince(sinceSeq = 0) {
     const minSeq = Number(statsRes.rows[0]?.min_seq || 0);
     const maxSeq = Number(statsRes.rows[0]?.max_seq || 0);
 
-    // If client cursor is behind oldest retained change OR ahead of maxSeq (db was wiped/reset)
-    if ((cursor > 0 && maxSeq === 0) || (cursor > maxSeq) || (minSeq > 1 && cursor < minSeq) || (cursor > 0 && minSeq > 0 && cursor < minSeq)) {
+    // If client cursor is 0 (initial sync) and changes exist, signal bootstrap via snapshot
+    // Or if client cursor is behind oldest retained change OR ahead of maxSeq (db was wiped/reset)
+    if ((cursor === 0 && maxSeq > 0) || (cursor > 0 && maxSeq === 0) || (cursor > maxSeq) || (minSeq > 1 && cursor < minSeq) || (cursor > 0 && minSeq > 0 && cursor < minSeq)) {
       return {
         requiresBootstrap: true,
         currentSeq: maxSeq,
@@ -193,9 +195,14 @@ async function getChangesSince(sinceSeq = 0) {
       [cursor]
     );
 
+    const changes = changesRes.rows.map(r => ({ ...r, seq: Number(r.seq) }));
+    const lastBatchSeq = changes.length > 0 ? changes[changes.length - 1].seq : cursor;
+
     return {
       requiresBootstrap: false,
-      changes: changesRes.rows.map(r => ({ ...r, seq: Number(r.seq) })),
+      changes,
+      lastBatchSeq,
+      hasMore: lastBatchSeq < maxSeq,
       currentSeq: maxSeq,
       serverTime: Date.now()
     };
@@ -902,6 +909,8 @@ async function processSyncBatch(deviceId, operations = []) {
           // 1. Lock existing sale
           const saleRes = await client.query('SELECT * FROM sales WHERE id = $1 FOR UPDATE', [saleId]);
           if (saleRes.rows.length === 0) {
+            // Also ensure any lingering activity with this saleId or activityId is removed
+            await client.query('DELETE FROM activities WHERE sale_id = $1 OR id = $2', [saleId, activityId || saleId]);
             // Already absent or deleted, accept idempotently
             accepted.push(op.id);
             await client.query('COMMIT');
@@ -967,10 +976,10 @@ async function processSyncBatch(deviceId, operations = []) {
             [now, saleId]
           );
 
-          // 4. Update or soft delete activity record
+          // 4. Delete activity record so it no longer appears in activities or reports
           await client.query(
-            "UPDATE activities SET notes = $1 WHERE sale_id = $2 OR id = $3",
-            [notes ? notes.trim() : 'Sale deleted / voided', saleId, activityId || saleId]
+            "DELETE FROM activities WHERE sale_id = $1 OR id = $2",
+            [saleId, activityId || saleId]
           );
 
           // 5. Append changes
@@ -988,6 +997,78 @@ async function processSyncBatch(deviceId, operations = []) {
           await client.query(
             'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
             [op.id, deviceId, op.type, op.createdAt || now, now, { accepted: true, saleId }, currentHash]
+          );
+
+          await client.query('COMMIT');
+          accepted.push(op.id);
+          continue;
+        } else if (op.type === 'DELETE_ACTIVITY') {
+          const { id, activityId, saleId } = payload;
+          const targetId = id || activityId;
+          if (!targetId && !saleId) {
+            throw { code: 'INVALID_PAYLOAD', message: 'Activity id or saleId is required' };
+          }
+
+          let linkedSaleId = saleId;
+          if (!linkedSaleId && targetId) {
+            const actRes = await client.query('SELECT sale_id FROM activities WHERE id = $1', [targetId]);
+            if (actRes.rows.length > 0 && actRes.rows[0].sale_id) {
+              linkedSaleId = actRes.rows[0].sale_id;
+            }
+          }
+
+          if (linkedSaleId) {
+            const saleRes = await client.query('SELECT * FROM sales WHERE id = $1 FOR UPDATE', [linkedSaleId]);
+            if (saleRes.rows.length > 0) {
+              const sale = saleRes.rows[0];
+              if (sale.status !== 'VOIDED' && !sale.is_deleted) {
+                const itemsRes = await client.query('SELECT * FROM sale_items WHERE sale_id = $1', [linkedSaleId]);
+                const restoreQtyMap = new Map();
+                for (const row of itemsRes.rows) {
+                  if (row.product_id) {
+                    restoreQtyMap.set(row.product_id, (restoreQtyMap.get(row.product_id) || 0) + Number(row.quantity || 0));
+                  }
+                }
+                const pids = [...restoreQtyMap.keys()].filter(Boolean).sort();
+                if (pids.length > 0) {
+                  const prodRes = await client.query(
+                    `SELECT id, name, category_id, quantity::float, sold::float, price::bigint, version 
+                     FROM products WHERE id = ANY($1::varchar[]) ORDER BY id ASC FOR UPDATE`,
+                    [pids]
+                  );
+                  for (const prod of prodRes.rows) {
+                    const returnQty = restoreQtyMap.get(prod.id) || 0;
+                    const newQty = (prod.quantity !== null && prod.quantity !== undefined) ? (prod.quantity + returnQty) : null;
+                    const newSold = Math.max(0, (prod.sold || 0) - returnQty);
+                    const newVersion = (prod.version || 1) + 1;
+                    await client.query('UPDATE products SET quantity = $1, sold = $2, version = $3, updated_at = $4 WHERE id = $5', [newQty, newSold, newVersion, now, prod.id]);
+                    await client.query('INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)', ['product', prod.id, 'UPDATE', {
+                      id: prod.id, name: prod.name, categoryId: prod.category_id, price: Number(prod.price), quantity: newQty, sold: newSold, version: newVersion, isDeleted: false, updatedAt: now
+                    }, now]);
+                  }
+                }
+                await client.query("UPDATE sales SET status = 'VOIDED', is_deleted = TRUE, updated_at = $1 WHERE id = $2", [now, linkedSaleId]);
+                await client.query('INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)', ['sale', linkedSaleId, 'DELETE', { id: linkedSaleId, isDeleted: true, status: 'VOIDED', updatedAt: now }, now]);
+              }
+            }
+          }
+
+          if (targetId && linkedSaleId) {
+            await client.query('DELETE FROM activities WHERE id = $1 OR sale_id = $2', [targetId, linkedSaleId]);
+          } else if (targetId) {
+            await client.query('DELETE FROM activities WHERE id = $1', [targetId]);
+          } else if (linkedSaleId) {
+            await client.query('DELETE FROM activities WHERE sale_id = $1', [linkedSaleId]);
+          }
+
+          await client.query(
+            'INSERT INTO changes (entity_type, entity_id, action, data, created_at) VALUES ($1, $2, $3, $4, $5)',
+            ['activity', targetId || linkedSaleId, 'DELETE', { id: targetId || linkedSaleId, saleId: linkedSaleId, isDeleted: true, updatedAt: now }, now]
+          );
+
+          await client.query(
+            'INSERT INTO sync_operations (id, device_id, type, created_at, processed_at, result, payload_hash) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [op.id, deviceId, op.type, op.createdAt || now, now, { accepted: true, targetId, linkedSaleId }, currentHash]
           );
 
           await client.query('COMMIT');

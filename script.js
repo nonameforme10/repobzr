@@ -554,8 +554,11 @@ const syncEngine = {
         }
     },
 
+    _lastKickTime: 0,
+
     async kick() {
-        if (this.syncing) return;
+        if (this.syncing && Date.now() - this._lastKickTime < 15000) return;
+        this._lastKickTime = Date.now();
 
         if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
             try {
@@ -575,7 +578,8 @@ const syncEngine = {
     },
 
     async _executeSync() {
-        if (this.syncing) return;
+        if (this.syncing && Date.now() - this._lastKickTime < 15000) return;
+        this._lastKickTime = Date.now();
         clearTimeout(this.retryTimer);
 
         if (!navigator.onLine) {
@@ -607,7 +611,7 @@ const syncEngine = {
 
     async pushOutbox() {
         const allOps = await localDb.getAll('outbox');
-        const pending = allOps.filter(o => o.status === 'pending');
+        const pending = allOps.filter(o => o.status === 'pending' || o.status === 'syncing');
         if (pending.length === 0) return;
 
         const batch = pending.slice(0, 50);
@@ -617,16 +621,33 @@ const syncEngine = {
         }
         await this.updateUI();
 
-        const res = await fetch(`${API_BASE_URL}/sync`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                deviceId: getDeviceId(),
-                operations: batch
-            })
-        });
+        let res;
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            res = await fetch(`${API_BASE_URL}/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    deviceId: getDeviceId(),
+                    operations: batch
+                }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+        } catch (fetchErr) {
+            for (const op of batch) {
+                op.status = 'pending';
+                await localDb.put('outbox', op);
+            }
+            throw fetchErr;
+        }
 
         if (!res.ok) {
+            for (const op of batch) {
+                op.status = 'pending';
+                await localDb.put('outbox', op);
+            }
             throw new Error(`Sync HTTP error ${res.status}`);
         }
 
@@ -639,6 +660,12 @@ const syncEngine = {
                 await localDb.delete('outbox', op.id);
             } else if (rejectedMap.has(op.id)) {
                 const rej = rejectedMap.get(op.id);
+                if ((op.type === 'VOID_SALE_TRANSACTION' || op.type === 'DELETE_SALE_TRANSACTION' || op.type === 'DELETE_ACTIVITY') &&
+                    (rej.code === 'SALE_NOT_FOUND' || rej.code === 'NOT_FOUND' || rej.code === 'ALREADY_VOIDED')) {
+                    await localDb.delete('outbox', op.id);
+                    continue;
+                }
+
                 op.status = 'failed';
                 op.errorCode = rej.code || 'REJECTED';
                 op.errorMessage = rej.message || 'Operation rejected by server';
@@ -686,25 +713,48 @@ const syncEngine = {
     },
 
     async pullChanges() {
-        const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
-        const res = await fetch(`${API_BASE_URL}/sync?since=${lastSyncSeq}`, { cache: 'no-store' });
-        if (!res.ok) return;
-
-        const data = await res.json();
-
-        if (data.requiresBootstrap) {
-            const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
-            if (snapRes.ok) {
-                const snap = await snapRes.json();
-                await this.mergeSnapshot(snap);
-                await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+        let loopCount = 0;
+        while (loopCount < 10) {
+            loopCount++;
+            const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
+            let res;
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                res = await fetch(`${API_BASE_URL}/sync?since=${lastSyncSeq}`, { cache: 'no-store', signal: controller.signal });
+                clearTimeout(timeoutId);
+            } catch (err) {
+                break;
             }
-            return;
-        }
+            if (!res.ok) break;
 
-        if (Array.isArray(data.changes) && data.changes.length > 0) {
-            await this.applyDeltaChanges(data.changes);
-            await localDb.setMeta('lastSyncSeq', data.currentSeq || 0);
+            const data = await res.json();
+            const serverCurrentSeq = Number(data.currentSeq || 0);
+
+            if (data.requiresBootstrap || (lastSyncSeq > 0 && serverCurrentSeq === 0)) {
+                const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+                if (snapRes.ok) {
+                    const snap = await snapRes.json();
+                    await this.mergeSnapshot(snap);
+                    await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+                }
+                return;
+            }
+
+            if (Array.isArray(data.changes) && data.changes.length > 0) {
+                await this.applyDeltaChanges(data.changes);
+                const maxSeqInBatch = data.changes.reduce((max, c) => Math.max(max, Number(c.seq) || 0), lastSyncSeq);
+                await localDb.setMeta('lastSyncSeq', maxSeqInBatch);
+
+                if (maxSeqInBatch < serverCurrentSeq && data.changes.length >= 200) {
+                    continue;
+                }
+            } else {
+                if (serverCurrentSeq > lastSyncSeq) {
+                    await localDb.setMeta('lastSyncSeq', serverCurrentSeq);
+                }
+            }
+            break;
         }
     },
 
@@ -786,6 +836,8 @@ const syncEngine = {
         }
 
         if (modified) {
+            state.activities.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+            saveState();
             refreshAll();
             notifyCatalogChange('CATALOG_CHANGED', { reason: 'DELTA_SYNC' });
         }
@@ -1358,11 +1410,30 @@ function addActivity(data) {
     return activity;
 }
 
-function deleteActivity(id) {
+async function deleteActivity(id) {
+    const act = state.activities.find(a => a.id === id);
     state.activities = state.activities.filter(a => a.id !== id);
     saveState();
+    await localDb.delete('activities', id);
     renderActivity();
     renderDashboard();
+
+    if (act) {
+        if (act.saleId) {
+            await enqueueOperation('VOID_SALE_TRANSACTION', {
+                saleId: act.saleId,
+                activityId: id,
+                notes: 'Deleted via Admin activities view',
+                timestamp: Date.now()
+            });
+        } else {
+            await enqueueOperation('DELETE_ACTIVITY', {
+                id: id,
+                activityId: id,
+                timestamp: Date.now()
+            });
+        }
+    }
 }
 
 function editActivityNotes(id, newNotes) {
@@ -4412,27 +4483,46 @@ async function init() {
         syncEngine.updateUI();
     });
     window.addEventListener('focus', () => syncEngine.kick());
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) syncEngine.kick();
+    });
 
-    // 3. Start backend network sync and currency fetch IMMEDIATELY (0ms delay!)
-    currency.fetchRates();
-    syncEngine.kick();
-    setInterval(() => syncEngine.kick(), 30000);
-
-    // 4. Asynchronously initialize IndexedDB without blocking the UI or sync
-    localDb.init().then(async () => {
+    // 3. Initialize IndexedDB and hydrate state
+    try {
+        await localDb.init();
         await loadState();
         await purgeDemoDataIfPresent();
         refreshAll();
-        if (filter) {
-            filter.innerHTML = '<option value="">All Categories</option>';
-            state.categories.forEach(c => {
-                filter.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
-            });
-        }
-        syncEngine.kick();
-    }).catch(err => {
+    } catch (err) {
         console.warn('[init] IndexedDB background load notice:', err);
-    });
+    }
+
+    if (filter) {
+        filter.innerHTML = '<option value="">All Categories</option>';
+        state.categories.forEach(c => {
+            filter.innerHTML += `<option value="${c.id}">${escapeHtml(c.name)}</option>`;
+        });
+    }
+
+    // 4. If client has no cursor or no activities, bootstrap from /api/data snapshot
+    const lastSyncSeq = (await localDb.getMeta('lastSyncSeq')) || 0;
+    if (lastSyncSeq === 0 || (!state.activities || state.activities.length === 0)) {
+        try {
+            const snapRes = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+            if (snapRes.ok) {
+                const snap = await snapRes.json();
+                await syncEngine.mergeSnapshot(snap);
+                await localDb.setMeta('lastSyncSeq', snap.currentSeq || 0);
+            }
+        } catch (e) {
+            console.warn('[init] Initial snapshot bootstrap notice:', e);
+        }
+    }
+
+    // 5. Start backend network sync and currency fetch
+    currency.fetchRates();
+    syncEngine.kick();
+    setInterval(() => syncEngine.kick(), 5000);
 }
 
 // Start application when DOM is ready

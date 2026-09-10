@@ -252,6 +252,7 @@
             'type.update': 'Updated',
             'type.delete': 'Deleted',
             'type.note':   'Note',
+            'type.cash_out': 'Cash Out',
 
             // Daily reset
             'reset.title':   'Daily Reset',
@@ -644,6 +645,7 @@
             'type.update': 'Изменено',
             'type.delete': 'Удалено',
             'type.note':   'Заметка',
+            'type.cash_out': 'Расход кассы',
 
             'reset.title':   'Сброс за день',
             'reset.confirm': 'Это сбросит счётчики дня и заархивирует данные. Продолжить?',
@@ -1033,6 +1035,7 @@
             'type.update': 'Yangilandi',
             'type.delete': 'Oʻchirildi',
             'type.note':   'Izoh',
+            'type.cash_out': 'Kassadan chiqim',
 
             'reset.title':   'Kunlik tiklash',
             'reset.confirm': 'Bu bugungi hisoblagichlarni qayta tiklaydi va kun maʼlumotlarini arxivga oladi. Davom etilsinmi?',
