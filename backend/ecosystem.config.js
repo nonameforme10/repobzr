@@ -17,8 +17,8 @@ module.exports = {
     },
     {
       name: 'bozor-telegram-bot',
-      script: 'python3',
-      args: '-m telegram_bot.run',
+      script: 'telegram_bot/run.py',
+      interpreter: 'python3',
       cwd: path.resolve(__dirname, '..'),
       autorestart: true,
       watch: false,

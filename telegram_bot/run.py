@@ -6,15 +6,24 @@ Run with: python -m telegram_bot.run
 import asyncio
 import logging
 import sys
+from pathlib import Path
+
+# Add project root directory to sys.path so direct execution works (e.g. via PM2)
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
-from .config import TELEGRAM_BOT_TOKEN
-from .db import init_db_pool, close_db_pool
-from .middlewares.auth import AuthMiddleware
-from .handlers import main_router
-from .scheduler import start_scheduler, stop_scheduler
+from telegram_bot.config import TELEGRAM_BOT_TOKEN
+from telegram_bot.db import init_db_pool, close_db_pool
+from telegram_bot.middlewares.auth import AuthMiddleware
+from telegram_bot.handlers import main_router
+from telegram_bot.scheduler import start_scheduler, stop_scheduler
+from telegram_bot.version_checker import check_and_broadcast_version_update
 
 # Configure structured logging
 logging.basicConfig(
@@ -58,7 +67,6 @@ async def main():
         logger.info(f"Bot connected successfully as @{bot_info.username} (ID: {bot_info.id})")
 
         # Check version.txt on startup and force-update admins if new version
-        from .version_checker import check_and_broadcast_version_update
         await check_and_broadcast_version_update(bot)
 
         logger.info("Starting long-polling with drop_pending_updates=True...")
