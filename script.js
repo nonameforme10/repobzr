@@ -3157,45 +3157,251 @@ function renderHomeReports() {
     reportsList.innerHTML = rowsHtml;
 }
 
-// ---------- Dashboard ----------
-function renderDashboard() {
-    const resetTime = getResetTime();
-    const todayActivities = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= resetTime);
-    const soldToday = todayActivities.reduce((s, a) => s + (a.quantity || 0), 0);
-    const totalRevenue = getTodayRevenue();
+// ---------- Unified Analytics & Dashboard State & Helpers ----------
+const analyticsFilter = {
+    mode: 'today', // 'today' | 'yesterday' | '7days' | '30days' | 'all' | 'custom'
+    customDate: ''
+};
+
+function getLocalDateString(d = new Date()) {
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const da = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${da}`;
+}
+
+function getAnalyticsDateRange() {
+    const now = new Date();
+    const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : undefined;
+
+    if (analyticsFilter.mode === 'today') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+        return { start, end, label: tr('filter.today') || 'Bugun', isSingleDay: true, baseDate: now };
+    }
+    if (analyticsFilter.mode === 'yesterday') {
+        const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+        const start = y.getTime();
+        const end = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59, 999).getTime();
+        return { start, end, label: tr('filter.yesterday') || 'Kecha', isSingleDay: true, baseDate: y };
+    }
+    if (analyticsFilter.mode === '7days') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6, 0, 0, 0, 0).getTime();
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+        return { start, end, label: tr('filter.7days') || '7 kun', isSingleDay: false, daysCount: 7, baseDate: now };
+    }
+    if (analyticsFilter.mode === '30days') {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29, 0, 0, 0, 0).getTime();
+        const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+        return { start, end, label: tr('filter.30days') || '30 kun', isSingleDay: false, daysCount: 30, baseDate: now };
+    }
+    if (analyticsFilter.mode === 'custom' && analyticsFilter.customDate) {
+        const parts = analyticsFilter.customDate.split('-');
+        if (parts.length === 3) {
+            const yr = parseInt(parts[0], 10);
+            const mo = parseInt(parts[1], 10) - 1;
+            const da = parseInt(parts[2], 10);
+            const d = new Date(yr, mo, da, 0, 0, 0, 0);
+            const start = d.getTime();
+            const end = new Date(yr, mo, da, 23, 59, 59, 999).getTime();
+            const label = d.toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' });
+            return { start, end, label, isSingleDay: true, baseDate: d };
+        }
+    }
+    // Default: 'all'
+    return { start: 0, end: Infinity, label: tr('filter.all') || 'Barchasi', isSingleDay: false, daysCount: 30, baseDate: now };
+}
+
+function getPeriodProductSales(range) {
+    const map = new Map();
+    const activities = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= range.start && a.timestamp <= range.end);
+    activities.forEach(a => {
+        const d = resolveActivitySaleDetails(a);
+        if (d.items && d.items.length > 0) {
+            d.items.forEach(item => {
+                const name = item.productName || item.name || 'Unknown';
+                const qty = Number(item.quantity) || 1;
+                const prev = map.get(name) || { name, sold: 0 };
+                prev.sold += qty;
+                map.set(name, prev);
+            });
+        } else {
+            const name = a.productName || d.displayName || 'Unknown';
+            const qty = d.totalUnits || a.quantity || 1;
+            const prev = map.get(name) || { name, sold: 0 };
+            prev.sold += qty;
+            map.set(name, prev);
+        }
+    });
+    return Array.from(map.values()).sort((a, b) => b.sold - a.sold);
+}
+
+function getPeriodRevenue(range) {
+    return state.activities
+        .filter(a => a.type === 'sale' && !a.undone && a.timestamp >= range.start && a.timestamp <= range.end)
+        .reduce((sum, a) => {
+            const d = resolveActivitySaleDetails(a);
+            return sum + d.totalSaleValue;
+        }, 0);
+}
+
+function getPeriodSoldUnits(range) {
+    return state.activities
+        .filter(a => a.type === 'sale' && !a.undone && a.timestamp >= range.start && a.timestamp <= range.end)
+        .reduce((sum, a) => {
+            const d = resolveActivitySaleDetails(a);
+            return sum + (d.totalUnits || a.quantity || 0);
+        }, 0);
+}
+
+function initAnalyticsFilters() {
+    const toolbar = document.getElementById('analyticsFilterToolbar');
+    const datePicker = document.getElementById('analyticsDatePicker');
+    if (!toolbar) return;
+
+    if (datePicker && !datePicker.value) {
+        datePicker.value = getLocalDateString(new Date());
+    }
+
+    toolbar.querySelectorAll('.filter-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const period = btn.dataset.period;
+            if (!period) return;
+            toolbar.querySelectorAll('.filter-preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            analyticsFilter.mode = period;
+
+            if (datePicker) {
+                if (period === 'today') {
+                    datePicker.value = getLocalDateString(new Date());
+                } else if (period === 'yesterday') {
+                    datePicker.value = getLocalDateString(new Date(Date.now() - 86400000));
+                } else {
+                    datePicker.value = '';
+                }
+            }
+
+            renderAnalytics();
+            updateCharts();
+        });
+    });
+
+    if (datePicker) {
+        datePicker.addEventListener('change', () => {
+            if (!datePicker.value) return;
+            toolbar.querySelectorAll('.filter-preset-btn').forEach(b => b.classList.remove('active'));
+            analyticsFilter.mode = 'custom';
+            analyticsFilter.customDate = datePicker.value;
+
+            renderAnalytics();
+            updateCharts();
+        });
+    }
+}
+
+function renderAnalytics() {
+    const range = getAnalyticsDateRange();
+    const periodSold = getPeriodSoldUnits(range);
+    const periodRev = getPeriodRevenue(range);
+    const periodProds = getPeriodProductSales(range);
 
     const trackedStock = state.products.reduce((acc, p) => (p.quantity !== null && p.quantity !== undefined ? acc + p.quantity : acc), 0);
 
-    const soldTodayEl = document.getElementById('dashSoldToday');
-    if (soldTodayEl) soldTodayEl.textContent = soldToday;
+    // Dynamic Period Badge
+    const badgeEl = document.getElementById('analyticsPeriodBadge');
+    if (badgeEl) badgeEl.textContent = range.label;
 
+    // Dynamic Units Sold
+    const soldEl = document.getElementById('dashSoldToday');
+    if (soldEl) soldEl.textContent = periodSold;
+
+    // Tracked Stock
     const trackedStockEl = document.getElementById('dashTrackedStock');
     if (trackedStockEl) trackedStockEl.textContent = trackedStock;
 
+    // Total Products
     const totalProdEl = document.getElementById('dashTotalProducts');
     if (totalProdEl) totalProdEl.textContent = state.products.length;
 
+    // Revenue
     const revEl = document.getElementById('dashRevenue');
-    if (revEl) revEl.textContent = formatCurrency(totalRevenue);
+    if (revEl) revEl.textContent = formatCurrency(periodRev);
 
-    const sortedProds = [...state.products].sort((a, b) => (b.sold || 0) - (a.sold || 0));
+    // Best Product in period
     const bestProductEl = document.getElementById('dashBestProduct');
     if (bestProductEl) {
-        bestProductEl.textContent = (sortedProds.length && sortedProds[0].sold > 0)
-            ? `${sortedProds[0].name} (${sortedProds[0].sold})`
-            : (sortedProds.length ? sortedProds[0].name : '-');
-    }
-
-    // Recent activity (last 5)
-    const recent = state.activities.slice(0, 5);
-    const list = document.getElementById('dashActivityList');
-    if (list) {
-        if (!recent.length) {
-            list.innerHTML = `<div class="empty-state">${tr('dash.noRecent')}</div>`;
+        if (periodProds.length > 0 && periodProds[0].sold > 0) {
+            bestProductEl.textContent = `${periodProds[0].name} (${periodProds[0].sold})`;
         } else {
-            list.innerHTML = recent.map(a => renderActivityItem(a)).join('');
+            const sortedOverall = [...state.products].sort((a, b) => (b.sold || 0) - (a.sold || 0));
+            bestProductEl.textContent = (sortedOverall.length && sortedOverall[0].sold > 0)
+                ? `${sortedOverall[0].name} (${sortedOverall[0].sold})`
+                : (sortedOverall.length ? sortedOverall[0].name : '-');
         }
     }
+
+    // Smart Insights
+    const topEl = document.getElementById('insightTopProduct');
+    const lowEl = document.getElementById('insightLowProduct');
+    const fastEl = document.getElementById('insightFastProduct');
+    const slowEl = document.getElementById('insightSlowProduct');
+
+    const prods = [...state.products].sort((a, b) => (b.sold || 0) - (a.sold || 0));
+    if (topEl) {
+        if (periodProds.length > 0 && periodProds[0].sold > 0) {
+            topEl.textContent = `${periodProds[0].name} (${periodProds[0].sold} sold)`;
+        } else {
+            topEl.textContent = prods.length ? `${prods[0].name} (${prods[0].sold || 0} sold)` : '-';
+        }
+    }
+    if (lowEl) {
+        if (periodProds.length > 1) {
+            const last = periodProds[periodProds.length - 1];
+            lowEl.textContent = `${last.name} (${last.sold} sold)`;
+        } else if (prods.length > 1) {
+            const last = prods[prods.length - 1];
+            lowEl.textContent = `${last.name} (${last.sold || 0} sold)`;
+        } else {
+            lowEl.textContent = '-';
+        }
+    }
+    if (fastEl) {
+        const fast = prods.filter(p => (p.sold || 0) > 0).sort((a, b) => {
+            const ar = (a.quantity || 0) / ((a.sold || 0) + 1);
+            const br = (b.quantity || 0) / ((b.sold || 0) + 1);
+            return ar - br;
+        })[0];
+        fastEl.textContent = fast ? fast.name : '-';
+    }
+    if (slowEl) {
+        const slow = prods.filter(p => (p.quantity || 0) > 0).sort((a, b) => {
+            const ar = (a.sold || 0) / ((a.quantity || 0) + 1);
+            const br = (b.sold || 0) / ((b.quantity || 0) + 1);
+            return ar - br;
+        })[0];
+        slowEl.textContent = slow ? slow.name : '-';
+    }
+
+    // Recent activity in period (or latest 5)
+    const list = document.getElementById('dashActivityList');
+    if (list) {
+        let periodActs = state.activities.filter(a => a.timestamp >= range.start && a.timestamp <= range.end);
+        if (!periodActs.length && range.start === 0) {
+            periodActs = state.activities.slice(0, 5);
+        } else if (periodActs.length > 5) {
+            periodActs = periodActs.slice(0, 5);
+        }
+        if (!periodActs.length) {
+            list.innerHTML = `<div class="empty-state">${tr('dash.noRecent')}</div>`;
+        } else {
+            list.innerHTML = periodActs.map(a => renderActivityItem(a)).join('');
+        }
+    }
+}
+
+// Backward-compatible alias
+function renderDashboard() {
+    renderAnalytics();
 }
 
 function renderActivityItem(a) {
@@ -3725,40 +3931,7 @@ function editNotePrompt(id) {
     }
 }
 
-// ---------- Analytics ----------
-function renderAnalytics() {
-    const topEl = document.getElementById('insightTopProduct');
-    const lowEl = document.getElementById('insightLowProduct');
-    const fastEl = document.getElementById('insightFastProduct');
-    const slowEl = document.getElementById('insightSlowProduct');
-    if (!topEl && !lowEl && !fastEl && !slowEl) return;
 
-    const catStats = getCategoryStats();
-    const prods = [...state.products].sort((a, b) => b.sold - a.sold);
-
-    if (topEl) topEl.textContent = prods.length ? `${prods[0].name} (${prods[0].sold} sold)` : '-';
-    if (lowEl) lowEl.textContent = prods.length > 1 ? `${prods[prods.length - 1].name} (${prods[prods.length - 1].sold} sold)` : '-';
-
-    // Fast moving: highest sold with low stock ratio
-    if (fastEl) {
-        const fast = prods.filter(p => p.sold > 0).sort((a, b) => {
-            const ar = a.quantity / (a.sold + 1);
-            const br = b.quantity / (b.sold + 1);
-            return ar - br;
-        })[0];
-        fastEl.textContent = fast ? `${fast.name}` : '-';
-    }
-
-    // Slow moving: high stock, low sales
-    if (slowEl) {
-        const slow = prods.filter(p => p.quantity > 0).sort((a, b) => {
-            const ar = a.sold / (a.quantity + 1);
-            const br = b.sold / (b.quantity + 1);
-            return ar - br;
-        })[0];
-        slowEl.textContent = slow ? `${slow.name}` : '-';
-    }
-}
 
 // ==================== CHARTS ====================
 function destroyChart(key) {
@@ -4201,11 +4374,10 @@ function getChartColors(count) {
 }
 
 function updateCharts() {
-    if (currentPage === 'dashboard') {
-        updateDashCategoryChart();
+    if (currentPage === 'dashboard' || currentPage === 'analytics') {
         updateDashTrendChart();
-    } else if (currentPage === 'analytics') {
-        updateAnalyticsCharts();
+        updateDashCategoryChart();
+        updateAnalyticsBarChart();
     }
 }
 
@@ -4213,9 +4385,12 @@ function updateDashCategoryChart() {
     const ctx = document.getElementById('dashCategoryChart');
     if (!ctx) return;
     destroyChart('dashCategory');
-    const prods = [...state.products].filter(p => (p.sold || 0) > 0).sort((a, b) => b.sold - a.sold).slice(0, 8);
+
+    const range = getAnalyticsDateRange();
+    const periodProds = getPeriodProductSales(range).slice(0, 8);
     const t = getChartTheme();
-    if (!prods.length) {
+
+    if (!periodProds.length) {
         chartInstances.dashCategory = new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -4229,13 +4404,16 @@ function updateDashCategoryChart() {
         });
         return;
     }
+
+    const totalSold = periodProds.reduce((s, p) => s + p.sold, 0);
+
     chartInstances.dashCategory = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: prods.map(p => p.name),
+            labels: periodProds.map(p => p.name),
             datasets: [{
-                data: prods.map(p => p.sold),
-                backgroundColor: getChartColors(prods.length),
+                data: periodProds.map(p => p.sold),
+                backgroundColor: getChartColors(periodProds.length),
                 borderWidth: 2,
                 borderColor: t.surface
             }]
@@ -4246,7 +4424,21 @@ function updateDashCategoryChart() {
             cutout: '62%',
             plugins: {
                 legend: { position: 'bottom', labels: { color: t.text, padding: 16, usePointStyle: true, boxWidth: 8 } },
-                tooltip: { backgroundColor: t.tooltipBg, titleColor: t.tooltipText, bodyColor: t.tooltipText, padding: 10, cornerRadius: 8, boxPadding: 4 }
+                tooltip: {
+                    backgroundColor: t.tooltipBg,
+                    titleColor: t.tooltipText,
+                    bodyColor: t.tooltipText,
+                    padding: 10,
+                    cornerRadius: 8,
+                    boxPadding: 4,
+                    callbacks: {
+                        label: (c) => {
+                            const val = c.raw;
+                            const pct = totalSold > 0 ? ((val / totalSold) * 100).toFixed(1) : 0;
+                            return ` ${c.label}: ${val} (${pct}%)`;
+                        }
+                    }
+                }
             }
         }
     });
@@ -4257,26 +4449,47 @@ function updateDashTrendChart() {
     if (!ctx) return;
     destroyChart('dashTrend');
 
-    // Group sales by hour for today
-    const resetTime = getResetTime();
-    const sales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= resetTime);
-    const hours = {};
-    for (let i = 0; i < 24; i++) hours[i] = 0;
-    sales.forEach(a => {
-        const h = new Date(a.timestamp).getHours();
-        hours[h] += a.quantity;
-    });
-
-    const labels = Object.keys(hours).map(h => `${h}:00`);
-    const data = Object.values(hours);
-
+    const range = getAnalyticsDateRange();
     const t = getChartTheme();
+    const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : undefined;
+
+    let labels = [];
+    let data = [];
+
+    if (range.isSingleDay) {
+        const hours = {};
+        for (let i = 0; i < 24; i++) hours[i] = 0;
+        const sales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= range.start && a.timestamp <= range.end);
+        sales.forEach(a => {
+            const h = new Date(a.timestamp).getHours();
+            const d = resolveActivitySaleDetails(a);
+            hours[h] += (d.totalUnits || a.quantity || 1);
+        });
+        labels = Object.keys(hours).map(h => `${h}:00`);
+        data = Object.values(hours);
+    } else {
+        const daysCount = range.daysCount || 7;
+        for (let i = daysCount - 1; i >= 0; i--) {
+            const d = new Date(range.baseDate.getFullYear(), range.baseDate.getMonth(), range.baseDate.getDate() - i, 0, 0, 0, 0);
+            const startMs = d.getTime();
+            const endMs = startMs + 86400000 - 1;
+            const count = state.activities
+                .filter(a => a.type === 'sale' && !a.undone && a.timestamp >= startMs && a.timestamp <= endMs)
+                .reduce((s, a) => s + (resolveActivitySaleDetails(a).totalUnits || a.quantity || 0), 0);
+            data.push(count);
+            const labelFmt = daysCount <= 7
+                ? d.toLocaleDateString(lang, { weekday: 'short' })
+                : d.toLocaleDateString(lang, { month: 'numeric', day: 'numeric' });
+            labels.push(labelFmt);
+        }
+    }
+
     chartInstances.dashTrend = new Chart(ctx, {
         type: 'line',
         data: {
             labels,
             datasets: [{
-                label: 'Units Sold',
+                label: tr('chart.unitsSold') || 'Units Sold',
                 data,
                 borderColor: t.accent,
                 backgroundColor: t.accentSoft,
@@ -4286,8 +4499,8 @@ function updateDashTrendChart() {
                 pointBackgroundColor: t.accent,
                 pointBorderColor: t.surface,
                 pointBorderWidth: 2,
-                pointRadius: 3,
-                pointHoverRadius: 5
+                pointRadius: range.isSingleDay ? 3 : 4,
+                pointHoverRadius: 6
             }]
         },
         options: {
@@ -4298,7 +4511,7 @@ function updateDashTrendChart() {
                     ticks: {
                         color: t.text,
                         font: { size: 10 },
-                        maxTicksLimit: 6,
+                        maxTicksLimit: range.isSingleDay ? 8 : 10,
                         maxRotation: 0,
                         minRotation: 0,
                         autoSkip: true
@@ -4326,158 +4539,27 @@ function updateDashTrendChart() {
     });
 }
 
-function updateAnalyticsCharts() {
-    const t = getChartTheme();
-    // Pie chart - product sales distribution
-    const pieCtx = document.getElementById('analyticsPieChart');
-    if (pieCtx) {
-        destroyChart('analyticsPie');
-        const prods = [...state.products].filter(p => (p.sold || 0) > 0).sort((a, b) => b.sold - a.sold).slice(0, 10);
-        const total = prods.reduce((s, p) => s + p.sold, 0);
-        if (prods.length && total > 0) {
-            chartInstances.analyticsPie = new Chart(pieCtx, {
-                type: 'pie',
-                data: {
-                    labels: prods.map(p => p.name),
-                    datasets: [{
-                        data: prods.map(p => p.sold),
-                        backgroundColor: getChartColors(prods.length),
-                        borderWidth: 2,
-                        borderColor: t.surface
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        tooltip: {
-                            backgroundColor: t.tooltipBg, titleColor: t.tooltipText, bodyColor: t.tooltipText,
-                            padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4,
-                            callbacks: {
-                                label: (ctx) => {
-                                    const val = ctx.raw;
-                                    const pct = ((val / total) * 100).toFixed(1);
-                                    return ` ${ctx.label}: ${val} sold (${pct}%)`;
-                                }
-                            }
-                        },
-                        legend: { position: 'right', labels: { color: t.text, usePointStyle: true, padding: 14, boxWidth: 8 } }
-                    }
-                }
-            });
-        } else {
-            chartInstances.analyticsPie = new Chart(pieCtx, {
-                type: 'pie',
-                data: { labels: ['No Data'], datasets: [{ data: [1], backgroundColor: [t.empty], borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: t.text } } } }
-            });
-        }
-    }
-
-    // Bar chart - product performance
+function updateAnalyticsBarChart() {
     const barCtx = document.getElementById('analyticsBarChart');
-    if (barCtx) {
-        destroyChart('analyticsBar');
-        const prods = [...state.products].filter(p => p.sold > 0).sort((a, b) => b.sold - a.sold).slice(0, 10);
-        if (prods.length) {
-            chartInstances.analyticsBar = new Chart(barCtx, {
-                type: 'bar',
-                data: {
-                    labels: prods.map(p => p.name),
-                    datasets: [{
-                        label: 'Total Sold',
-                        data: prods.map(p => p.sold),
-                        backgroundColor: getChartColors(prods.length),
-                        borderRadius: 6,
-                        borderSkipped: false,
-                        maxBarThickness: 40
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: t.text,
-                                font: { size: 10 },
-                                maxRotation: 45,
-                                maxTicksLimit: 8,
-                                autoSkip: true
-                            },
-                            grid: { display: false },
-                            border: { color: t.border }
-                        },
-                        y: {
-                            ticks: {
-                                color: t.text,
-                                font: { size: 11 },
-                                precision: 0,
-                                stepSize: 1
-                            },
-                            grid: { color: t.grid },
-                            border: { display: false },
-                            beginAtZero: true
-                        }
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { backgroundColor: t.tooltipBg, titleColor: t.tooltipText, bodyColor: t.tooltipText, padding: 10, cornerRadius: 8, displayColors: false }
-                    }
-                }
-            });
-        } else {
-            chartInstances.analyticsBar = new Chart(barCtx, {
-                type: 'bar',
-                data: { labels: ['No Data'], datasets: [{ data: [0], backgroundColor: t.empty, borderRadius: 6 }] },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { ticks: { color: t.text, font: { size: 10 } } },
-                        y: { ticks: { color: t.text, font: { size: 11 }, precision: 0, stepSize: 1 }, beginAtZero: true }
-                    },
-                    plugins: { legend: { display: false } }
-                }
-            });
-        }
-    }
+    if (!barCtx) return;
+    destroyChart('analyticsBar');
 
-    // Line chart - sales over last 7 days
-    const lineCtx = document.getElementById('analyticsLineChart');
-    if (lineCtx) {
-        destroyChart('analyticsLine');
-        const days = [];
-        const dayLabels = [];
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date();
-            d.setDate(d.getDate() - i);
-            d.setHours(0, 0, 0, 0);
-            const start = d.getTime();
-            const end = start + 86400000;
-            const count = state.activities
-                .filter(a => a.type === 'sale' && !a.undone && a.timestamp >= start && a.timestamp < end)
-                .reduce((s, a) => s + a.quantity, 0);
-            days.push(count);
-            dayLabels.push(d.toLocaleDateString((window.i18n && window.i18n.getLang()) || undefined, { weekday: 'short' }));
-        }
-        chartInstances.analyticsLine = new Chart(lineCtx, {
-            type: 'line',
+    const range = getAnalyticsDateRange();
+    const prods = getPeriodProductSales(range).slice(0, 10);
+    const t = getChartTheme();
+
+    if (prods.length) {
+        chartInstances.analyticsBar = new Chart(barCtx, {
+            type: 'bar',
             data: {
-                labels: dayLabels,
+                labels: prods.map(p => p.name),
                 datasets: [{
-                    label: 'Daily Sales',
-                    data: days,
-                    borderColor: t.gold,
-                    backgroundColor: t.goldSoft,
-                    fill: true,
-                    tension: 0.35,
-                    borderWidth: 2,
-                    pointBackgroundColor: t.gold,
-                    pointBorderColor: t.surface,
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
+                    label: tr('product.totalSold') || 'Total Sold',
+                    data: prods.map(p => p.sold),
+                    backgroundColor: getChartColors(prods.length),
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    maxBarThickness: 40
                 }]
             },
             options: {
@@ -4488,10 +4570,11 @@ function updateAnalyticsCharts() {
                         ticks: {
                             color: t.text,
                             font: { size: 10 },
-                            maxRotation: 0,
+                            maxRotation: 45,
+                            maxTicksLimit: 8,
                             autoSkip: true
                         },
-                        grid: { color: t.grid },
+                        grid: { display: false },
                         border: { color: t.border }
                     },
                     y: {
@@ -4512,7 +4595,25 @@ function updateAnalyticsCharts() {
                 }
             }
         });
+    } else {
+        chartInstances.analyticsBar = new Chart(barCtx, {
+            type: 'bar',
+            data: { labels: ['No Data'], datasets: [{ data: [0], backgroundColor: t.empty, borderRadius: 6 }] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { color: t.text, font: { size: 10 } } },
+                    y: { ticks: { color: t.text, font: { size: 11 }, precision: 0, stepSize: 1 }, beginAtZero: true }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
     }
+}
+
+function updateAnalyticsCharts() {
+    updateCharts();
 }
 
 
@@ -4939,6 +5040,7 @@ function submitRestock(productId) {
 
 // ==================== NAVIGATION ====================
 function navigateTo(page) {
+    if (page === 'dashboard') page = 'analytics';
     currentPage = page;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -4948,7 +5050,6 @@ function navigateTo(page) {
 
     const titleKeys = {
         home:       'nav.home',
-        dashboard:  'nav.dashboard',
         categories: 'category.title',
         products:   'product.title',
         analytics:  'analytics.title',
@@ -4965,8 +5066,9 @@ function navigateTo(page) {
         document.getElementById('sidebarOverlay')?.classList.remove('active');
     }
 
-    // Refresh charts when entering dashboard or analytics
-    if (page === 'dashboard' || page === 'analytics') {
+    // Refresh metrics & charts when entering analytics
+    if (page === 'analytics') {
+        renderAnalytics();
         requestAnimationFrame(() => {
             setTimeout(updateCharts, 60);
         });
@@ -5188,6 +5290,7 @@ function setupEventListeners() {
     // Setup drag-and-drop sortable sidebar and products
     setupSidebarSortable();
     setupAdminProductGridSortable();
+    initAnalyticsFilters();
 
     // Sidebar toggle and overlay
     const sidebar = document.getElementById('sidebar');
@@ -5270,8 +5373,7 @@ function setupEventListeners() {
     // Update revenue display and switcher pills when active currency or rates change
     const onCurrencyUpdated = () => {
         updateCurrencySwitcherUI();
-        const revEl = document.getElementById('dashRevenue');
-        if (revEl) revEl.textContent = formatCurrency(getTodayRevenue());
+        renderAnalytics();
         renderHomeReports();
     };
     document.addEventListener('currency:change', onCurrencyUpdated);
@@ -5300,6 +5402,15 @@ function setupEventListeners() {
     setInterval(renderDate, 60000);
     renderDate();
     document.addEventListener('i18n:change', renderDate);
+
+    // Support links with data-page (e.g. recent activity 'View All')
+    document.addEventListener('click', (e) => {
+        const pageLink = e.target.closest('a[data-page]');
+        if (pageLink) {
+            e.preventDefault();
+            navigateTo(pageLink.dataset.page);
+        }
+    });
 
     // Close sidebar when clicking outside on mobile
     document.addEventListener('click', (e) => {

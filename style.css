@@ -728,6 +728,118 @@ canvas {
 }
 
 /* ============================================
+   ANALYTICS DYNAMIC FILTER TOOLBAR
+   ============================================ */
+.analytics-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.analytics-title-wrap h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+
+.analytics-subtitle {
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    margin-top: 4px;
+    font-weight: 500;
+}
+
+.analytics-filter-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    flex-wrap: wrap;
+}
+
+.filter-presets {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 8px;
+}
+
+.filter-preset-btn {
+    background: transparent;
+    border: none;
+    color: var(--ink-muted);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.filter-preset-btn:hover {
+    color: var(--ink-strong);
+}
+
+.filter-preset-btn.active {
+    background: var(--accent, #D4AF37);
+    color: #000000;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.filter-custom-date {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 4px;
+}
+
+.custom-date-icon {
+    font-size: 0.875rem;
+    user-select: none;
+}
+
+.analytics-date-input {
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.15));
+    color: var(--ink-strong);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+[data-theme="light"] .analytics-date-input {
+    background: #FFFFFF;
+    border-color: #CBD5E1;
+}
+
+.analytics-date-input:focus {
+    border-color: var(--accent, #D4AF37);
+}
+
+@media (max-width: 768px) {
+    .analytics-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .analytics-filter-toolbar {
+        justify-content: space-between;
+    }
+    .filter-presets {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
    RECENT ACTIVITY
    ============================================ */
 .recent-activity {

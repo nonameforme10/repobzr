@@ -206,6 +206,11 @@
             'analytics.needsAttention': 'Needs Attention',
             'analytics.fastMoving':     'Fast Moving',
             'analytics.slowMoving':     'Slow Moving',
+            'filter.today':             'Today',
+            'filter.yesterday':         'Yesterday',
+            'filter.7days':             '7 Days',
+            'filter.30days':            '30 Days',
+            'filter.all':               'All Time',
 
             // Activity log
             'activity.title':           'Activity Log',
@@ -606,6 +611,11 @@
             'analytics.needsAttention': 'Требует внимания',
             'analytics.fastMoving':     'Быстро уходит',
             'analytics.slowMoving':     'Медленно уходит',
+            'filter.today':             'Сегодня',
+            'filter.yesterday':         'Вчера',
+            'filter.7days':             '7 дней',
+            'filter.30days':            '30 дней',
+            'filter.all':               'Все время',
 
             'activity.title':          'История операций',
             'activity.clearHistory':   'Очистить историю',
@@ -1000,6 +1010,11 @@
             'analytics.needsAttention': 'Eʼtibor talab qiladi',
             'analytics.fastMoving':     'Tez sotiladi',
             'analytics.slowMoving':     'Sekin sotiladi',
+            'filter.today':             'Bugun',
+            'filter.yesterday':         'Kecha',
+            'filter.7days':             '7 kun',
+            'filter.30days':            '30 kun',
+            'filter.all':               'Barchasi',
 
             'activity.title':          'Faoliyat tarixi',
             'activity.clearHistory':   'Tarixni tozalash',
