@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bazar-pos-v2.8.0';
+const CACHE_NAME = 'bazar-pos-v2.8.1';
 const ASSETS_TO_CACHE = [
   '/',
   '/admin',
@@ -13,6 +13,8 @@ const ASSETS_TO_CACHE = [
   '/manifest.json',
   '/assets/logo.webp',
   '/assets/logo-icon.webp',
+  '/assets/vendor/html2canvas.min.js',
+  '/assets/vendor/xlsx.full.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
 ];
 
@@ -39,6 +41,7 @@ self.addEventListener('activate', event => {
       return Promise.all(
         keys.map(key => {
           if (key !== CACHE_NAME) {
+            console.log(`[SW] Deleting old cache: ${key}`);
             return caches.delete(key);
           }
         })

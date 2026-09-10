@@ -4037,3 +4037,18 @@ canvas {
     margin-bottom: 4px;
 }
 
+/* PNG Export Snapshot Helper */
+body.is-exporting-png .toast-container,
+body.is-exporting-png .sidebar,
+body.is-exporting-png .topbar,
+body.is-exporting-png .sidebar-overlay,
+body.is-exporting-png .modal-overlay,
+body.is-exporting-png .confirm-overlay {
+    display: none !important;
+}
+
+body.is-exporting-png [data-export-target] {
+    box-shadow: none !important;
+    max-width: none !important;
+}
+

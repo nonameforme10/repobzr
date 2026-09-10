@@ -981,35 +981,443 @@ async function saveState() {
     syncEngine.updateUI();
 }
 
-function exportData() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sales-backup-${formatDateFile(new Date())}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(tr('data.exported'), 'success');
+// ==================== EXPORT (PNG & EXCEL) ====================
+async function exportAsPng() {
+    const btn = document.getElementById('exportPngBtn');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg> <span>${tr('action.exporting')}</span>`;
+    }
+
+    // Determine target based on explicit data-export-target
+    let target = null;
+    const activePage = document.querySelector('.page.active');
+    if (activePage) {
+        target = activePage.querySelector('[data-export-target]') || activePage;
+    }
+    if (!target) {
+        target = document.querySelector('[data-export-target="home"]') || document.getElementById('contentArea');
+    }
+
+    document.body.classList.add('is-exporting-png');
+
+    try {
+        if (typeof html2canvas === 'undefined') {
+            throw new Error('html2canvas library is not loaded');
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const bgColor = isDark ? '#0E0D0B' : '#FAF8F3';
+
+        const canvas = await html2canvas(target, {
+            backgroundColor: bgColor,
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+            ignoreElements: (el) => {
+                if (el.classList && (
+                    el.classList.contains('sidebar') ||
+                    el.classList.contains('topbar') ||
+                    el.classList.contains('sidebar-overlay') ||
+                    el.classList.contains('modal-overlay') ||
+                    el.classList.contains('toast-container') ||
+                    el.classList.contains('confirm-overlay') ||
+                    el.classList.contains('page-actions')
+                )) {
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        const selectedDate = (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function')
+            ? window.homeCalendar.getSelectedDate()
+            : new Date();
+        const dateStr = formatDateFile(selectedDate);
+        const fileName = `bazar-${currentPage || 'report'}-${dateStr}.png`;
+
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        showToast(tr('action.exportSuccess'), 'success');
+    } catch (err) {
+        console.error('[exportAsPng error]', err);
+        showToast(tr('action.exportError') || 'Export failed', 'error');
+    } finally {
+        document.body.classList.remove('is-exporting-png');
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 }
 
-function importData(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const data = JSON.parse(e.target.result);
-            if (data.categories && data.products && data.activities) {
-                state = { ...state, ...data };
-                saveState();
-                refreshAll();
-                showToast(tr('data.imported'), 'success');
-            } else {
-                showToast(tr('data.invalidFile'), 'error');
-            }
-        } catch (err) {
-            showToast(tr('data.importFailed'), 'error');
+async function exportAsExcel() {
+    const btn = document.getElementById('exportExcelBtn');
+    const originalHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg> <span>${tr('action.exporting')}</span>`;
+    }
+
+    try {
+        if (typeof XLSX === 'undefined') {
+            throw new Error('XLSX library is not loaded');
         }
-    };
-    reader.readAsText(file);
+
+        const wb = XLSX.utils.book_new();
+
+        // 1. DATA PREPARATION FROM LOCAL STATE (Zero API dependency, 100% offline)
+        const selectedDate = (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function')
+            ? window.homeCalendar.getSelectedDate()
+            : new Date();
+        const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
+        const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).getTime();
+
+        const dayActivities = state.activities.filter(a => !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
+        const daySales = dayActivities.filter(a => a.type === 'sale');
+        const dayCashOuts = dayActivities.filter(a => a.type === 'cash_out');
+
+        const totalUnits = daySales.reduce((acc, s) => {
+            const d = resolveActivitySaleDetails(s);
+            return acc + d.totalUnits;
+        }, 0);
+        const totalRev = daySales.reduce((acc, s) => {
+            const d = resolveActivitySaleDetails(s);
+            return acc + d.totalSaleValue;
+        }, 0);
+        const totalSpends = dayCashOuts.reduce((acc, c) => {
+            return acc + (Number(c.amount) || Number(c.quantity) || 0);
+        }, 0);
+        const netCash = totalRev - totalSpends;
+        const txCount = daySales.length;
+
+        // ---------- SHEET 1: Kunlik hisobot (Daily Report) ----------
+        const dailyAoa = [
+            ['Bazar — Kunlik hisobot', ''],
+            ['Hisobot sanasi (Report date)', formatDateFile(selectedDate)],
+            ['Eksport qilingan vaqt', formatDateTime(Date.now())],
+            [],
+            ['KOʻRSATKICH (Metric)', 'QIYMAT (Value)'],
+            ['Jami sotilgan dona (Sold units)', totalUnits],
+            ['Jami tushum (Revenue)', totalRev],
+            ['Kassadan chiqim (Cash out)', totalSpends],
+            ['Kassadagi sof naqd pul (Net register cash)', netCash],
+            ['Savdolar soni (Transactions)', txCount],
+            [],
+            ['TRANZAKSIYALAR JADVALI (Transactions Table)'],
+            [
+                '№',
+                'Tranzaksiya ID',
+                'Vaqt',
+                'Tur',
+                'Mahsulot / Tavsif',
+                'Toifa',
+                'Miqdor',
+                'Birlik narxi (soʻm)',
+                'Qator summasi (soʻm)',
+                'Chegirma (soʻm)',
+                'Yakuniy summa (soʻm)',
+                'Toʻlov / Manba'
+            ]
+        ];
+
+        const dayReportItems = dayActivities.filter(a => a.type === 'sale' || a.type === 'cash_out' || a.type === 'return');
+        dayReportItems.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
+
+        let rowIdx = 1;
+        let sumSubtotal = 0;
+        let sumDiscounts = 0;
+        let sumFinal = 0;
+        let sumUnits = 0;
+
+        dayReportItems.forEach(item => {
+            if (item.type === 'cash_out') {
+                const amt = Number(item.amount) || Number(item.quantity) || 0;
+                sumFinal -= amt;
+                dailyAoa.push([
+                    rowIdx++,
+                    item.id || item.transactionId || '',
+                    formatTime(item.timestamp),
+                    'Chiqim',
+                    item.notes || item.reason || 'Kassadan chiqim',
+                    'Kassa chiqimi',
+                    1,
+                    -amt,
+                    -amt,
+                    0,
+                    -amt,
+                    item.source || 'Kassa'
+                ]);
+            } else if (item.type === 'sale') {
+                const details = resolveActivitySaleDetails(item);
+                const isPos = Boolean(item.notes && /pos/i.test(item.notes));
+                const sourceStr = item.source || (isPos ? 'POS' : 'Kassa');
+                const catName = getCategoryName(item.categoryId || (details.product ? details.product.categoryId : null));
+
+                // Extract authoritative recorded manual discount (never inferred or recalculated)
+                let recordedDiscount = 0;
+                if (item.discount != null && !isNaN(Number(item.discount)) && Number(item.discount) > 0) {
+                    recordedDiscount = Number(item.discount);
+                } else if (details.linkedSale && details.linkedSale.discount != null && !isNaN(Number(details.linkedSale.discount)) && Number(details.linkedSale.discount) > 0) {
+                    recordedDiscount = Number(details.linkedSale.discount);
+                } else if (item.notes) {
+                    const m = item.notes.match(/(?:discount|chegirma):\s*-?([0-9\s]+)/i);
+                    if (m) {
+                        recordedDiscount = parseInt(m[1].replace(/\s+/g, ''), 10) || 0;
+                    }
+                }
+
+                const lineSubtotal = details.subtotal || (details.totalSaleValue + recordedDiscount);
+                const finalVal = details.totalSaleValue;
+                const units = details.totalUnits;
+                const unitPrice = units > 0 ? Math.round(lineSubtotal / units) : 0;
+
+                sumUnits += units;
+                sumSubtotal += lineSubtotal;
+                sumDiscounts += recordedDiscount;
+                sumFinal += finalVal;
+
+                dailyAoa.push([
+                    rowIdx++,
+                    item.saleId || item.id || '',
+                    formatTime(item.timestamp),
+                    'Savdo',
+                    details.displayName,
+                    catName,
+                    units,
+                    unitPrice,
+                    lineSubtotal,
+                    recordedDiscount,
+                    finalVal,
+                    sourceStr
+                ]);
+
+                // If multi-item breakdown exists, list individual items under transaction
+                if (details.items && details.items.length > 1) {
+                    details.items.forEach(it => {
+                        const itName = it.productName || it.product_name_snapshot || 'Mahsulot';
+                        const itQty = Number(it.quantity || 1);
+                        const itPrice = Number(it.salePrice || it.basePrice || it.price || 0);
+                        const itSub = Number(it.subtotal || (itQty * itPrice));
+                        dailyAoa.push([
+                            '',
+                            '',
+                            '',
+                            '  ↳ ' + itName,
+                            itName,
+                            catName,
+                            itQty,
+                            itPrice,
+                            itSub,
+                            '',
+                            itSub,
+                            sourceStr
+                        ]);
+                    });
+                }
+            } else if (item.type === 'return') {
+                const amt = Number(item.totalSaleValue || item.amount || 0);
+                const qty = Number(item.quantity) || 1;
+                sumUnits -= qty;
+                sumFinal -= amt;
+                dailyAoa.push([
+                    rowIdx++,
+                    item.id || '',
+                    formatTime(item.timestamp),
+                    'Qaytarish',
+                    item.productName || 'Mahsulot qaytarildi',
+                    getCategoryName(item.categoryId),
+                    qty,
+                    -amt,
+                    -amt,
+                    0,
+                    -amt,
+                    item.source || 'POS'
+                ]);
+            }
+        });
+
+        // Add summary row to Daily sheet
+        dailyAoa.push([
+            'JAMI (TOTAL)',
+            '',
+            '',
+            '',
+            '',
+            '',
+            sumUnits,
+            '',
+            sumSubtotal,
+            sumDiscounts,
+            sumFinal,
+            ''
+        ]);
+
+        const wsDaily = XLSX.utils.aoa_to_sheet(dailyAoa);
+        wsDaily['!cols'] = [
+            { wch: 6 },   // №
+            { wch: 22 },  // Tranzaksiya ID
+            { wch: 10 },  // Vaqt
+            { wch: 12 },  // Tur
+            { wch: 32 },  // Mahsulot / Tavsif
+            { wch: 18 },  // Toifa
+            { wch: 10 },  // Miqdor
+            { wch: 20 },  // Birlik narxi
+            { wch: 22 },  // Qator summasi
+            { wch: 18 },  // Chegirma
+            { wch: 22 },  // Yakuniy summa
+            { wch: 16 }   // To'lov / Manba
+        ];
+        XLSX.utils.book_append_sheet(wb, wsDaily, 'Kunlik hisobot');
+
+        // ---------- SHEET 2: Mahsulotlar (Products Inventory) ----------
+        const prodAoa = [
+            [
+                '№',
+                'Mahsulot nomi (Product name)',
+                'Toifa (Category)',
+                'Asosiy narx (Base price)',
+                'Qoldiq (Stock)',
+                'Sotilgan (Sold)',
+                'Tushum (Revenue)',
+                'Jami qiymati (Total value)'
+            ]
+        ];
+
+        let totalStockTracked = 0;
+        let totalSoldAll = 0;
+        let totalRevenueAll = 0;
+        let totalInventoryValue = 0;
+
+        state.products.forEach((p, idx) => {
+            const pName = getProductDisplayName(p);
+            const pCat = getCategoryName(p.categoryId);
+            const pPrice = Number(p.price) || 0;
+            const isStockTracked = p.quantity !== null && p.quantity !== undefined;
+            const pStock = isStockTracked ? Number(p.quantity) : 'Cheksiz';
+            const pSold = Number(p.sold) || 0;
+            const pRevenue = pSold * pPrice;
+            const pVal = isStockTracked ? (Number(p.quantity) * pPrice) : 0;
+
+            if (isStockTracked) totalStockTracked += Number(p.quantity);
+            totalSoldAll += pSold;
+            totalRevenueAll += pRevenue;
+            totalInventoryValue += pVal;
+
+            prodAoa.push([
+                idx + 1,
+                pName,
+                pCat,
+                pPrice,
+                pStock,
+                pSold,
+                pRevenue,
+                pVal
+            ]);
+        });
+
+        // Summary row for Products
+        prodAoa.push([
+            'JAMI (TOTAL)',
+            '',
+            '',
+            '',
+            totalStockTracked,
+            totalSoldAll,
+            totalRevenueAll,
+            totalInventoryValue
+        ]);
+
+        const wsProd = XLSX.utils.aoa_to_sheet(prodAoa);
+        wsProd['!cols'] = [
+            { wch: 6 },   // №
+            { wch: 32 },  // Mahsulot nomi
+            { wch: 20 },  // Toifa
+            { wch: 22 },  // Asosiy narx
+            { wch: 15 },  // Qoldiq
+            { wch: 15 },  // Sotilgan
+            { wch: 22 },  // Tushum
+            { wch: 24 }   // Jami qiymati
+        ];
+        XLSX.utils.book_append_sheet(wb, wsProd, 'Mahsulotlar');
+
+        // ---------- SHEET 3: Barcha faoliyat (All Activity) ----------
+        const actAoa = [
+            [
+                '№',
+                'Sana va vaqt (Timestamp)',
+                'Harakat turi (Activity)',
+                'Mahsulot / Obyekt (Product)',
+                'Miqdor (Quantity)',
+                'Summa (Amount soʻm)',
+                'Foydalanuvchi / Manba (User/Source)',
+                'Tafsilotlar (Details)'
+            ]
+        ];
+
+        const allActivities = [...state.activities];
+        allActivities.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+
+        allActivities.forEach((act, idx) => {
+            const timeStr = formatDateTime(act.timestamp);
+            let actionTypeStr = act.type;
+            if (act.type === 'sale') actionTypeStr = 'Savdo';
+            else if (act.type === 'cash_out') actionTypeStr = 'Kassadan chiqim';
+            else if (act.type === 'return') actionTypeStr = 'Qaytarish';
+            else if (act.type === 'create') actionTypeStr = 'Yaratildi';
+            else if (act.type === 'update') actionTypeStr = 'Yangilandi';
+            else if (act.type === 'delete') actionTypeStr = 'Oʻchirildi';
+
+            const prodOrEntity = act.productName || (act.type === 'cash_out' ? (act.reason || 'Kassadan chiqim') : (act.notes || ''));
+            const qtyVal = act.quantity != null && !isNaN(Number(act.quantity)) ? Number(act.quantity) : '';
+            const amtVal = act.totalSaleValue != null ? Number(act.totalSaleValue) : (act.amount != null ? Number(act.amount) : '');
+            const sourceVal = act.source || (act.notes && /pos/i.test(act.notes) ? 'POS' : 'Admin');
+            const detailsVal = act.notes || '';
+
+            actAoa.push([
+                idx + 1,
+                timeStr,
+                actionTypeStr,
+                prodOrEntity,
+                qtyVal,
+                amtVal,
+                sourceVal,
+                detailsVal
+            ]);
+        });
+
+        const wsAct = XLSX.utils.aoa_to_sheet(actAoa);
+        wsAct['!cols'] = [
+            { wch: 6 },   // №
+            { wch: 22 },  // Sana va vaqt
+            { wch: 18 },  // Harakat turi
+            { wch: 28 },  // Mahsulot / Obyekt
+            { wch: 12 },  // Miqdor
+            { wch: 22 },  // Summa
+            { wch: 20 },  // Foydalanuvchi / Manba
+            { wch: 36 }   // Tafsilotlar
+        ];
+        XLSX.utils.book_append_sheet(wb, wsAct, 'Barcha faoliyat');
+
+        // 3. GENERATE & DOWNLOAD
+        const fileName = `bazar-hisobot-${formatDateFile(selectedDate)}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+
+        showToast(tr('action.exportSuccess'), 'success');
+    } catch (err) {
+        console.error('[exportAsExcel error]', err);
+        showToast(tr('action.exportError') || 'Excel export failed', 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 }
 
 // ==================== UTILITIES ====================
@@ -1783,59 +2191,6 @@ function dailyReset() {
     });
 }
 
-// ==================== CLEAR ALL DATA (SQL + CLIENT) ====================
-async function clearAllData() {
-    confirmAction(tr('action.clearAllData'), tr('action.confirmClearAllData'), async () => {
-        const btn = document.getElementById('clearAllDataBtn');
-        const originalHtml = btn ? btn.innerHTML : '';
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = `<svg class="spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="32" stroke-dashoffset="12"/></svg> <span>...</span>`;
-        }
-        try {
-            // 1. Clear transactions and activities on backend (products & categories are preserved)
-            const res = await fetch('/api/reset-database', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (!res.ok) {
-                const errJson = await res.json().catch(() => ({}));
-                throw new Error(errJson.error || `Server responded with ${res.status}`);
-            }
-            const resData = await res.json().catch(() => ({}));
-
-            // 2. Clear local activities and outbox (DO NOT clear products or categories!)
-            await Promise.all([
-                localDb.clear('activities'),
-                localDb.clear('outbox')
-            ]);
-            if (resData.currentSeq !== undefined) {
-                await localDb.setMeta('lastSyncSeq', Number(resData.currentSeq));
-            }
-
-            // 3. Reset in-memory activities and save state (preserving products and categories!)
-            state.activities = [];
-            saveState();
-
-            // 4. Update UI
-            refreshAll();
-            syncEngine.updateUI();
-
-            // 5. Broadcast reset to any open POS/Sellers tabs
-            notifyCatalogChange('DATABASE_RESET');
-
-            showToast(tr('action.clearAllDataSuccess'), 'success', 4000);
-        } catch (err) {
-            console.error('[clearAllData error]', err);
-            showToast(err.message || 'Failed to clear database', 'error', 5000);
-        } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = originalHtml;
-            }
-        }
-    });
-}
 
 
 // ==================== RENDERERS ====================
@@ -4427,15 +4782,10 @@ function setupEventListeners() {
         if (currentPage === 'products') renderProducts();
     });
 
-    // Export / Import / Reset
-    document.getElementById('exportBtn')?.addEventListener('click', exportData);
-    document.getElementById('importBtn')?.addEventListener('click', () => document.getElementById('importFile')?.click());
-    document.getElementById('importFile')?.addEventListener('change', (e) => {
-        if (e.target.files[0]) importData(e.target.files[0]);
-        e.target.value = '';
-    });
+    // Export / Reset
     document.getElementById('resetDailyBtn')?.addEventListener('click', dailyReset);
-    document.getElementById('clearAllDataBtn')?.addEventListener('click', clearAllData);
+    document.getElementById('exportPngBtn')?.addEventListener('click', exportAsPng);
+    document.getElementById('exportExcelBtn')?.addEventListener('click', exportAsExcel);
     document.getElementById('clearActivityBtn')?.addEventListener('click', () => {
         confirmAction(tr('activity.clearHistory'), tr('activity.confirmClear'), () => {
             state.activities = [];
