@@ -49,3 +49,18 @@ async def handle_reports_catalog(message: Message):
         "_Har bir hisobot ostida 📸 PNG Rasm va 📑 Excel Fayl yuklash imkoniyati mavjud._"
     )
     await message.reply(text, parse_mode="Markdown", reply_markup=main_reply_keyboard)
+
+
+@router.message(F.text == "/version")
+async def handle_version_cmd(message: Message):
+    from ..version_checker import read_version_info, get_last_broadcasted_version
+    current = read_version_info() or "Noma'lum"
+    last = await get_last_broadcasted_version() or "Hali yuborilmagan"
+
+    text = (
+        f"🏷 *BAZAR BOT VERSIYASI*:\n\n"
+        f"• *Hozirgi versiya (version.txt):* `{current}`\n"
+        f"• *Oxirgi tarqatilgan versiya:* `{last}`\n\n"
+        f"_Agar version.txt faylidagi matn o'zgarsa (masalan, v1.2), bot avtomatik tarzda barcha adminlarga xabar yuboradi va menyuni yangilaydi._"
+    )
+    await message.reply(text, parse_mode="Markdown", reply_markup=main_reply_keyboard)

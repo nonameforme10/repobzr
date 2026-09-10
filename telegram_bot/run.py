@@ -56,6 +56,11 @@ async def main():
     try:
         bot_info = await bot.get_me()
         logger.info(f"Bot connected successfully as @{bot_info.username} (ID: {bot_info.id})")
+
+        # Check version.txt on startup and force-update admins if new version
+        from .version_checker import check_and_broadcast_version_update
+        await check_and_broadcast_version_update(bot)
+
         logger.info("Starting long-polling with drop_pending_updates=True...")
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)

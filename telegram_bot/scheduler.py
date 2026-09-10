@@ -182,9 +182,20 @@ def start_scheduler(bot: Bot) -> Optional[AsyncIOScheduler]:
         replace_existing=True
     )
 
+    # Periodic watcher for version.txt changes (every 60 seconds)
+    from .version_checker import check_and_broadcast_version_update
+    _scheduler.add_job(
+        check_and_broadcast_version_update,
+        trigger="interval",
+        seconds=60,
+        args=[bot],
+        name="version_file_watcher",
+        replace_existing=True
+    )
+
     if not _scheduler.running:
         _scheduler.start()
-        logger.info(f"[scheduler] APScheduler started. Nightly push scheduled at {hour:02d}:{minute:02d} ({TIMEZONE}).")
+        logger.info(f"[scheduler] APScheduler started. Nightly push at {hour:02d}:{minute:02d}, version watcher every 60s.")
 
     return _scheduler
 
