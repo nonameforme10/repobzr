@@ -981,6 +981,27 @@ async function saveState() {
     syncEngine.updateUI();
 }
 
+/// Helper to authoritatively get the selected report date from calendar
+function getActiveReportDate() {
+    try {
+        if (typeof homeCalendar !== 'undefined' && homeCalendar && typeof homeCalendar.getSelectedDate === 'function') {
+            const d = homeCalendar.getSelectedDate();
+            if (d instanceof Date && !isNaN(d.getTime())) {
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+            }
+        }
+    } catch (_) {}
+    try {
+        if (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function') {
+            const d = window.homeCalendar.getSelectedDate();
+            if (d instanceof Date && !isNaN(d.getTime())) {
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0);
+            }
+        }
+    } catch (_) {}
+    return new Date();
+}
+
 /// ==================== EXPORT (PNG & EXCEL) ====================
 async function exportAsPng() {
     const btn = document.getElementById('exportPngBtn');
@@ -996,9 +1017,7 @@ async function exportAsPng() {
         }
 
         const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        const selectedDate = (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function')
-            ? window.homeCalendar.getSelectedDate()
-            : new Date();
+        const selectedDate = getActiveReportDate();
         const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
         const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).getTime();
 
@@ -1015,7 +1034,10 @@ async function exportAsPng() {
         const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
         const locale = lang === 'ru' ? 'ru-RU' : (lang === 'uz' ? 'uz-UZ' : 'en-US');
         const dateStr = selectedDate.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const timeStr = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const now = new Date();
+        const exportTimeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const exportDateStr = now.toLocaleDateString(locale, { year: 'numeric', month: 'numeric', day: 'numeric' });
+        const downloadTimestamp = `${exportDateStr}, ${exportTimeStr}`;
 
         const dayReportItems = dayActivities.filter(a => a.type === 'sale' || a.type === 'cash_out');
         dayReportItems.sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
@@ -1049,43 +1071,46 @@ async function exportAsPng() {
                 const amt = Number(item.amount) || Number(item.quantity) || 0;
                 rowsHtml += `
                     <tr style="background: ${rowBg}; border-bottom: 1px solid ${borderCard};">
-                        <td style="padding: 10px 12px; text-align: center; color: ${textSecondary}; font-size: 12px;">${idx + 1}</td>
-                        <td style="padding: 10px 12px; text-align: center; font-size: 13px; font-weight: 500;">${formatTime(item.timestamp)}</td>
-                        <td style="padding: 10px 12px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.15); color: #EF4444; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">Chiqim</span></td>
-                        <td style="padding: 10px 12px; font-size: 13px; font-weight: 500;">${escapeHtml(item.notes || item.reason || 'Kassadan chiqim')}</td>
-                        <td style="padding: 10px 12px; text-align: center; font-size: 13px;">1</td>
-                        <td style="padding: 10px 12px; text-align: right; font-size: 13px; font-weight: 700; color: #EF4444;">−${formatCurrency(amt)}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 11px; color: ${textSecondary};">${idx + 1}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 11px; font-weight: 500;">${formatTime(item.timestamp)}</td>
+                        <td style="padding: 10px 12px; text-align: center;"><span style="background: rgba(239, 68, 68, 0.15); color: #EF4444; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Chiqim</span></td>
+                        <td style="padding: 10px 12px; font-size: 12px; font-weight: 500; color: ${textPrimary};">${item.notes || item.reason || 'Kassadan chiqim'}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 12px; color: ${textSecondary};">1</td>
+                        <td style="padding: 10px 12px; text-align: right; font-size: 12px; font-weight: 700; color: #DC2626;">−${formatCurrency(amt)}</td>
                     </tr>
                 `;
-            } else {
+            } else if (item.type === 'sale') {
                 const details = resolveActivitySaleDetails(item);
                 const isPos = Boolean(item.notes && /pos/i.test(item.notes));
-                const badgeColor = isPos ? '#38BDF8' : '#EAB308';
-                const badgeBg = isPos ? 'rgba(56, 189, 248, 0.15)' : 'rgba(234, 179, 8, 0.15)';
+                const badgeColor = isPos ? '#0284C7' : '#16A34A';
+                const badgeBg = isPos ? 'rgba(2, 132, 199, 0.15)' : 'rgba(22, 163, 74, 0.15)';
                 const badgeText = isPos ? 'POS' : 'Savdo';
 
-                let itemDesc = escapeHtml(details.displayName);
+                let subitemsHtml = '';
                 if (details.items && details.items.length > 1) {
-                    itemDesc += `<div style="font-size: 11px; color: ${textSecondary}; margin-top: 2px;">${details.items.map(i => `${escapeHtml(i.productName || 'Mahsulot')} (${i.quantity}x)`).join(', ')}</div>`;
+                    subitemsHtml = `<div style="font-size: 10px; color: ${textSecondary}; margin-top: 2px; line-height: 1.4;">${details.items.map(it => `• ${it.productName || 'Mahsulot'} (${it.quantity} dona)`).join(' ')}</div>`;
                 }
 
                 rowsHtml += `
                     <tr style="background: ${rowBg}; border-bottom: 1px solid ${borderCard};">
-                        <td style="padding: 10px 12px; text-align: center; color: ${textSecondary}; font-size: 12px;">${idx + 1}</td>
-                        <td style="padding: 10px 12px; text-align: center; font-size: 13px; font-weight: 500;">${formatTime(item.timestamp)}</td>
-                        <td style="padding: 10px 12px; text-align: center;"><span style="background: ${badgeBg}; color: ${badgeColor}; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">${badgeText}</span></td>
-                        <td style="padding: 10px 12px; font-size: 13px; font-weight: 500;">${itemDesc}</td>
-                        <td style="padding: 10px 12px; text-align: center; font-size: 13px;"><span style="background: ${isDark ? '#232D3F' : '#E2E8F0'}; padding: 2px 7px; border-radius: 10px; font-size: 12px; font-weight: 600;">${details.totalUnits}</span></td>
-                        <td style="padding: 10px 12px; text-align: right; font-size: 13px; font-weight: 700; color: ${textPrimary};">${formatCurrency(details.totalSaleValue)}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 11px; color: ${textSecondary};">${idx + 1}</td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 11px; font-weight: 500;">${formatTime(item.timestamp)}</td>
+                        <td style="padding: 10px 12px; text-align: center;"><span style="background: ${badgeBg}; color: ${badgeColor}; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase;">${badgeText}</span></td>
+                        <td style="padding: 10px 12px; font-size: 12px; font-weight: 600; color: ${textPrimary};">
+                            ${details.displayName}
+                            ${subitemsHtml}
+                        </td>
+                        <td style="padding: 10px 12px; text-align: center; font-size: 12px; font-weight: 600;">${details.totalUnits}</td>
+                        <td style="padding: 10px 12px; text-align: right; font-size: 12px; font-weight: 700; color: ${textPrimary};">${formatCurrency(details.totalSaleValue)}</td>
                     </tr>
                 `;
             }
         });
 
         exportContainer.innerHTML = `
-            <div style="background: ${bgCard}; border: 1px solid ${borderCard}; border-radius: 16px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            <div style="background: ${bgCard}; border: 1px solid ${borderCard}; border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);">
                 <!-- Header -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid ${borderCard}; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid ${borderCard};">
                     <div style="display: flex; align-items: center; gap: 14px;">
                         <img src="/assets/logo-icon.webp" width="44" height="44" style="border-radius: 10px;" alt="Logo" onerror="this.style.display='none'">
                         <div>
@@ -1094,10 +1119,11 @@ async function exportAsPng() {
                         </div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="display: inline-block; background: ${isDark ? '#1E293B' : '#EEF2F6'}; color: ${textPrimary}; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; margin-bottom: 4px;">
+                        <div style="font-size: 11px; font-weight: 700; color: #16A34A; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">HISOBOT SANASI</div>
+                        <div style="display: inline-block; background: ${isDark ? '#1E293B' : '#EEF2F6'}; color: ${textPrimary}; padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 700; margin-bottom: 4px;">
                             📅 ${dateStr}
                         </div>
-                        <div style="font-size: 12px; color: ${textSecondary};">Vaqt: ${timeStr}</div>
+                        <div style="font-size: 11px; color: ${textSecondary};">Fayl yuklandi: ${downloadTimestamp}</div>
                     </div>
                 </div>
 
@@ -1159,7 +1185,7 @@ async function exportAsPng() {
                 <!-- Footer -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid ${borderCard}; font-size: 11px; color: ${textSecondary};">
                     <div>✓ Bazar savdo va ombor boshqaruvi tizimi</div>
-                    <div>Hisobot generatsiya qilindi: ${timeStr}</div>
+                    <div>Hisobot sanasi: <strong>${dateStr}</strong></div>
                 </div>
             </div>
         `;
@@ -1212,9 +1238,7 @@ async function exportAsExcel() {
         wb.created = new Date();
         wb.modified = new Date();
 
-        const selectedDate = (window.homeCalendar && typeof window.homeCalendar.getSelectedDate === 'function')
-            ? window.homeCalendar.getSelectedDate()
-            : new Date();
+        const selectedDate = getActiveReportDate();
         const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
         const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).getTime();
 
@@ -1231,13 +1255,16 @@ async function exportAsExcel() {
         const lang = (window.i18n && window.i18n.getLang) ? window.i18n.getLang() : 'uz';
         const locale = lang === 'ru' ? 'ru-RU' : (lang === 'uz' ? 'uz-UZ' : 'en-US');
         const dateFormatted = selectedDate.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const timeFormatted = new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const now = new Date();
+        const exportTimeStr = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const exportDateStr = now.toLocaleDateString(locale, { year: 'numeric', month: 'numeric', day: 'numeric' });
+        const downloadTimestamp = `${exportDateStr}, ${exportTimeStr}`;
 
         // ==========================================
         // SHEET 1: KUNLIK HISOBOT (Executive Daily Report)
         // ==========================================
         const wsDaily = wb.addWorksheet('Kunlik hisobot', {
-            views: [{ showGridLines: true, state: 'frozen', ySplit: 7 }],
+            views: [{ showGridLines: true, state: 'frozen', ySplit: 9 }],
             pageSetup: { orientation: 'landscape', fitToWidth: 1, fitToHeight: 0 }
         });
 
@@ -1259,24 +1286,39 @@ async function exportAsExcel() {
         titleCell.font = { name: 'Segoe UI', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
         titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
         titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
-        wsDaily.getRow(1).height = 38;
+        wsDaily.getRow(1).height = 36;
 
-        // 2. Subtitle / Metadata
+        // 2. Report Date Banner (Prominent so the report date is 100% unmistakable)
         wsDaily.mergeCells('A2:H2');
-        const subCell = wsDaily.getCell('A2');
-        subCell.value = `Sana: ${dateFormatted}   |   Hisobot vaqti: ${timeFormatted}   |   Valyuta: UZS (soʻm)`;
-        subCell.font = { name: 'Segoe UI', size: 10, italic: true, color: { argb: 'FF475569' } };
+        const dateCell = wsDaily.getCell('A2');
+        const dateLabel = (lang === 'ru') ? 'ДАТА ОТЧЁТА' : ((lang === 'en') ? 'REPORT DATE' : 'HISOBOT SANASI');
+        dateCell.value = `${dateLabel}: ${dateFormatted.toUpperCase()}`;
+        dateCell.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+        dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+        dateCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        wsDaily.getRow(2).height = 28;
+
+        // 3. Subtitle / Metadata (Downloaded time clearly distinguished from report date)
+        wsDaily.mergeCells('A3:H3');
+        const subCell = wsDaily.getCell('A3');
+        const exportLabel = (lang === 'ru') ? 'Время экспорта' : ((lang === 'en') ? 'Exported at' : 'Fayl yuklangan vaqt');
+        const currLabel = (lang === 'ru') ? 'Валюта: UZS (сум)' : 'Valyuta: UZS (soʻm)';
+        subCell.value = `${exportLabel}: ${downloadTimestamp}   |   ${currLabel}`;
+        subCell.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF64748B' } };
         subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
         subCell.alignment = { vertical: 'middle', horizontal: 'center' };
-        wsDaily.getRow(2).height = 22;
+        wsDaily.getRow(3).height = 20;
 
-        // 3. KPI Header Labels
-        wsDaily.mergeCells('A3:B3'); wsDaily.getCell('A3').value = 'JAMI SOTILDI';
-        wsDaily.mergeCells('C3:D3'); wsDaily.getCell('C3').value = 'JAMI TUSHUM';
-        wsDaily.mergeCells('E3:F3'); wsDaily.getCell('E3').value = 'KASSADAN CHIQIM';
-        wsDaily.mergeCells('G3:H3'); wsDaily.getCell('G3').value = 'SOF KASSA';
+        // Row 4: Gap
+        wsDaily.getRow(4).height = 10;
 
-        ['A3', 'C3', 'E3', 'G3'].forEach(ref => {
+        // 4. KPI Header Labels
+        wsDaily.mergeCells('A5:B5'); wsDaily.getCell('A5').value = 'JAMI SOTILDI';
+        wsDaily.mergeCells('C5:D5'); wsDaily.getCell('C5').value = 'JAMI TUSHUM';
+        wsDaily.mergeCells('E5:F5'); wsDaily.getCell('E5').value = 'KASSADAN CHIQIM';
+        wsDaily.mergeCells('G5:H5'); wsDaily.getCell('G5').value = 'SOF KASSA';
+
+        ['A5', 'C5', 'E5', 'G5'].forEach(ref => {
             const c = wsDaily.getCell(ref);
             c.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: 'FF64748B' } };
             c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
@@ -1286,36 +1328,36 @@ async function exportAsExcel() {
                 bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } }
             };
         });
-        wsDaily.getRow(3).height = 20;
+        wsDaily.getRow(5).height = 20;
 
-        // 4. KPI Values
-        wsDaily.mergeCells('A4:B4'); wsDaily.getCell('A4').value = totalUnits; wsDaily.getCell('A4').numFmt = '#,##0 "dona"';
-        wsDaily.mergeCells('C4:D4'); wsDaily.getCell('C4').value = totalRev; wsDaily.getCell('C4').numFmt = '#,##0 "so\'m"';
-        wsDaily.mergeCells('E4:F4'); wsDaily.getCell('E4').value = totalSpends; wsDaily.getCell('E4').numFmt = '#,##0 "so\'m"';
-        wsDaily.mergeCells('G4:H4'); wsDaily.getCell('G4').value = netCash; wsDaily.getCell('G4').numFmt = '#,##0 "so\'m"';
+        // 5. KPI Values
+        wsDaily.mergeCells('A6:B6'); wsDaily.getCell('A6').value = totalUnits; wsDaily.getCell('A6').numFmt = '#,##0 "dona"';
+        wsDaily.mergeCells('C6:D6'); wsDaily.getCell('C6').value = totalRev; wsDaily.getCell('C6').numFmt = '#,##0 "so\'m"';
+        wsDaily.mergeCells('E6:F6'); wsDaily.getCell('E6').value = totalSpends; wsDaily.getCell('E6').numFmt = '#,##0 "so\'m"';
+        wsDaily.mergeCells('G6:H6'); wsDaily.getCell('G6').value = netCash; wsDaily.getCell('G6').numFmt = '#,##0 "so\'m"';
 
         const kpiColors = ['FF0F172A', 'FF16A34A', 'FFDC2626', 'FF0284C7'];
-        ['A4', 'C4', 'E4', 'G4'].forEach((ref, idx) => {
+        ['A6', 'C6', 'E6', 'G6'].forEach((ref, idx) => {
             const c = wsDaily.getCell(ref);
             c.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: kpiColors[idx] } };
             c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
             c.alignment = { vertical: 'middle', horizontal: 'center' };
             c.border = { bottom: { style: 'medium', color: { argb: 'FFCBD5E1' } } };
         });
-        wsDaily.getRow(4).height = 32;
+        wsDaily.getRow(6).height = 32;
 
-        // Row 5: Gap
-        wsDaily.getRow(5).height = 10;
+        // Row 7: Gap
+        wsDaily.getRow(7).height = 10;
 
-        // 5. Section Header
-        wsDaily.mergeCells('A6:H6');
-        const sec = wsDaily.getCell('A6');
+        // 6. Section Header
+        wsDaily.mergeCells('A8:H8');
+        const sec = wsDaily.getCell('A8');
         sec.value = 'KUNLIK TRANZAKSIYALAR ROʻYXATI';
         sec.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF1E293B' } };
         sec.alignment = { vertical: 'middle', horizontal: 'left' };
-        wsDaily.getRow(6).height = 22;
+        wsDaily.getRow(8).height = 22;
 
-        // 6. Table Headers
+        // 7. Table Headers (Row 9)
         const tableHeaders = ['№', 'Vaqt', 'Tur', 'Mahsulot / Izoh', 'Miqdor', 'Birlik narxi', 'Chegirma', 'Yakuniy summa'];
         const hRow = wsDaily.addRow(tableHeaders);
         hRow.height = 26;
@@ -1537,7 +1579,7 @@ async function exportAsExcel() {
 
         // Enable AutoFilter
         wsDaily.autoFilter = {
-            from: 'A7',
+            from: 'A9',
             to: 'H' + (wsDaily.rowCount - 1)
         };
 
@@ -1835,7 +1877,11 @@ function formatDate(ts) {
 }
 
 function formatDateFile(d) {
-    return d.toISOString().split('T')[0];
+    if (!d || !(d instanceof Date) || isNaN(d.getTime())) d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function formatDateTime(ts) {
@@ -2831,6 +2877,7 @@ const homeCalendar = {
         }
     }
 };
+window.homeCalendar = homeCalendar;
 
 function renderHome() {
     homeCalendar.init();
