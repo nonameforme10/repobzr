@@ -2029,7 +2029,7 @@ const homeCalendar = {
                     }
                     const dStart = new Date(currentYear, currentMonth, d, 0, 0, 0, 0).getTime();
                     const dEnd = new Date(currentYear, currentMonth, d, 23, 59, 59, 999).getTime();
-                    if (Array.isArray(state.activities) && state.activities.some(a => a.type === 'sale' && !a.undone && a.timestamp >= dStart && a.timestamp <= dEnd)) {
+                    if (Array.isArray(state.activities) && state.activities.some(a => (a.type === 'sale' || a.type === 'cash_out') && !a.undone && a.timestamp >= dStart && a.timestamp <= dEnd)) {
                         cell.classList.add('has-sales');
                     }
                     cell.textContent = d;
@@ -2108,7 +2108,9 @@ function renderHomeReports() {
     const startOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 0, 0, 0, 0).getTime();
     const endOfDay = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), 23, 59, 59, 999).getTime();
 
-    const daySales = state.activities.filter(a => a.type === 'sale' && !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
+    const dayActivities = state.activities.filter(a => !a.undone && a.timestamp >= startOfDay && a.timestamp <= endOfDay);
+    const daySales = dayActivities.filter(a => a.type === 'sale');
+    const dayCashOuts = dayActivities.filter(a => a.type === 'cash_out');
 
     // Compute KPIs for Daily Overview using resolveActivitySaleDetails
     const totalUnits = daySales.reduce((acc, s) => {
@@ -2119,6 +2121,10 @@ function renderHomeReports() {
         const d = resolveActivitySaleDetails(s);
         return acc + d.totalSaleValue;
     }, 0);
+    const totalSpends = dayCashOuts.reduce((acc, c) => {
+        return acc + (Number(c.amount) || Number(c.quantity) || 0);
+    }, 0);
+    const netCash = totalRev - totalSpends;
     const txCount = daySales.length;
 
     const daySoldEl = document.getElementById('homeDaySold');
@@ -2127,19 +2133,35 @@ function renderHomeReports() {
     const dayRevEl = document.getElementById('homeDayRevenue');
     if (dayRevEl) dayRevEl.textContent = formatCurrency(totalRev);
 
+    const daySpendsEl = document.getElementById('homeDaySpends');
+    if (daySpendsEl) daySpendsEl.textContent = totalSpends > 0 ? `−${formatCurrency(totalSpends)}` : formatCurrency(0);
+
+    const dayNetEl = document.getElementById('homeDayNetCash');
+    if (dayNetEl) {
+        dayNetEl.textContent = (netCash < 0 ? '−' : '') + formatCurrency(Math.abs(netCash));
+    }
+
     const dayTxEl = document.getElementById('homeDayTransactions');
     if (dayTxEl) dayTxEl.textContent = txCount;
 
     const summaryBadge = document.getElementById('homeReportsSummaryBadge');
     if (summaryBadge) {
-        summaryBadge.textContent = `${totalUnits} ${tr('home.unitsSold')} · ${formatCurrency(totalRev)}`;
+        let badgeText = `${totalUnits} ${tr('home.unitsSold')} · ${formatCurrency(totalRev)}`;
+        if (totalSpends > 0) {
+            badgeText += ` · −${formatCurrency(totalSpends)} ${tr('home.spends') || 'chiqim'}`;
+        }
+        summaryBadge.textContent = badgeText;
     }
 
-    // Render Blueprint Reports Rows
+    // Render Blueprint Reports Rows (sales + cash_outs)
     const reportsList = document.getElementById('homeReportsList');
     if (!reportsList) return;
 
-    if (daySales.length === 0) {
+    const dayReportItems = dayActivities.filter(a => a.type === 'sale' || a.type === 'cash_out');
+    // Sort chronologically descending (newest first)
+    dayReportItems.sort((a, b) => Number(b.timestamp || 0) - Number(a.timestamp || 0));
+
+    if (dayReportItems.length === 0) {
         reportsList.innerHTML = `
             <div class="bp-empty-state">
                 <div class="bp-empty-icon">
@@ -2151,8 +2173,65 @@ function renderHomeReports() {
         return;
     }
 
+    const reasonIcons = {
+        lunch: '🍲',
+        taxi: '🚕',
+        supplies: '📦',
+        personal: '👤',
+        other: '📝'
+    };
+    const reasonTitles = {
+        lunch: tr('pos.reasonLunch') || 'Lunch 🍲',
+        taxi: tr('pos.reasonTaxi') || 'Taxi / Travel 🚕',
+        supplies: tr('pos.reasonSupplies') || 'Store Supplies 📦',
+        personal: tr('pos.reasonPersonal') || 'Personal Withdrawal 👤',
+        other: tr('pos.reasonOther') || 'Other 📝'
+    };
+
     let rowsHtml = '';
-    daySales.forEach(sale => {
+    dayReportItems.forEach(item => {
+        if (item.type === 'cash_out') {
+            const reasonKey = item.reason || 'lunch';
+            const icon = reasonIcons[reasonKey] || '💸';
+            const reasonTitle = reasonTitles[reasonKey] || tr('type.cash_out') || 'Kassadan chiqim';
+            const amt = Number(item.amount) || Number(item.quantity) || 0;
+            const timeStr = formatTime(item.timestamp);
+            const notesText = item.notes && item.notes !== reasonTitle ? item.notes : '';
+
+            rowsHtml += `
+                <div class="bp-card-container is-cashout-card">
+                    <div class="bp-row">
+                        <div class="bp-img-wrap bp-img-cashout">
+                            <span>${icon}</span>
+                        </div>
+                        <div class="bp-info">
+                            <div class="bp-name-line">
+                                <span class="bp-name" title="${escapeHtml(item.notes || reasonTitle)}">${escapeHtml(item.notes || reasonTitle)}</span>
+                                <span class="bp-source-badge cashout">${tr('type.cash_out') || 'Chiqim'}</span>
+                            </div>
+                            <div class="bp-meta">
+                                <span class="bp-meta-time">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                                    ${timeStr}
+                                </span>
+                                <span class="bp-meta-cat">· ${tr('pos.cashOut') || 'Kassadan olingan'}</span>
+                                ${notesText ? `<span class="bp-note-text" title="${escapeHtml(notesText)}">${escapeHtml(notesText)}</span>` : ''}
+                            </div>
+                        </div>
+                        <div class="bp-qty-cell">
+                            <span class="bp-qty-pill" style="background: rgba(239, 68, 68, 0.12); color: #ef4444;">−</span>
+                        </div>
+                        <div class="bp-sum-cell">
+                            <span class="bp-sum-val bp-sum-cashout">−${formatCurrency(amt)}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // Sale item rendering
+        const sale = item;
         const details = resolveActivitySaleDetails(sale);
         const name = details.displayName;
         const qty = details.totalUnits;
@@ -2320,28 +2399,29 @@ function renderDashboard() {
 
 function renderActivityItem(a) {
     const typeLabels = {
-        sale:   tr('type.sale'),
-        return: tr('type.return'),
-        create: tr('type.create'),
-        update: tr('type.update'),
-        delete: tr('type.delete'),
-        note:   tr('type.note')
+        sale:     tr('type.sale'),
+        return:   tr('type.return'),
+        create:   tr('type.create'),
+        update:   tr('type.update'),
+        delete:   tr('type.delete'),
+        note:     tr('type.note'),
+        cash_out: tr('type.cash_out')
     };
     const label = typeLabels[a.type] || a.type;
     const systemLabel = tr('activity.system');
     const qtyLabel = tr('activity.qty');
     const details = resolveActivitySaleDetails(a);
-    const title = a.type === 'sale' ? details.displayName : (a.productName || a.categoryName || systemLabel);
-    const noteFormatted = formatActivityNote(a.notes, a);
+    const title = a.type === 'sale' ? details.displayName : (a.type === 'cash_out' ? (a.notes || tr('type.cash_out')) : (a.productName || a.categoryName || systemLabel));
+    const noteFormatted = a.type === 'cash_out' ? `−${formatCurrency(a.amount || a.quantity)}` : formatActivityNote(a.notes, a);
 
     return `
         <div class="activity-item ${a.type}">
-            <div class="activity-icon ${a.type}">${label[0]}</div>
+            <div class="activity-icon ${a.type}">${a.type === 'cash_out' ? '💸' : (label ? label[0] : '•')}</div>
             <div class="activity-content">
                 <div class="activity-title">${escapeHtml(title)} — ${label}</div>
                 <div class="activity-meta">
                     <span>${formatDateTime(a.timestamp)}</span>
-                    ${a.quantity ? `<span>${qtyLabel}: ${a.quantity}</span>` : ''}
+                    ${a.quantity && a.type !== 'cash_out' ? `<span>${qtyLabel}: ${a.quantity}</span>` : ''}
                 </div>
                 ${noteFormatted ? `<div class="activity-note">${escapeHtml(noteFormatted)}</div>` : ''}
             </div>
@@ -2796,6 +2876,24 @@ function renderActivity() {
     }
 
     tbody.innerHTML = acts.map(a => {
+        if (a.type === 'cash_out') {
+            const amt = Number(a.amount) || Number(a.quantity) || 0;
+            const reasonTitle = a.notes || tr('type.cash_out');
+            return `
+                <tr>
+                    <td>${formatDateTime(a.timestamp)}</td>
+                    <td><span class="badge badge-cash_out">${tr('type.cash_out')}</span></td>
+                    <td>${escapeHtml(reasonTitle)}</td>
+                    <td>${tr('pos.cashOut') || 'Kassa'}</td>
+                    <td>−</td>
+                    <td style="color:var(--danger, #ef4444); font-weight:600;">−${formatCurrency(amt)}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-secondary" onclick="editNotePrompt('${a.id}')">${tr('activity.editNote')}</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteActivity('${a.id}')">${tr('common.delete')}</button>
+                    </td>
+                </tr>
+            `;
+        }
         const details = resolveActivitySaleDetails(a);
         const prodName = a.type === 'sale' ? details.displayName : (a.productName || '-');
         const noteFormatted = formatActivityNote(a.notes, a);

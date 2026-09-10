@@ -811,6 +811,7 @@ canvas {
 .activity-icon.create { background: var(--info-soft);    color: var(--info); }
 .activity-icon.delete { background: var(--danger-soft);  color: var(--danger); }
 .activity-icon.update { background: var(--accent-soft);  color: var(--accent); }
+.activity-icon.cash_out { background: var(--danger-soft, rgba(239, 68, 68, 0.12)); color: var(--danger, #ef4444); }
 
 .activity-content { flex: 1; min-width: 0; }
 
@@ -1370,8 +1371,9 @@ canvas {
 .badge-return { background: var(--warning-soft); color: var(--warning); }
 .badge-create { background: var(--info-soft);    color: var(--info); }
 .badge-update { background: var(--accent-soft);  color: var(--accent-strong); }
-.badge-delete { background: var(--danger-soft);  color: var(--danger); }
-.badge-note   { background: var(--revenue-soft); color: var(--revenue); }
+.badge-delete   { background: var(--danger-soft);  color: var(--danger); }
+.badge-cash_out { background: var(--danger-soft);  color: var(--danger); }
+.badge-note     { background: var(--revenue-soft); color: var(--revenue); }
 
 .activity-table .actions-cell {
     display: flex;
@@ -3197,8 +3199,8 @@ canvas {
 
 .overview-stats-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
 }
 
 @media (max-width: 640px) {
@@ -3242,6 +3244,16 @@ canvas {
     color: var(--success);
 }
 
+.ov-icon-spends {
+    background: var(--danger-soft, rgba(239, 68, 68, 0.12));
+    color: var(--danger, #ef4444);
+}
+
+.ov-icon-net {
+    background: var(--warning-soft, rgba(245, 158, 11, 0.12));
+    color: var(--warning, #f59e0b);
+}
+
 .ov-icon-tx {
     background: var(--info-soft);
     color: var(--info);
@@ -3262,6 +3274,14 @@ canvas {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.ov-val.val-out {
+    color: var(--danger, #ef4444);
+}
+
+.ov-val.val-net {
+    color: var(--ink-strong);
 }
 
 .ov-lbl {
@@ -3514,6 +3534,18 @@ canvas {
     border-color: rgba(129, 140, 248, 0.3);
 }
 
+.bp-source-badge.cashout {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+[data-theme="dark"] .bp-source-badge.cashout {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.35);
+}
+
 .bp-unit-rate {
     font-size: 0.75rem;
     color: var(--ink-muted);
@@ -3578,6 +3610,10 @@ canvas {
     color: #F4F1EA;
 }
 
+.bp-sum-val.bp-sum-cashout {
+    color: var(--danger, #ef4444) !important;
+}
+
 /* Optom & Breakdown Dropdown for Blueprint Reports */
 .bp-card-container {
     display: flex;
@@ -3588,6 +3624,16 @@ canvas {
     background: var(--bg-surface-2);
     overflow: hidden;
     transition: var(--transition-fast);
+}
+
+.bp-card-container.is-cashout-card {
+    border-left: 3px solid var(--danger, #ef4444);
+}
+
+.bp-img-wrap.bp-img-cashout {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.2);
+    font-size: 1.35rem;
 }
 
 [data-theme="dark"] .bp-card-container {
