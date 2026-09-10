@@ -8,7 +8,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, BufferedInputFile
 from .. import report_service, report_exporter
-from ..keyboards import report_inline_keyboard, seven_day_inline_keyboard
+from ..keyboards import report_inline_keyboard, seven_day_inline_keyboard, main_reply_keyboard
 
 logger = logging.getLogger(__name__)
 router = Router(name="reports")
@@ -145,7 +145,7 @@ async def cb_export_png(callback: CallbackQuery):
             f"🏦 Sof kassa: *{report_exporter.format_soom(report_data['totals']['netCash'])} so'm*"
         )
         file = BufferedInputFile(png_bytes, filename=f"Bazar_Hisobot_{date_str}.png")
-        await callback.message.reply_photo(photo=file, caption=caption, parse_mode="Markdown")
+        await callback.message.reply_photo(photo=file, caption=caption, parse_mode="Markdown", reply_markup=main_reply_keyboard)
 
         try:
             await status_msg.delete()
@@ -176,7 +176,7 @@ async def cb_export_excel(callback: CallbackQuery):
             f"🏦 Sof kassa: *{report_exporter.format_soom(report_data['totals']['netCash'])} so'm*"
         )
         file = BufferedInputFile(excel_bytes, filename=f"Bazar_Hisobot_{date_str}.xlsx")
-        await callback.message.reply_document(document=file, caption=caption, parse_mode="Markdown")
+        await callback.message.reply_document(document=file, caption=caption, parse_mode="Markdown", reply_markup=main_reply_keyboard)
 
         try:
             await status_msg.delete()
@@ -203,7 +203,7 @@ async def cb_export7_png(callback: CallbackQuery):
             f"🏦 7 kunlik sof kassa: *{report_exporter.format_soom(seven_day_data['rollup']['netCash'])} so'm*"
         )
         file = BufferedInputFile(png_bytes, filename=f"Bazar_7Kunlik_{seven_day_data['endDate']}.png")
-        await callback.message.reply_photo(photo=file, caption=caption, parse_mode="Markdown")
+        await callback.message.reply_photo(photo=file, caption=caption, parse_mode="Markdown", reply_markup=main_reply_keyboard)
 
         try:
             await status_msg.delete()
@@ -230,7 +230,7 @@ async def cb_export7_excel(callback: CallbackQuery):
             f"🏦 7 kunlik sof kassa: *{report_exporter.format_soom(seven_day_data['rollup']['netCash'])} so'm*"
         )
         file = BufferedInputFile(excel_bytes, filename=f"Bazar_7Kunlik_{seven_day_data['endDate']}.xlsx")
-        await callback.message.reply_document(document=file, caption=caption, parse_mode="Markdown")
+        await callback.message.reply_document(document=file, caption=caption, parse_mode="Markdown", reply_markup=main_reply_keyboard)
 
         try:
             await status_msg.delete()
